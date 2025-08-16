@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -14,12 +14,13 @@ export async function POST(
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    const { id } = await params // Await the params
 
     // Mark notification as read
     const { error } = await supabase
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
-      .eq('id', params.id)
+      .eq('id', id) // Use awaited id
       .or(`user_id.eq.${decoded.userId},user_id.is.null`)
 
     if (error) {

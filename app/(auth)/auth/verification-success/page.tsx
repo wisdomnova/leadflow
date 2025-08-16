@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { CheckCircle, ArrowRight } from 'lucide-react'
 
-export default function VerificationSuccessPage() {
+function VerificationSuccessContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const alreadyVerified = searchParams.get('already-verified')
@@ -13,6 +14,16 @@ export default function VerificationSuccessPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="flex justify-center mb-8">
+          <Image
+            src="/leadflow.png"
+            alt="Leadflow"
+            width={180}
+            height={40}
+            className="h-13 w-auto"
+          />
+        </div>
+        
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <div className="text-center">
             <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
@@ -24,7 +35,7 @@ export default function VerificationSuccessPage() {
             </h2>
             
             <p className="mt-2 text-sm text-gray-600">
-              {alreadyVerified 
+              {alreadyVerified  
                 ? 'Your email was already verified. You can now access your dashboard.'
                 : 'Your email address has been successfully verified. Welcome to LeadFlow!'
               }
@@ -61,10 +72,24 @@ export default function VerificationSuccessPage() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </div>
-
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function VerificationSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <VerificationSuccessContent />
+    </Suspense>
   )
 }

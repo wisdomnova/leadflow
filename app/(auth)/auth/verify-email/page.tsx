@@ -1,61 +1,57 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabase'
 import { Mail, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'resend'>('loading')
-  const [email, setEmail] = useState('')
-  const [resending, setResending] = useState(false)
+  const token = searchParams.get('token')
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'already-verified'>('loading')
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
     const verifyEmail = async () => {
-      const { data, error } = await supabase.auth.getSession()
-      
-      if (error) {
+      if (!token) {
         setStatus('error')
+        setErrorMessage('Invalid verification link')
         return
       }
 
-      if (data.session?.user) {
-        if (data.session.user.email_confirmed_at) {
-          setStatus('success')
-          // Redirect to dashboard after 3 seconds
-          setTimeout(() => {
-            router.push('/dashboard')
-          }, 3000)
+      try {
+        const response = await fetch('/api/auth/verify-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        })
+
+        const data = await response.json()
+
+        if (response.ok) {
+          if (data.alreadyVerified) {
+            setStatus('already-verified')
+          } else {
+            setStatus('success')
+            // Redirect to sign in after 3 seconds
+            setTimeout(() => {
+              router.push('/auth/sign-in')
+            }, 3000)
+          }
         } else {
-          setEmail(data.session.user.email || '')
-          setStatus('resend')
+          setStatus('error')
+          setErrorMessage(data.error || 'Verification failed')
         }
+      } catch (error) {
+        setStatus('error')
+        setErrorMessage('Network error. Please try again.')
       }
     }
 
     verifyEmail()
-  }, [router])
-
-  const handleResendVerification = async () => {
-    setResending(true)
-    
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email: email
-    })
-
-    if (!error) {
-      alert('Verification email sent! Please check your inbox.')
-    } else {
-      alert('Failed to send verification email. Please try again.')
-    }
-    
-    setResending(false)
-  }
+  }, [token, router])
 
   if (status === 'loading') {
     return (
@@ -77,6 +73,9 @@ export default function VerifyEmailPage() {
               <h2 className="text-2xl font-black text-gray-900 mb-4">
                 Verifying your email...
               </h2>
+              <p className="text-sm text-gray-600 font-medium">
+                Please wait while we confirm your email address.
+              </p>
             </div>
           </div>
         </div>
@@ -107,14 +106,17 @@ export default function VerifyEmailPage() {
                 Email verified successfully!
               </h2>
               <p className="text-sm text-gray-600 font-medium mb-6">
-                Your account is now active. Redirecting to your dashboard...
+                Your account is now active. You can now sign in and start your 14-day free trial.
+              </p>
+              <p className="text-sm text-gray-500 font-medium mb-6">
+                Redirecting to sign in page...
               </p>
               
               <Link 
-                href="/dashboard"
+                href="/auth/sign-in"
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
               >
-                Go to Dashboard
+                Sign In Now
               </Link>
             </div>
           </div>
@@ -123,7 +125,7 @@ export default function VerifyEmailPage() {
     )
   }
 
-  if (status === 'error') {
+  if (status === 'already-verified') {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -139,31 +141,22 @@ export default function VerifyEmailPage() {
           
           <div className="mt-8 bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
             <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-                <XCircle className="h-6 w-6 text-red-600" />
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
+                <CheckCircle className="h-6 w-6 text-blue-600" />
               </div>
               <h2 className="text-2xl font-black text-gray-900 mb-4">
-                Verification failed
+                Already verified!
               </h2>
               <p className="text-sm text-gray-600 font-medium mb-6">
-                The verification link is invalid or has expired.
+                Your email address was already verified. You can sign in to access your account.
               </p>
               
-              <div className="space-y-4">
-                <Link 
-                  href="/auth/sign-up"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  Create New Account
-                </Link>
-                
-                <Link 
-                  href="/auth/sign-in"
-                  className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  Sign In Instead
-                </Link>
-              </div>
+              <Link 
+                href="/auth/sign-in"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+              >
+                Sign In
+              </Link>
             </div>
           </div>
         </div>
@@ -171,7 +164,7 @@ export default function VerifyEmailPage() {
     )
   }
 
-  // Resend verification state
+  // Error state
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -187,42 +180,49 @@ export default function VerifyEmailPage() {
         
         <div className="mt-8 bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mb-4">
-              <Mail className="h-6 w-6 text-yellow-600" />
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+              <XCircle className="h-6 w-6 text-red-600" />
             </div>
             <h2 className="text-2xl font-black text-gray-900 mb-4">
-              Verify your email
+              Verification failed
             </h2>
             <p className="text-sm text-gray-600 font-medium mb-6">
-              Please check your email and click the verification link to activate your account.
-            </p>
-            <p className="text-sm text-gray-500 font-medium mb-6">
-              Email sent to: <span className="font-bold text-gray-900">{email}</span>
+              {errorMessage || 'The verification link is invalid or has expired.'}
             </p>
             
             <div className="space-y-4">
-              <button
-                onClick={handleResendVerification}
-                disabled={resending}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              <Link 
+                href="/auth/sign-up"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
               >
-                {resending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  'Resend Verification Email'
-                )}
-              </button>
+                Create New Account
+              </Link>
               
               <Link 
                 href="/auth/sign-in"
                 className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
               >
-                Back to Sign In
+                Sign In Instead
               </Link>
             </div>
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   )
 }

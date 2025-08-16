@@ -17,29 +17,34 @@ export const emailVerificationTemplate = ({ name, verificationUrl }: EmailVerifi
   <title>Verify Your Email</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
-    .header { background-color: #3b82f6; padding: 40px 20px; text-align: center; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .header { background-color: #1e40af; padding: 40px 20px; text-align: center; }
     .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }
-    .content { padding: 40px 20px; }
-    .content h2 { color: #1f2937; margin: 0 0 16px 0; font-size: 24px; }
-    .content p { color: #6b7280; line-height: 1.6; margin: 0 0 24px 0; }
-    .button { display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-weight: 600; margin: 24px 0; }
-    .button:hover { background-color: #2563eb; }
-    .footer { padding: 20px; text-align: center; color: #9ca3af; font-size: 14px; border-top: 1px solid #e5e7eb; }
-    .security-note { background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 24px 0; }
-    .security-note p { margin: 0; font-size: 14px; color: #6b7280; }
+    .content { padding: 40px 30px; }
+    .content h2 { color: #1f2937; margin: 0 0 20px 0; font-size: 24px; font-weight: 600; }
+    .content p { color: #374151; line-height: 1.6; margin: 0 0 20px 0; font-size: 16px; }
+    .button { display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; margin: 24px 0; font-size: 16px; }
+    .button:hover { background-color: #1d4ed8; }
+    .footer { padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; background-color: #f9fafb; }
+    .info-box { background-color: #f1f5f9; padding: 20px; border-radius: 6px; margin: 24px 0; border-left: 4px solid #2563eb; }
+    .info-box p { margin: 0; font-size: 14px; color: #475569; }
+    .link-text { word-break: break-all; color: #2563eb; font-size: 14px; background-color: #f8fafc; padding: 12px; border-radius: 4px; border: 1px solid #e2e8f0; }
+    ul { color: #374151; line-height: 1.6; margin: 20px 0; padding-left: 20px; }
+    li { margin-bottom: 8px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>Welcome to LeadFlow!</h1> 
+      <h1>LeadFlow</h1> 
     </div>
     
     <div class="content">
-      <h2>Hi ${name},</h2>
+      <h2>Verify Your Email Address</h2>
       
-      <p>Thank you for signing up for LeadFlow! To get started, please verify your email address by clicking the button below.</p>
+      <p>Hello ${name},</p>
+      
+      <p>Thank you for signing up for LeadFlow. To complete your account setup and start your free trial, please verify your email address by clicking the button below.</p>
       
       <div style="text-align: center;">
         <a href="${verificationUrl}" class="button">Verify Email Address</a>
@@ -47,24 +52,27 @@ export const emailVerificationTemplate = ({ name, verificationUrl }: EmailVerifi
       
       <p>Once verified, you'll have full access to your LeadFlow dashboard where you can:</p>
       
-      <ul style="color: #6b7280; line-height: 1.6;">
+      <ul>
         <li>Import and manage your contacts</li>
-        <li>Create email campaigns</li>
-        <li>Track campaign performance</li>
-        <li>Start your 14-day free trial</li>
+        <li>Create and send email campaigns</li>
+        <li>Track campaign performance and analytics</li>
+        <li>Access all premium features during your 14-day free trial</li>
       </ul>
       
-      <div class="security-note">
-        <p><strong>Security Note:</strong> This verification link will expire in 24 hours. If you didn't create an account with LeadFlow, please ignore this email.</p>
+      <div class="info-box">
+        <p><strong>Important:</strong> This verification link will expire in 24 hours for security purposes. If you didn't create an account with LeadFlow, please disregard this email.</p>
       </div>
       
-      <p>If the button doesn't work, copy and paste this link into your browser:</p>
-      <p style="word-break: break-all; color: #3b82f6;">${verificationUrl}</p>
+      <p>If the button above doesn't work, you can copy and paste the following link into your browser:</p>
+      <div class="link-text">${verificationUrl}</div>
+      
+      <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
     </div>
     
     <div class="footer">
+      <p><strong>LeadFlow</strong></p>
+      <p>This email was sent to verify your account. If you didn't sign up for LeadFlow, please ignore this message.</p>
       <p>© 2024 LeadFlow. All rights reserved.</p>
-      <p>If you have any questions, reply to this email or contact our support team.</p>
     </div>
   </div>
 </body>
@@ -80,47 +88,51 @@ export const passwordResetTemplate = ({ name, resetUrl }: PasswordResetProps) =>
   <title>Reset Your Password</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
-    .header { background-color: #dc2626; padding: 40px 20px; text-align: center; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .header { background-color: #1e40af; padding: 40px 20px; text-align: center; }
     .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }
-    .content { padding: 40px 20px; }
-    .content h2 { color: #1f2937; margin: 0 0 16px 0; font-size: 24px; }
-    .content p { color: #6b7280; line-height: 1.6; margin: 0 0 24px 0; }
-    .button { display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-weight: 600; margin: 24px 0; }
-    .button:hover { background-color: #b91c1c; }
-    .footer { padding: 20px; text-align: center; color: #9ca3af; font-size: 14px; border-top: 1px solid #e5e7eb; }
-    .security-note { background-color: #fef2f2; padding: 16px; border-radius: 8px; margin: 24px 0; border-left: 4px solid #dc2626; }
-    .security-note p { margin: 0; font-size: 14px; color: #6b7280; }
+    .content { padding: 40px 30px; }
+    .content h2 { color: #1f2937; margin: 0 0 20px 0; font-size: 24px; font-weight: 600; }
+    .content p { color: #374151; line-height: 1.6; margin: 0 0 20px 0; font-size: 16px; }
+    .button { display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; margin: 24px 0; font-size: 16px; }
+    .button:hover { background-color: #1d4ed8; }
+    .footer { padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; background-color: #f9fafb; }
+    .info-box { background-color: #f1f5f9; padding: 20px; border-radius: 6px; margin: 24px 0; border-left: 4px solid #2563eb; }
+    .info-box p { margin: 0; font-size: 14px; color: #475569; }
+    .link-text { word-break: break-all; color: #2563eb; font-size: 14px; background-color: #f8fafc; padding: 12px; border-radius: 4px; border: 1px solid #e2e8f0; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>Password Reset Request</h1>
+      <h1>LeadFlow</h1>
     </div>
     
     <div class="content">
-      <h2>Hi ${name},</h2>
+      <h2>Password Reset Request</h2>
       
-      <p>We received a request to reset your password for your LeadFlow account. Click the button below to create a new password.</p>
+      <p>Hello ${name},</p>
+      
+      <p>We received a request to reset the password for your LeadFlow account. To create a new password, please click the button below.</p>
       
       <div style="text-align: center;">
         <a href="${resetUrl}" class="button">Reset Password</a>
       </div>
       
-      <div class="security-note">
-        <p><strong>Important:</strong> This password reset link will expire in 1 hour for security reasons. If you didn't request this reset, please ignore this email and your password will remain unchanged.</p>
+      <div class="info-box">
+        <p><strong>Security Notice:</strong> This password reset link will expire in 1 hour for security purposes. If you didn't request this password reset, please ignore this email and your password will remain unchanged.</p>
       </div>
       
-      <p>If the button doesn't work, copy and paste this link into your browser:</p>
-      <p style="word-break: break-all; color: #dc2626;">${resetUrl}</p>
+      <p>If the button above doesn't work, you can copy and paste the following link into your browser:</p>
+      <div class="link-text">${resetUrl}</div>
       
-      <p>If you continue to have problems, please contact our support team.</p>
+      <p>For additional security, please ensure you're accessing this link from a trusted device. If you continue to experience issues or have concerns about your account security, please contact our support team immediately.</p>
     </div>
     
     <div class="footer">
-      <p>© 2024 LeadFlow. All rights reserved.</p>
+      <p><strong>LeadFlow</strong></p>
       <p>This email was sent because a password reset was requested for your account.</p>
+      <p>© 2024 LeadFlow. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -136,41 +148,53 @@ export const emailVerifiedSuccessTemplate = (name: string) => `
   <title>Email Verified Successfully</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
-    .header { background-color: #10b981; padding: 40px 20px; text-align: center; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .header { background-color: #1e40af; padding: 40px 20px; text-align: center; }
     .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }
-    .content { padding: 40px 20px; }
-    .content h2 { color: #1f2937; margin: 0 0 16px 0; font-size: 24px; }
-    .content p { color: #6b7280; line-height: 1.6; margin: 0 0 24px 0; }
-    .button { display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-weight: 600; margin: 24px 0; }
-    .footer { padding: 20px; text-align: center; color: #9ca3af; font-size: 14px; border-top: 1px solid #e5e7eb; }
+    .content { padding: 40px 30px; }
+    .content h2 { color: #1f2937; margin: 0 0 20px 0; font-size: 24px; font-weight: 600; }
+    .content p { color: #374151; line-height: 1.6; margin: 0 0 20px 0; font-size: 16px; }
+    .button { display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; margin: 24px 0; font-size: 16px; }
+    .button:hover { background-color: #1d4ed8; }
+    .footer { padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; background-color: #f9fafb; }
+    ul { color: #374151; line-height: 1.6; margin: 20px 0; padding-left: 20px; }
+    li { margin-bottom: 8px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>✅ Email Verified!</h1>
+      <h1>LeadFlow</h1>
     </div>
     
     <div class="content">
-      <h2>Welcome ${name}!</h2>
+      <h2>Email Verification Successful</h2>
       
-      <p>Your email address has been successfully verified. You now have full access to your LeadFlow account.</p>
+      <p>Hello ${name},</p>
       
-      <p>You can now:</p>
-      <ul style="color: #6b7280; line-height: 1.6;">
-        <li>Access your dashboard</li>
-        <li>Import contacts</li>
-        <li>Create campaigns</li>
-        <li>Enjoy your 14-day free trial</li> 
+      <p>Congratulations! Your email address has been successfully verified and your LeadFlow account is now fully activated.</p>
+      
+      <p>You now have complete access to all LeadFlow features, including:</p>
+      <ul>
+        <li>Full dashboard access and analytics</li>
+        <li>Contact import and management tools</li>
+        <li>Email campaign creation and automation</li>
+        <li>Performance tracking and detailed reporting</li>
+        <li>14-day free trial with all premium features</li>
       </ul>
       
+      <p>Ready to get started? Access your dashboard now and begin creating your first campaign.</p>
+      
       <div style="text-align: center;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard" class="button">Go to Dashboard</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard" class="button">Access Dashboard</a>
       </div>
+      
+      <p>If you have any questions or need assistance getting started, our support team is here to help. We're excited to help you succeed with LeadFlow.</p>
     </div>
     
     <div class="footer">
+      <p><strong>LeadFlow</strong></p>
+      <p>Welcome to LeadFlow! We're glad to have you on board.</p>
       <p>© 2024 LeadFlow. All rights reserved.</p>
     </div>
   </div>

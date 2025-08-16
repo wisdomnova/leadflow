@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -15,6 +15,7 @@ export async function PUT(
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
     const body = await request.json()
+    const { id } = await params // Await the params
 
     // Get user's organization
     const { data: userData, error: userError } = await supabase
@@ -31,7 +32,7 @@ export async function PUT(
     const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
       .update(body)
-      .eq('id', params.id)
+      .eq('id', id) // Use awaited id
       .eq('organization_id', userData.organization_id)
       .select()
       .single()
@@ -50,7 +51,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -60,6 +61,7 @@ export async function DELETE(
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    const { id } = await params // Await the params
 
     // Get user's organization
     const { data: userData, error: userError } = await supabase
@@ -75,8 +77,8 @@ export async function DELETE(
     // Delete campaign
     const { error: deleteError } = await supabase
       .from('campaigns')
-      .delete()
-      .eq('id', params.id)
+      .delete() 
+      .eq('id', id) // Use awaited id
       .eq('organization_id', userData.organization_id)
 
     if (deleteError) {

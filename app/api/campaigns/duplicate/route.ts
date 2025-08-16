@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get('auth-token')?.value
 
@@ -14,6 +11,11 @@ export async function POST(
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    const { id } = await request.json() // Get id from request body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Campaign ID is required' }, { status: 400 })
+    }
 
     // Get user's organization
     const { data: userData, error: userError } = await supabase
@@ -30,7 +32,7 @@ export async function POST(
     const { data: originalCampaign, error: fetchError } = await supabase
       .from('campaigns')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id) // Use id from request body
       .eq('organization_id', userData.organization_id)
       .single()
 

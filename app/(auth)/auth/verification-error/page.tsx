@@ -1,11 +1,13 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { AlertCircle, Mail, RefreshCw, ArrowRight} from 'lucide-react'
 import { useState } from 'react'
 
-export default function VerificationErrorPage() {
+function VerificationErrorContent() {
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
   const [isResending, setIsResending] = useState(false)
@@ -49,6 +51,16 @@ export default function VerificationErrorPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="flex justify-center mb-8">
+          <Image
+            src="/leadflow.png"
+            alt="Leadflow"
+            width={180}
+            height={40}
+            className="h-13 w-auto"
+          />
+        </div>
+        
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <div className="text-center">
             <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
@@ -83,7 +95,7 @@ export default function VerificationErrorPage() {
                     </ul>
                   </div>
                 </div>
-              </div>
+              </div> 
             </div>
 
             {resendMessage && (
@@ -112,5 +124,20 @@ export default function VerificationErrorPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function VerificationErrorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <VerificationErrorContent />
+    </Suspense>
   )
 }
