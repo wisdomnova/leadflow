@@ -18,7 +18,7 @@ export default function SignUpPage() {
     password: '',
     companyName: ''
   })
-  
+   
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -31,10 +31,10 @@ export default function SignUpPage() {
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters long')
       setLoading(false)
-      return
+      return 
     }
 
-    const { error } = await signUp(
+    const result = await signUp(
       formData.email,
       formData.password,
       formData.firstName,
@@ -42,9 +42,13 @@ export default function SignUpPage() {
       formData.companyName
     )
 
-    if (error) {
-      setError(error)
+    if (result.error) {
+      setError(result.error)
+    } else if (result.requiresVerification) {
+      // Redirect to success page with email parameter
+      router.push(`/auth/signup-success?email=${encodeURIComponent(formData.email)}`)
     } else {
+      // Fallback - shouldn't happen with email verification enabled
       router.push('/dashboard')
     }
     

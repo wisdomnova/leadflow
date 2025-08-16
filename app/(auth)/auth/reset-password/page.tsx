@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabase'
-import { Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react'
+import { Eye, EyeOff, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const token = searchParams.get('token')
+  
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -17,18 +18,14 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [tokenValid, setTokenValid] = useState(true)
 
   useEffect(() => {
-    // Handle the auth callback
-    const handleAuthCallback = async () => {
-      const { data, error } = await supabase.auth.getSession()
-      if (error) {
-        setError('Invalid or expired reset link')
-      }
+    if (!token) {
+      setError('Invalid reset link')
+      setTokenValid(false)
     }
-    
-    handleAuthCallback()
-  }, [])
+  }, [token])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,21 +44,77 @@ export default function ResetPasswordPage() {
       return
     }
 
-    const { error } = await supabase.auth.updateUser({
-      password: password
-    })
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password })
+      })
 
-    if (error) {
-      setError(error.message)
-    } else {
-      setSuccess(true)
-      // Redirect to dashboard after 2 seconds
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 2000)
+      const data = await response.json()
+
+      if (response.ok) {
+        setSuccess(true)
+        // Redirect to sign in after 3 seconds
+        setTimeout(() => {
+          router.push('/auth/sign-in')
+        }, 3000)
+      } else {
+        setError(data.error || 'Failed to reset password')
+      }
+    } catch (error) {
+      setError('Network error. Please try again.')
     }
     
     setLoading(false)
+  }
+
+  if (!tokenValid) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="flex justify-center">
+            <Image
+              src="/leadflow.png"
+              alt="Leadflow"
+              width={180}
+              height={40}
+              className="h-13 w-auto"
+            />
+          </div>
+          
+          <div className="mt-8 bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <h2 className="text-2xl font-black text-gray-900 mb-4">
+                Invalid Reset Link
+              </h2>
+              <p className="text-sm text-gray-600 font-medium mb-6">
+                This password reset link is invalid or has expired.
+              </p>
+              
+              <div className="space-y-4">
+                <Link 
+                  href="/auth/forgot-password"
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  Request New Reset Link
+                </Link>
+                
+                <Link 
+                  href="/auth/sign-in"
+                  className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  Back to Sign In
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (success) {
@@ -87,14 +140,17 @@ export default function ResetPasswordPage() {
                 Password updated successfully
               </h2>
               <p className="text-sm text-gray-600 font-medium mb-6">
-                Your password has been changed. Redirecting to your dashboard...
+                Your password has been changed successfully. You can now sign in with your new password.
+              </p>
+              <p className="text-sm text-gray-500 font-medium mb-6">
+                Redirecting to sign in page...
               </p>
               
               <Link 
-                href="/dashboard"
+                href="/auth/sign-in"
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
               >
-                Go to Dashboard
+                Sign In Now
               </Link>
             </div>
           </div>
@@ -195,14 +251,14 @@ export default function ResetPasswordPage() {
 
             <div>
               <button
-                type="submit"
+                type="submit" 
                 disabled={loading}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  'Update Password'
+                  'Update Password' 
                 )}
               </button>
             </div>

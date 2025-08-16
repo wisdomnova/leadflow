@@ -30,11 +30,11 @@ export default function SignInPage() {
     const { error } = await signIn(formData.email, formData.password)
 
     if (error) {
-      console.error('Sign in failed:', error) // Debug log
+      //console.error('Sign in failed:', error) // Debug log
       setError(error)
       setLoading(false)
     } else {
-      console.log('Sign in successful, redirecting...') // Debug log
+      //console.log('Sign in successful, redirecting...') // Debug log
       // Small delay to ensure auth state is updated
       setTimeout(() => {
         router.push('/dashboard')

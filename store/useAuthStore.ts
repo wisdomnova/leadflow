@@ -5,21 +5,21 @@ interface User {
   email: string
   first_name: string | null
   last_name: string | null
-  organization_id: string | null
+  organization_id: string | null 
   trial_ends_at: string | null
   subscription_status: string
   plan_type: string
   organizations?: {
     id: string
-    name: string
+    name: string 
   }
 }
 
 interface AuthState {
   user: User | null
   loading: boolean
-  signUp: (email: string, password: string, firstName: string, lastName: string, companyName: string) => Promise<{ error?: string }>
-  signIn: (email: string, password: string) => Promise<{ error?: string }>
+  signUp: (email: string, password: string, firstName: string, lastName: string, companyName: string) => Promise<{ error?: string; requiresVerification?: boolean; email?: string }>
+  signIn: (email: string, password: string) => Promise<{ error?: string; requiresVerification?: boolean; email?: string }>
   signOut: () => Promise<void>
   checkAuth: () => Promise<void>
 }
@@ -42,8 +42,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return { error: data.error || 'Signup failed' }
       }
 
-      // Auto sign in after signup
-      return await get().signIn(email, password)
+      // Return success with verification requirement
+      return { 
+        requiresVerification: data.requiresVerification,
+        email: email 
+      }
     } catch (error) {
       return { error: 'Network error' }
     }
@@ -60,7 +63,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const data = await response.json()
 
       if (!response.ok) {
-        return { error: data.error || 'Sign in failed' }
+        return { 
+          error: data.error || 'Sign in failed',
+          requiresVerification: data.requiresVerification,
+          email: data.email
+        }
       }
 
       set({ user: data.user })

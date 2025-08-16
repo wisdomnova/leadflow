@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabase'
 import { ArrowLeft, Loader2, Mail } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
@@ -12,19 +11,27 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => { 
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`
-    })
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
 
-    if (error) {
-      setError(error.message)
-    } else {
-      setSent(true)
+      const data = await response.json()
+
+      if (response.ok) {
+        setSent(true)
+      } else {
+        setError(data.error || 'Failed to send reset email')
+      }
+    } catch (error) {
+      setError('Network error. Please try again.')
     }
     
     setLoading(false)
@@ -56,7 +63,7 @@ export default function ForgotPasswordPage() {
                 We've sent a password reset link to <span className="font-bold text-gray-900">{email}</span>
               </p>
               <p className="text-sm text-gray-500 font-medium mb-6">
-                Didn't receive the email? Check your spam folder or try again.
+                The reset link will expire in 1 hour for security reasons.
               </p>
               
               <div className="space-y-4">

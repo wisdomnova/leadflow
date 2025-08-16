@@ -7,11 +7,23 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
 
-    // Find user
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
+    }
+
+    // Find user with organization data
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('*')
-      .eq('email', email)
+      .select(`
+        *,
+        organizations (
+          id,
+          name,
+          trial_ends_at,
+          subscription_status
+        )
+      `)
+      .eq('email', email.toLowerCase())
       .single()
 
     if (userError || !userData) {
@@ -25,20 +37,60 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
+    // Check email verification
+    if (!userData.email_verified) {
+      return NextResponse.json({ 
+        error: 'Please verify your email address before logging in. Check your email for the verification link.',
+        requiresVerification: true,
+        email: userData.email
+      }, { status: 403 })
+    }
+
     // Create JWT token
     const token = jwt.sign(
-      { userId: userData.id, email: userData.email },
+      { 
+        userId: userData.id, 
+        email: userData.email,
+        organizationId: userData.organization_id
+      },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     )
+
+    // Update last login
+    await supabase
+      .from('users')
+      .update({ 
+        last_login_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userData.id)
+
+    // Log activity
+    try {
+      await supabase
+        .from('activity_logs')
+        .insert([{
+          organization_id: userData.organization_id,
+          user_id: userData.id,
+          action: 'user_login',
+          description: 'User logged in successfully'
+        }])
+    } catch (logError) {
+      console.warn('Failed to log login activity:', logError)
+    }
 
     // Return user without password
     const { password_hash, ...userWithoutPassword } = userData
 
     const response = NextResponse.json({ 
       success: true, 
-      user: userWithoutPassword,
-      token 
+      user: {
+        ...userWithoutPassword,
+        organization: userData.organizations
+      },
+      token,
+      message: 'Login successful'
     })
 
     // Set HTTP-only cookie
