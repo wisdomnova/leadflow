@@ -14,8 +14,14 @@ interface BillingInfo {
   isLoading: boolean
 }
 
+interface UsageStats {
+  contacts: { used: number; limit: number }
+  campaigns: { used: number; limit: number }
+  emails: { used: number; limit: number }
+}
+
 export default function BillingPage() {
-  const { user } = useAuth();
+  const { user } = useAuth()
   const { subscriptionStatus, planType, daysRemaining, isTrialActive } = useTrialStatus()
   const [billingInfo, setBillingInfo] = useState<BillingInfo>({
     subscription: null,
@@ -23,19 +29,47 @@ export default function BillingPage() {
     amount: 0,
     isLoading: true
   })
+  const [usageStats, setUsageStats] = useState<UsageStats>({
+    contacts: { used: 0, limit: 1000 },
+    campaigns: { used: 0, limit: 10 },
+    emails: { used: 0, limit: 5000 }
+  })
   const [isLoadingPortal, setIsLoadingPortal] = useState(false)
 
   useEffect(() => {
     fetchBillingInfo()
-  }, [])
+    fetchUsageStats()
+  }, [user])
 
   const fetchBillingInfo = async () => {
     try {
-      // You'll implement this API route to get billing info
-      setBillingInfo(prev => ({ ...prev, isLoading: false }))
+      const response = await fetch('/api/billing/info')
+      if (response.ok) {
+        const data = await response.json()
+        setBillingInfo({
+          subscription: data.subscription,
+          nextBilling: data.nextBilling,
+          amount: data.amount,
+          isLoading: false
+        })
+      } else {
+        setBillingInfo(prev => ({ ...prev, isLoading: false }))
+      }
     } catch (error) {
       console.error('Failed to fetch billing info:', error)
       setBillingInfo(prev => ({ ...prev, isLoading: false }))
+    }
+  }
+
+  const fetchUsageStats = async () => {
+    try {
+      const response = await fetch('/api/usage/stats')
+      if (response.ok) {
+        const data = await response.json()
+        setUsageStats(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch usage stats:', error)
     }
   }
 
@@ -75,6 +109,26 @@ export default function BillingPage() {
     )
   }
 
+  const getPlanPrice = (plan: string, cycle: string) => {
+    const prices = {
+      starter: { monthly: 29, yearly: 290 },
+      pro: { monthly: 79, yearly: 790 }
+    }
+    return prices[plan as keyof typeof prices]?.[cycle as keyof typeof prices.starter] || 0
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  const calculatePercentage = (used: number, limit: number) => {
+    return Math.min((used / limit) * 100, 100)
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-8">
@@ -108,7 +162,9 @@ export default function BillingPage() {
           ) : (
             <div>
               <p className="text-sm font-medium text-gray-500">Billing Cycle</p>
-              <p className="text-lg font-semibold text-gray-900">Monthly</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {billingInfo.subscription?.billing_cycle ? billingInfo.subscription.billing_cycle.charAt(0).toUpperCase() + billingInfo.subscription.billing_cycle.slice(1) : 'Monthly'}
+              </p>
             </div>
           )}
 
@@ -126,7 +182,7 @@ export default function BillingPage() {
               href="/billing/upgrade"
               className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              Upgrade to Pro
+              Upgrade Now
             </Link>
           </div>
         ) : (
@@ -160,30 +216,45 @@ export default function BillingPage() {
           <div>
             <div className="flex justify-between text-sm mb-1">
               <span className="font-medium text-gray-700">Contacts</span>
-              <span className="text-gray-500">245 / 1,000</span>
+              <span className="text-gray-500">
+                {usageStats.contacts.used.toLocaleString()} / {usageStats.contacts.limit.toLocaleString()}
+              </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-blue-600 h-2 rounded-full" style={{ width: '24.5%' }}></div>
+              <div 
+                className="bg-blue-600 h-2 rounded-full" 
+                style={{ width: `${calculatePercentage(usageStats.contacts.used, usageStats.contacts.limit)}%` }}
+              ></div>
             </div>
           </div>
 
           <div>
             <div className="flex justify-between text-sm mb-1">
               <span className="font-medium text-gray-700">Email Campaigns This Month</span>
-              <span className="text-gray-500">3 / 10</span>
+              <span className="text-gray-500">
+                {usageStats.campaigns.used} / {usageStats.campaigns.limit}
+              </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-blue-600 h-2 rounded-full" style={{ width: '30%' }}></div>
+              <div 
+                className="bg-blue-600 h-2 rounded-full" 
+                style={{ width: `${calculatePercentage(usageStats.campaigns.used, usageStats.campaigns.limit)}%` }}
+              ></div>
             </div>
           </div>
 
           <div>
             <div className="flex justify-between text-sm mb-1">
               <span className="font-medium text-gray-700">Emails Sent This Month</span>
-              <span className="text-gray-500">1,250 / 5,000</span>
+              <span className="text-gray-500">
+                {usageStats.emails.used.toLocaleString()} / {usageStats.emails.limit.toLocaleString()}
+              </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-blue-600 h-2 rounded-full" style={{ width: '25%' }}></div>
+              <div 
+                className="bg-blue-600 h-2 rounded-full" 
+                style={{ width: `${calculatePercentage(usageStats.emails.used, usageStats.emails.limit)}%` }}
+              ></div>
             </div>
           </div>
         </div>
@@ -203,16 +274,32 @@ export default function BillingPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center justify-between py-3 border-b border-gray-200">
-              <div>
-                <p className="font-medium text-gray-900">LeadFlow Pro - Monthly</p>
-                <p className="text-sm text-gray-500">Dec 1, 2024</p>
+            {billingInfo.isLoading ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
               </div>
-              <div className="text-right">
-                <p className="font-medium text-gray-900">$29.00</p>
-                <p className="text-sm text-green-600">Paid</p>
+            ) : billingInfo.subscription ? (
+              <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                <div>
+                  <p className="font-medium text-gray-900">
+                    LeadFlow {getPlanDisplayName(planType)} - {billingInfo.subscription?.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Till {billingInfo.nextBilling ? formatDate(billingInfo.nextBilling) : 'Processing...'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium text-gray-900">
+                    ${getPlanPrice(planType, billingInfo.subscription?.billing_cycle || 'monthly')}.00
+                  </p>
+                  <p className="text-sm text-green-600">Paid</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No billing history available.</p>
+              </div>
+            )}
           </div>
         )}
       </div>

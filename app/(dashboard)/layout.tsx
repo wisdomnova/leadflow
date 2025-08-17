@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 import TrialBanner from '@/components/layout/TrialBanner'
+import TrialExpiredModal from '@/components/TrialExpiredModal'
 
 export default function DashboardLayout({
   children,
@@ -17,7 +18,7 @@ export default function DashboardLayout({
     checkAuth()
   }, [checkAuth])
  
-  if (loading) {
+  if (loading) { 
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -37,6 +38,9 @@ export default function DashboardLayout({
           </div>
         </main>
       </div>
+      
+      {/* Trial Expired Modal */}
+      <TrialExpiredModal />
     </div>
   )
-}
+} 

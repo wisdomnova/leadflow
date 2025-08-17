@@ -31,7 +31,7 @@ function PaymentSuccessContent() {
     } catch (error) {
       setError('Payment verification failed')
       setIsVerifying(false)
-    }
+    } 
   }
 
   if (isVerifying) {

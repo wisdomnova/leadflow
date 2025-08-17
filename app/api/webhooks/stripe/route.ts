@@ -3,7 +3,7 @@ import { stripe } from '@/lib/stripe'
 import { supabase } from '@/lib/supabase'
 import Stripe from 'stripe'
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest) { 
   const sig = request.headers.get('stripe-signature')!
   const body = await request.text()
 

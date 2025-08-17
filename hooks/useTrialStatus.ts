@@ -11,7 +11,7 @@ interface TrialStatus {
   isLoading: boolean
 }
 
-export function useTrialStatus(): TrialStatus {
+export function useTrialStatus(): TrialStatus { 
   const { user } = useAuth()
   const [status, setStatus] = useState<TrialStatus>({
     isTrialActive: false,
