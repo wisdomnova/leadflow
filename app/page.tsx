@@ -139,7 +139,7 @@ export default function Home() {
                   </div>
                 </div>
                 
-                <div className="flex items-start">
+                <div className="flex items-start"> 
                   <div className="flex-shrink-0">
                     <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                       <Check className="w-4 h-4 text-white" />

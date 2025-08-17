@@ -72,7 +72,7 @@ export const emailVerificationTemplate = ({ name, verificationUrl }: EmailVerifi
     <div class="footer">
       <p><strong>LeadFlow</strong></p>
       <p>This email was sent to verify your account. If you didn't sign up for LeadFlow, please ignore this message.</p>
-      <p>© 2024 LeadFlow. All rights reserved.</p>
+      <p>© 2025 LeadFlow. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -132,7 +132,7 @@ export const passwordResetTemplate = ({ name, resetUrl }: PasswordResetProps) =>
     <div class="footer">
       <p><strong>LeadFlow</strong></p>
       <p>This email was sent because a password reset was requested for your account.</p>
-      <p>© 2024 LeadFlow. All rights reserved.</p>
+      <p>© 2025 LeadFlow. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -195,7 +195,7 @@ export const emailVerifiedSuccessTemplate = (name: string) => `
     <div class="footer">
       <p><strong>LeadFlow</strong></p>
       <p>Welcome to LeadFlow! We're glad to have you on board.</p>
-      <p>© 2024 LeadFlow. All rights reserved.</p>
+      <p>© 2025 LeadFlow. All rights reserved.</p>
     </div>
   </div>
 </body>

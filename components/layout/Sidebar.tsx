@@ -11,6 +11,7 @@ import {
   BarChart3, 
   Settings, 
   HelpCircle,
+  CreditCard,
   X,
   Menu,
   User,
@@ -25,6 +26,7 @@ const navigation = [
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Help & Support', href: '/help', icon: HelpCircle },
+  {name: 'Billing', href: '/billing', icon: CreditCard}
 ]
 
 export function Sidebar() {

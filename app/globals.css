@@ -15,7 +15,7 @@
   --success-green: #28A745;
 }
 
-@theme inline {
+@theme inline { 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-lato);

@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
-import { TrialBanner } from '@/components/layout/TrialBanner'
+import TrialBanner from '@/components/layout/TrialBanner'
 
 export default function DashboardLayout({
   children,
@@ -28,7 +28,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
-      <div className="lg:pl-64">
+      <div className="lg:pl-64"> 
         <Header />
         <TrialBanner />
         <main className="py-6">

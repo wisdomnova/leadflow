@@ -9,7 +9,7 @@ interface User {
   trial_ends_at: string | null
   subscription_status: string
   plan_type: string
-  organizations?: {
+  organizations?: { 
     id: string
     name: string 
   }
