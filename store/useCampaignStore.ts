@@ -1,27 +1,34 @@
+// ./store/useCampaignStore.ts
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 
 interface Campaign {
-  id: string
+  from_email: string
+  from_name: string
+  id: string 
   organization_id: string
   name: string
   subject: string
   content: string
   status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused'
-  type: 'one-time' | 'recurring'
+  type: 'one-time' | 'recurring' | 'sequence' | 'single'  // Added sequence and single
   scheduled_at: string | null
   sent_at: string | null
   total_recipients: number
   delivered: number
-  opened: number
+  opened: number 
   clicked: number
   created_at: string
   updated_at: string
-}
+  description?: string  // Added description field
+  is_sequence?: boolean  // Added for sequence campaigns
+  total_steps?: number   // Added for sequence campaigns
+} 
 
 interface CampaignState {
   campaigns: Campaign[]
   loading: boolean
+  isLoading: boolean  // Added this alias
   searchQuery: string
   statusFilter: string
   
@@ -42,6 +49,9 @@ let realtimeChannel: any = null
 export const useCampaignStore = create<CampaignState>((set, get) => ({
   campaigns: [],
   loading: false,
+  get isLoading() {
+    return get().loading  // Alias for loading
+  },
   searchQuery: '',
   statusFilter: 'all',
 
@@ -76,6 +86,7 @@ export const useCampaignStore = create<CampaignState>((set, get) => ({
   createCampaign: async (data: Partial<Campaign>) => {
     try {
       console.log('Creating campaign with data:', data)
+      set({ loading: true })  // Set loading during creation
       
       const response = await fetch('/api/campaigns', {
         method: 'POST',
@@ -94,13 +105,15 @@ export const useCampaignStore = create<CampaignState>((set, get) => ({
       
       // Add to local state
       set(state => ({
-        campaigns: [campaign, ...state.campaigns]
+        campaigns: [campaign, ...state.campaigns],
+        loading: false
       }))
 
       return campaign
 
     } catch (error) {
       console.error('Create campaign failed:', error)
+      set({ loading: false })  // Clear loading on error
       throw error
     }
   },

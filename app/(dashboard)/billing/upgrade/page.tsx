@@ -18,7 +18,7 @@ const plans = [
     features: [
       '1,000 contacts',
       '10 email campaigns per month',
-      '5,000 emails per month',
+      '5,000 emails per month', 
       'Basic analytics',
       'Email support',
       'CSV import/export'

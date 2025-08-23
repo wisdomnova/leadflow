@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       .from('users') 
       .select('id, email_verified')
       .eq('email', email.toLowerCase())
-      .single()
+      .single() 
 
     if (existingUser) {
       if (existingUser.email_verified) {

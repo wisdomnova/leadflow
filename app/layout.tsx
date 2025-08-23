@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Lato } from "next/font/google";
+import { Ubuntu } from "next/font/google";
 import "./globals.css";
 
-const lato = Lato({
-  variable: "--font-lato",
+const ubuntu = Ubuntu({
+  variable: "--font-ubuntu",
   subsets: ["latin"],
-  weight: ["300", "400", "700", "900"],
+  weight: ["300", "400", "500", "700"], 
 });
 
 export const metadata: Metadata = {
@@ -21,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${lato.variable} antialiased font-sans`}
+        className={`${ubuntu.variable} antialiased font-sans`}
       >
         {children} 
       </body>

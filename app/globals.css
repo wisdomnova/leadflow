@@ -5,7 +5,7 @@
   --foreground: #1E1E1E;
   
   /* Leadflow Brand Colors */
-  --primary-blue: #007BFF;
+  --primary-blue: #007BFF; 
   --primary-green: #28A745;
   --dark-text: #1E1E1E;
   --light-gray-bg: #F7F9FC;
@@ -18,7 +18,7 @@
 @theme inline { 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-lato);
+  --font-sans: var(--font-ubuntu);
   
   /* Leadflow Color Variables */
   --color-primary-blue: var(--primary-blue);
@@ -43,5 +43,5 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-lato), system-ui, sans-serif;
+  font-family: var(--font-ubuntu), system-ui, sans-serif;
 }

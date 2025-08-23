@@ -6,7 +6,7 @@ interface User {
   first_name: string | null
   last_name: string | null
   organization_id: string | null 
-  trial_ends_at: string | null
+  trial_ends_at: string | null 
   subscription_status: string
   plan_type: string
   organizations?: { 

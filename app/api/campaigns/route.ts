@@ -1,3 +1,4 @@
+// ./app/api/campaigns/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
       .from('users')
       .select('organization_id')
       .eq('id', decoded.userId)
-      .single()
+      .single() 
 
     if (userError || !userData) {
       console.error('User fetch error:', userError)
@@ -71,14 +72,22 @@ export async function POST(request: NextRequest) {
 
     console.log('User organization:', userData.organization_id)
 
-    // Prepare campaign data
+    // Prepare campaign data - handle both old and new structures
     const campaignData = {
       organization_id: userData.organization_id,
       name: body.name || 'Untitled Campaign',
+      // Handle both old (subject/content) and new (description) structures
       subject: body.subject || '',
       content: body.content || '',
+      // Add description field if provided (for new sequence campaigns)
+      ...(body.description !== undefined && { description: body.description }),
       status: body.status || 'draft',
       type: body.type || 'one-time',
+      // Add sequence fields if this is a sequence campaign
+      ...(body.type === 'sequence' && { 
+        is_sequence: true,
+        total_steps: 1 // Will be updated when sequence is saved
+      }),
       scheduled_at: body.scheduled_at || null,
       sent_at: null,
       total_recipients: 0,

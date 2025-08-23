@@ -1,14 +1,16 @@
+// ./app/(dashboard)/campaigns/page.tsx
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCampaignStore } from '@/store/useCampaignStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { 
   Mail, 
   Search, 
   Plus, 
-  MoreVertical, 
+  MoreVertical,  
   Play, 
   Pause, 
   Copy, 
@@ -19,7 +21,10 @@ import {
   Eye,
   Clock,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Edit,
+  Square,
+  RotateCcw
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -28,7 +33,7 @@ function useDebounce(value: string, delay: number) {
   const [debouncedValue, setDebouncedValue] = useState(value)
 
   useEffect(() => {
-    const handler = setTimeout(() => {
+    const handler = setTimeout(() => { 
       setDebouncedValue(value)
     }, delay)
 
@@ -41,6 +46,7 @@ function useDebounce(value: string, delay: number) {
 }
 
 export default function CampaignsPage() {
+  const router = useRouter()
   const { user } = useAuthStore()
   const {
     campaigns: allCampaigns,
@@ -57,6 +63,7 @@ export default function CampaignsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({})
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300)
 
@@ -69,7 +76,8 @@ export default function CampaignsPage() {
       const query = debouncedSearchQuery.toLowerCase()
       filtered = filtered.filter(campaign => 
         campaign.name.toLowerCase().includes(query) ||
-        campaign.subject.toLowerCase().includes(query)
+        (campaign.subject && campaign.subject.toLowerCase().includes(query)) ||
+        (campaign.description && campaign.description.toLowerCase().includes(query))
       )
     }
 
@@ -106,17 +114,49 @@ export default function CampaignsPage() {
 
   const handleDuplicateCampaign = async (campaignId: string) => {
     try {
-      await duplicateCampaign(campaignId)
+      await duplicateCampaign(campaignId) 
     } catch (error) {
       console.error('Duplicate failed:', error)
     }
   }
 
-  const handleStatusChange = async (campaignId: string, newStatus: "draft" | "scheduled" | "sending" | "sent" | "paused") => {
+  // Updated campaign action handler using EmailScheduler
+  const handleCampaignAction = async (campaignId: string, action: 'launch' | 'pause' | 'resume' | 'stop') => {
+    if (actionLoading[campaignId]) return
+
+    setActionLoading(prev => ({ ...prev, [campaignId]: true }))
+    
     try {
-      await updateCampaign(campaignId, { status: newStatus })
+      const response = await fetch(`/api/campaigns/${campaignId}/${action}`, {
+        method: 'POST'
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || `Failed to ${action} campaign`)
+      }
+      
+      const result = await response.json()
+      
+      // Show appropriate success message
+      if (action === 'launch') {
+        alert(`🚀 Campaign launched! ${result.contactsScheduled || 'Contacts'} scheduled for sending.`)
+      } else if (action === 'pause') {
+        alert('⏸️ Campaign paused. Email sending has been stopped.')
+      } else if (action === 'resume') {
+        alert('▶️ Campaign resumed. Email sending will continue.')
+      } else if (action === 'stop') {
+        alert('🛑 Campaign stopped permanently.')
+      }
+      
+      // Refresh campaigns list to show updated status
+      await fetchCampaigns()
+      
     } catch (error) {
-      console.error('Status change failed:', error)
+      console.error(`Failed to ${action} campaign:`, error)
+      alert(error instanceof Error ? error.message : `Failed to ${action} campaign`)
+    } finally {
+      setActionLoading(prev => ({ ...prev, [campaignId]: false }))
     }
   }
 
@@ -129,6 +169,35 @@ export default function CampaignsPage() {
             Draft
           </span>
         )
+      case 'sending':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            <TrendingUp className="h-3 w-3 mr-1" />
+            Sending
+          </span>
+        )
+      case 'paused':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+            <Pause className="h-3 w-3 mr-1" />
+            Paused
+          </span>
+        )
+      case 'completed':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Completed
+          </span>
+        )
+      case 'stopped':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+            <Square className="h-3 w-3 mr-1" />
+            Stopped
+          </span>
+        )
+      // Legacy status support
       case 'scheduled':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -136,25 +205,11 @@ export default function CampaignsPage() {
             Scheduled
           </span>
         )
-      case 'sending':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-            <TrendingUp className="h-3 w-3 mr-1" />
-            Sending
-          </span>
-        )
       case 'sent':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
             <CheckCircle className="h-3 w-3 mr-1" />
             Sent
-          </span>
-        )
-      case 'paused':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-            <Pause className="h-3 w-3 mr-1" />
-            Paused
           </span>
         )
       default:
@@ -174,6 +229,155 @@ export default function CampaignsPage() {
   const getClickRate = (campaign: any) => {
     if (campaign.total_recipients === 0) return 0
     return ((campaign.clicked / campaign.total_recipients) * 100).toFixed(1)
+  }
+
+  // Function to render action buttons based on campaign status
+  const renderActionButtons = (campaign: any) => {
+    const isLoading = actionLoading[campaign.id]
+    
+    return (
+      <div className="flex items-center justify-end space-x-2">
+        {/* Edit button - goes to edit page */}
+        <Link
+          href={`/campaigns/${campaign.id}/edit`}
+          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+          title="Edit campaign"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Edit className="h-4 w-4" />
+        </Link>
+
+        {/* View button - goes to campaign detail */}
+        <Link
+          href={`/campaigns/${campaign.id}`}
+          className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
+          title="View campaign"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Eye className="h-4 w-4" />
+        </Link>
+
+        {/* Campaign Status Actions */}
+        {campaign.status === 'draft' && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleCampaignAction(campaign.id, 'launch')
+            }}
+            disabled={isLoading || campaign.total_recipients === 0}
+            className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={campaign.total_recipients === 0 ? "Add contacts before launching" : "Launch campaign"}
+          >
+            {isLoading ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+          </button>
+        )}
+
+        {campaign.status === 'sending' && (
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCampaignAction(campaign.id, 'pause')
+              }}
+              disabled={isLoading}
+              className="text-yellow-600 hover:text-yellow-900 p-1 rounded hover:bg-yellow-50 disabled:opacity-50"
+              title="Pause campaign"
+            >
+              {isLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
+              ) : (
+                <Pause className="h-4 w-4" />
+              )}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                if (confirm('Are you sure you want to stop this campaign? This cannot be undone.')) {
+                  handleCampaignAction(campaign.id, 'stop')
+                }
+              }}
+              disabled={isLoading}
+              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 disabled:opacity-50"
+              title="Stop campaign"
+            >
+              {isLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+            </button>
+          </>
+        )}
+
+        {campaign.status === 'paused' && (
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCampaignAction(campaign.id, 'resume')
+              }}
+              disabled={isLoading}
+              className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 disabled:opacity-50"
+              title="Resume campaign"
+            >
+              {isLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+              ) : (
+                <RotateCcw className="h-4 w-4" />
+              )}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                if (confirm('Are you sure you want to stop this campaign? This cannot be undone.')) {
+                  handleCampaignAction(campaign.id, 'stop')
+                }
+              }}
+              disabled={isLoading}
+              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 disabled:opacity-50"
+              title="Stop campaign"
+            >
+              {isLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+            </button>
+          </>
+        )}
+
+        {/* Duplicate button - available for all campaigns */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            handleDuplicateCampaign(campaign.id)
+          }}
+          className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-50"
+          title="Duplicate campaign"
+        >
+          <Copy className="h-4 w-4" />
+        </button>
+
+        {/* Delete button - only for draft, completed, or stopped campaigns */}
+        {['draft', 'completed', 'stopped'].includes(campaign.status) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setCampaignToDelete(campaign.id)
+              setShowDeleteModal(true)
+            }}
+            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+            title="Delete campaign"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    )
   }
 
   if (loading && allCampaigns.length === 0) {
@@ -203,7 +407,7 @@ export default function CampaignsPage() {
         </Link>
       </div>
 
-      {/* Stats */}
+      {/* Stats - Updated to reflect new statuses */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center">
@@ -225,7 +429,7 @@ export default function CampaignsPage() {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Active</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {allCampaigns.filter(c => c.status === 'sending' || c.status === 'scheduled').length}
+                {allCampaigns.filter(c => ['sending', 'scheduled'].includes(c.status)).length}
               </p>
             </div>
           </div>
@@ -263,7 +467,7 @@ export default function CampaignsPage() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters - Updated status options */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
@@ -287,10 +491,13 @@ export default function CampaignsPage() {
             >
               <option value="all">All Status</option>
               <option value="draft">Draft</option>
-              <option value="scheduled">Scheduled</option>
               <option value="sending">Sending</option>
-              <option value="sent">Sent</option>
               <option value="paused">Paused</option>
+              <option value="completed">Completed</option>
+              <option value="stopped">Stopped</option>
+              {/* Legacy support */}
+              <option value="scheduled">Scheduled</option>
+              <option value="sent">Sent</option>
             </select>
           </div>
         </div>
@@ -348,24 +555,36 @@ export default function CampaignsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredCampaigns.map((campaign) => (
-                  <tr key={campaign.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  <tr key={campaign.id} className="hover:bg-gray-50 cursor-pointer transition-colors">
+                    <td 
+                      className="px-6 py-4 whitespace-nowrap"
+                      onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                    >
                       <div>
                         <div className="text-sm font-medium text-gray-900">
                           {campaign.name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {campaign.subject || 'No subject'}
+                          {campaign.description || campaign.subject || 'No description'}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td 
+                      className="px-6 py-4 whitespace-nowrap"
+                      onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                    >
                       {getStatusBadge(campaign.status)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td 
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                      onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                    >
                       {campaign.total_recipients.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td 
+                      className="px-6 py-4 whitespace-nowrap"
+                      onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                    >
                       <div className="text-sm text-gray-900">
                         {campaign.total_recipients > 0 ? (
                           <>
@@ -377,35 +596,14 @@ export default function CampaignsPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td 
+                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                      onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                    >
                       {new Date(campaign.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
-                        {campaign.status === 'draft' && (
-                          <Link
-                            href={`/campaigns/${campaign.id}/edit`}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            <Play className="h-4 w-4" />
-                          </Link>
-                        )}
-                        <button
-                          onClick={() => handleDuplicateCampaign(campaign.id)}
-                          className="text-gray-600 hover:text-gray-900"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setCampaignToDelete(campaign.id)
-                            setShowDeleteModal(true)
-                          }}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      {renderActionButtons(campaign)}
                     </td>
                   </tr>
                 ))}
