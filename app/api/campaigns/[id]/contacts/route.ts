@@ -1,11 +1,10 @@
-// ./app/api/campaigns/[id]/contacts/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -15,7 +14,7 @@ export async function GET(
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-    const campaignId = params.id
+    const { id: campaignId } = await params
 
     // Get user's organization
     const { data: userData, error: userError } = await supabase
@@ -74,7 +73,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -84,7 +83,7 @@ export async function POST(
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-    const campaignId = params.id
+    const { id: campaignId } = await params
     const body = await request.json()
 
     // Get user's organization
@@ -133,7 +132,7 @@ export async function POST(
         company: body.company || null,
         phone: body.phone || null,
         status: 'pending',
-        added_at: new Date().toISOString()
+        added_at: new Date().toISOString() 
       }])
       .select()
       .single()

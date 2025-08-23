@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -15,12 +15,13 @@ export async function GET(
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    const { id: campaignId } = await params
 
     // Get campaign to verify ownership
     const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
       .select('organization_id')
-      .eq('id', params.id)
+      .eq('id', campaignId)
       .single()
 
     if (campaignError || !campaign) {
@@ -42,7 +43,7 @@ export async function GET(
     const { data: steps, error: stepsError } = await supabase
       .from('sequences')
       .select('*')
-      .eq('campaign_id', params.id)
+      .eq('campaign_id', campaignId)
       .order('step_number')
 
     if (stepsError) {
@@ -59,7 +60,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -70,6 +71,7 @@ export async function POST(
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
     const { steps } = await request.json()
+    const { id: campaignId } = await params
 
     // Validate steps
     if (!Array.isArray(steps) || steps.length < 1 || steps.length > 5) {
@@ -80,7 +82,7 @@ export async function POST(
     const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
       .select('organization_id')
-      .eq('id', params.id)
+      .eq('id', campaignId)
       .single()
 
     if (campaignError || !campaign) {
@@ -102,11 +104,11 @@ export async function POST(
     await supabase
       .from('sequences')
       .delete()
-      .eq('campaign_id', params.id)
+      .eq('campaign_id', campaignId)
 
     // Insert new sequence steps
     const sequenceData = steps.map((step: any, index: number) => ({
-      campaign_id: params.id,
+      campaign_id: campaignId,
       step_number: index + 1,
       name: step.name || `Step ${index + 1}`,
       subject: step.subject || '',
@@ -130,7 +132,7 @@ export async function POST(
         is_sequence: true,
         total_steps: steps.length
       })
-      .eq('id', params.id)
+      .eq('id', campaignId)
 
     return NextResponse.json({ success: true })
 

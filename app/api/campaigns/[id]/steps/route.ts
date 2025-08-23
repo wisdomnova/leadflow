@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = request.cookies.get('auth-token')?.value
@@ -15,7 +15,7 @@ export async function POST(
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-    const campaignId = params.id
+    const { id: campaignId } = await params
     const body = await request.json()
 
     // Get user's organization
