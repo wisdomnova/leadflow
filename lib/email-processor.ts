@@ -2,6 +2,8 @@
 import { Resend } from 'resend'
 import { supabase } from '@/lib/supabase'
 import { replaceTemplateVariables } from '@/lib/template-variables'
+import { EmailService } from '@/lib/email-service'
+import { generateCampaignEmailHTML } from '@/lib/email-templates/campaign-template'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -11,7 +13,7 @@ interface PlanLimits {
   emailsPerHour: number
 }
 
-const PLAN_LIMITS: Record<string, PlanLimits> = {
+const PLAN_LIMITS: Record<string, PlanLimits> = { 
   starter: {
     emailsPerMonth: 5000,
     emailsPerDay: 200,
@@ -19,7 +21,7 @@ const PLAN_LIMITS: Record<string, PlanLimits> = {
   },
   pro: {
     emailsPerMonth: 25000,
-    emailsPerDay: 1000,
+    emailsPerDay: 1000,  
     emailsPerHour: 200
   },
   enterprise: {
@@ -127,19 +129,26 @@ export class EmailProcessor {
           *,
           campaign_steps (
             subject,
-            content
+            content,
+            order_index
           ),
           campaign_contacts (
+            id,
             email,
             first_name,
             last_name,
             company,
-            phone
+            phone,
+            custom_fields
           ),
           campaigns (
+            id,
             from_name,
             from_email,
-            organization_id
+            reply_to,
+            organization_id,
+            track_opens,
+            track_clicks
           )
         `)
         .eq('id', jobId)
@@ -184,42 +193,54 @@ export class EmailProcessor {
         })
         .eq('id', jobId)
 
-      // Process template variables
+      // Process template variables using your existing function
       const contact = job.campaign_contacts
       const step = job.campaign_steps
       const campaign = job.campaigns
 
-      const processedSubject = replaceTemplateVariables(step.subject, {
-        first_name: contact.first_name,
-        last_name: contact.last_name,
-        email: contact.email,
-        company: contact.company,
-        phone: contact.phone
-      })
+      // Use your existing replaceTemplateVariables function
+      const processedSubject = replaceTemplateVariables(
+        step.subject, 
+        contact, 
+        contact.custom_fields || {}
+      )
 
-      const processedContent = replaceTemplateVariables(step.content, {
-        first_name: contact.first_name,
-        last_name: contact.last_name,
-        email: contact.email,
-        company: contact.company,
-        phone: contact.phone
-      })
+      const processedContent = replaceTemplateVariables(
+        step.content, 
+        contact, 
+        contact.custom_fields || {}
+      )
 
-      // Send email via Resend
-      const emailResponse = await resend.emails.send({
-        from: `${campaign.from_name} <${campaign.from_email}>`,
-        to: [contact.email],
+      // Generate unsubscribe URL
+      const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe?campaign=${campaign.id}&contact=${contact.id}`
+
+      // Generate professional HTML email with tracking
+      const emailHTML = generateCampaignEmailHTML({
         subject: processedSubject,
-        text: processedContent,
-        headers: {
-          'X-Campaign-ID': job.campaign_id,
-          'X-Contact-ID': job.contact_id,
-          'X-Step-ID': job.step_id
-        }
+        content: processedContent,
+        recipientName: contact.first_name,
+        unsubscribeUrl,
+        companyName: campaign.from_name || 'LeadFlow'
       })
 
-      if (emailResponse.error) {
-        throw new Error(emailResponse.error.message)
+      // Send email using EmailService (with tracking)
+      const emailResult = await EmailService.sendEmail({
+        to: contact.email,
+        subject: processedSubject,
+        html: emailHTML,
+        campaignId: campaign.id,
+        contactId: contact.id,
+        stepNumber: (step.order_index || 0) + 1,
+        from: campaign.from_email ? 
+          `${campaign.from_name || 'LeadFlow'} <${campaign.from_email}>` : 
+          undefined,
+        replyTo: campaign.reply_to || undefined,
+        trackOpens: campaign.track_opens !== false,
+        trackClicks: campaign.track_clicks !== false
+      })
+
+      if (!emailResult.success) {
+        throw new Error(emailResult.error || 'Email send failed')
       }
 
       // Mark as sent
@@ -231,12 +252,13 @@ export class EmailProcessor {
         })
         .eq('id', jobId)
 
-      // Update contact status
+      // Update contact status (EmailService already does this, but ensure consistency)
       await supabase
         .from('campaign_contacts')
         .update({ 
           status: 'sent',
-          sent_at: new Date().toISOString()
+          sent_at: new Date().toISOString(),
+          last_email_id: emailResult.messageId
         })
         .eq('id', job.contact_id)
 
@@ -299,6 +321,63 @@ export class EmailProcessor {
       return successCount
     } catch (error) {
       console.error('Error processing pending jobs:', error)
+      return 0
+    }
+  }
+
+  static async retryFailedJobs(maxAttempts: number = 3): Promise<number> {
+    try {
+      const { data: failedJobs, error } = await supabase
+        .from('email_queue')
+        .select('id')
+        .eq('status', 'failed')
+        .lt('attempt_count', maxAttempts)
+
+      if (error || !failedJobs) {
+        return 0
+      }
+
+      let retriedCount = 0
+      for (const job of failedJobs) {
+        await supabase
+          .from('email_queue')
+          .update({ 
+            status: 'pending',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', job.id)
+        retriedCount++
+      }
+
+      console.log(`Reset ${retriedCount} jobs for retry`)
+      return retriedCount
+
+    } catch (error) {
+      console.error('Retry failed jobs error:', error)
+      return 0
+    }
+  }
+
+  static async cleanupOldJobs(daysOld: number = 30): Promise<number> {
+    try {
+      const cutoffDate = new Date()
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld)
+
+      const { count, error } = await supabase
+        .from('email_queue')
+        .delete()
+        .eq('status', 'sent')
+        .lt('created_at', cutoffDate.toISOString())
+
+      if (error) {
+        console.error('Cleanup error:', error)
+        return 0
+      }
+
+      return count || 0
+
+    } catch (error) {
+      console.error('Cleanup old jobs error:', error)
       return 0
     }
   }

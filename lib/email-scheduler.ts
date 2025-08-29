@@ -1,5 +1,7 @@
 // ./lib/email-scheduler.ts
 import { supabase } from '@/lib/supabase'
+import { EmailService } from './email-service'
+import { generateCampaignEmailHTML } from './email-templates/campaign-template'
 
 export interface EmailJob {
   id?: string
@@ -9,7 +11,7 @@ export interface EmailJob {
   scheduled_for: string
   status: 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled'
   attempt_count: number
-  last_error?: string
+  last_error?: string 
   created_at?: string
   updated_at?: string
 }
@@ -109,7 +111,7 @@ export class EmailScheduler {
       const { error: updateError } = await supabase
         .from('campaigns')
         .update({ 
-          status: 'sending',
+          status: 'active',
           launched_at: new Date().toISOString()
         })
         .eq('id', campaignId)
@@ -121,7 +123,7 @@ export class EmailScheduler {
       return { success: true, contactsScheduled: contacts.length }
     } catch (error) {
       console.error('Failed to launch campaign:', error)
-      throw error
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   }
 
@@ -151,7 +153,7 @@ export class EmailScheduler {
       return { success: true }
     } catch (error) {
       console.error('Failed to pause campaign:', error)
-      throw error
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   }
 
@@ -170,8 +172,8 @@ export class EmailScheduler {
 
       // Update campaign status
       const { error: updateError } = await supabase
-        .from('campaigns')
-        .update({ status: 'sending' })
+        .from('campaigns') 
+        .update({ status: 'active' })
         .eq('id', campaignId)
 
       if (updateError) {
@@ -181,7 +183,153 @@ export class EmailScheduler {
       return { success: true }
     } catch (error) {
       console.error('Failed to resume campaign:', error)
-      throw error
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
+  }
+
+  // NEW: Process individual email job using EmailService
+  static async processEmailJob(jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Get the job details
+      const { data: job, error: jobError } = await supabase
+        .from('email_queue')
+        .select(`
+          *,
+          campaigns(*),
+          campaign_contacts(*),
+          campaign_steps(*)
+        `)
+        .eq('id', jobId)
+        .single()
+
+      if (jobError || !job) {
+        throw new Error('Job not found')
+      }
+
+      // Mark job as processing
+      await supabase
+        .from('email_queue')
+        .update({ 
+          status: 'processing',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+
+      // Get step content
+      const step = job.campaign_steps
+      const campaign = job.campaigns
+      const contact = job.campaign_contacts
+
+      // Personalize content
+      const personalizedContent = this.personalizeContent(step.content, contact)
+      const personalizedSubject = this.personalizeContent(step.subject, contact)
+
+      // Generate unsubscribe URL
+      const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe?campaign=${campaign.id}&contact=${contact.id}`
+
+      // Generate professional HTML email
+      const emailHTML = generateCampaignEmailHTML({
+        subject: personalizedSubject,
+        content: personalizedContent,
+        recipientName: contact.first_name,
+        unsubscribeUrl,
+        companyName: campaign.from_name || 'LeadFlow'
+      })
+
+      // Send email using EmailService
+      const result = await EmailService.sendEmail({
+        to: contact.email,
+        subject: personalizedSubject,
+        html: emailHTML,
+        campaignId: campaign.id,
+        contactId: contact.id,
+        stepNumber: step.order_index + 1,
+        from: campaign.from_email ? 
+          `${campaign.from_name || 'LeadFlow'} <${campaign.from_email}>` : 
+          undefined,
+        replyTo: campaign.reply_to || undefined,
+        trackOpens: campaign.track_opens !== false,
+        trackClicks: campaign.track_clicks !== false
+      })
+
+      // Update job status based on result
+      if (result.success) {
+        await supabase
+          .from('email_queue')
+          .update({ 
+            status: 'sent',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId)
+      } else {
+        await supabase
+          .from('email_queue')
+          .update({ 
+            status: 'failed',
+            attempt_count: job.attempt_count + 1,
+            last_error: result.error,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId)
+      }
+
+      return result
+
+    } catch (error) {
+      console.error('Failed to process email job:', error)
+      
+      // Mark job as failed
+      await supabase
+        .from('email_queue')
+        .update({ 
+          status: 'failed',
+          last_error: error instanceof Error ? error.message : 'Unknown error',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
+  }
+
+  // NEW: Get pending jobs ready to be sent
+  static async getPendingJobs(limit: number = 10) {
+    try {
+      const { data: jobs, error } = await supabase
+        .from('email_queue')
+        .select(`
+          *,
+          campaigns(*),
+          campaign_contacts(*),
+          campaign_steps(*)
+        `)
+        .eq('status', 'pending')
+        .lte('scheduled_for', new Date().toISOString())
+        .limit(limit)
+        .order('scheduled_for')
+
+      if (error) {
+        throw error
+      }
+
+      return jobs || []
+    } catch (error) {
+      console.error('Failed to get pending jobs:', error)
+      return []
+    }
+  }
+
+  // Helper method for personalizing content
+  private static personalizeContent(content: string, contact: any): string {
+    return content
+      .replace(/\{\{first_name\}\}/g, contact.first_name || '')
+      .replace(/\{\{last_name\}\}/g, contact.last_name || '')
+      .replace(/\{\{full_name\}\}/g, `${contact.first_name || ''} ${contact.last_name || ''}`.trim())
+      .replace(/\{\{company\}\}/g, contact.company || '')
+      .replace(/\{\{email\}\}/g, contact.email || '')
+      .replace(/\{\{phone\}\}/g, contact.phone || '')
   }
 }

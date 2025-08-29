@@ -7,7 +7,7 @@ interface SequenceStore {
   currentStep: number
   isLoading: boolean
   error: string | null
-  
+   
   // Actions
   addStep: () => void
   removeStep: (stepId: string) => void

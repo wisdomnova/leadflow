@@ -10,7 +10,7 @@ interface PasswordResetProps {
 
 export const emailVerificationTemplate = ({ name, verificationUrl }: EmailVerificationProps) => `
 <!DOCTYPE html>
-<html>
+<html> 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

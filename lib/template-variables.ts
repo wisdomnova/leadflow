@@ -8,7 +8,7 @@ export interface TemplateVariable {
 
 export const BUILT_IN_VARIABLES: TemplateVariable[] = [ 
   {
-    key: 'first_name',
+    key: 'first_name', 
     label: 'First Name',
     description: 'Contact\'s first name',
     example: 'John'

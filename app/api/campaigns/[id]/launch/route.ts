@@ -40,7 +40,7 @@ export async function POST(
     if (campaignError || !campaign) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
     }
-
+ 
     if (campaign.status !== 'draft') {
       return NextResponse.json({ error: 'Campaign is not in draft status' }, { status: 400 })
     }
