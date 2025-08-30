@@ -235,126 +235,110 @@ export class EmailProcessor {
   }
 
   // **NEW: Send bulk emails using Resend batch API**
-  static async sendBulkEmails(campaignId: string, step: any, campaign: any, contacts: any[]): Promise<number> {
-    try {
-      console.log(`🚀 Sending bulk email to ${contacts.length} recipients`)
+static async sendBulkEmails(campaignId: string, step: any, campaign: any, contacts: any[]): Promise<number> {
+  try {
+    console.log(`🚀 Sending TRUE bulk email to ${contacts.length} recipients`)
 
-      // Mark all contacts as processing
-      const contactIds = contacts.map(c => c.id)
-      await supabase
-        .from('campaign_contacts')
-        .update({ 
-          status: 'processing',
-          updated_at: new Date().toISOString()
-        })
-        .in('id', contactIds)
-
-      // **Option 1: Individual personalized emails in batch (RECOMMENDED)**
-      const emailPromises = contacts.map(async (contact) => {
-        try {
-          // Personalize content for each contact
-          const processedSubject = replaceTemplateVariables(
-            step.subject, 
-            contact.contacts, 
-            contact.contacts.custom_fields || {}
-          )
-
-          const processedContent = replaceTemplateVariables(
-            step.content, 
-            contact.contacts, 
-            contact.contacts.custom_fields || {}
-          )
-
-          const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe?campaign=${campaign.id}&contact=${contact.contacts.id}`
-
-          const emailHTML = generateCampaignEmailHTML({
-            subject: processedSubject,
-            content: processedContent,
-            recipientName: contact.contacts.first_name,
-            unsubscribeUrl,
-            companyName: campaign.from_name || 'LeadFlow'
-          })
-
-          // Send individual email with personalization
-          const result = await resend.emails.send({
-            from: campaign.from_email || 'noreply@resend.dev',
-            to: [contact.contacts.email],
-            subject: processedSubject,
-            html: emailHTML,
-            replyTo: campaign.reply_to || undefined,
-            tags: [
-              { name: 'campaign_id', value: campaignId },
-              { name: 'contact_id', value: contact.contacts.id },
-              { name: 'step_number', value: '1' },
-              { name: 'bulk_batch', value: 'true' }
-            ]
-          })
-
-          if (result.error) {
-            throw new Error(result.error.message)
-          }
-
-          // Mark as sent
-          await supabase
-            .from('campaign_contacts')
-            .update({ 
-              status: 'sent',
-              sent_at: new Date().toISOString(),
-              last_email_id: result.data?.id,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', contact.id)
-
-          console.log(`✅ Sent to ${contact.contacts.email}`)
-          return { success: true, contact: contact.contacts.email }
-
-        } catch (error) {
-          console.error(`❌ Failed to send to ${contact.contacts.email}:`, error)
-          
-          // Mark as failed
-          await supabase
-            .from('campaign_contacts')
-            .update({ 
-              status: 'failed',
-              last_error: error instanceof Error ? error.message : 'Unknown error',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', contact.id)
-
-          return { success: false, contact: contact.contacts.email, error }
-        }
+    // Mark all contacts as processing
+    const contactIds = contacts.map(c => c.id)
+    await supabase
+      .from('campaign_contacts')
+      .update({ 
+        status: 'processing',
+        updated_at: new Date().toISOString()
       })
+      .in('id', contactIds)
 
-      // **Execute all emails concurrently (this is the bulk magic!)**
-      const results = await Promise.allSettled(emailPromises)
-      
-      const successCount = results.filter(r => 
-        r.status === 'fulfilled' && r.value.success
-      ).length
+    // **GATHER ALL EMAIL ADDRESSES FOR BULK SENDING**
+    const emailAddresses = contacts.map(contact => contact.contacts.email)
+    
+    console.log(`📧 Bulk sending to: ${emailAddresses.join(', ')}`)
 
-      const failedCount = results.length - successCount
+    // **PROCESS TEMPLATE VARIABLES (use first contact as base or remove personalization)**
+    // Option 1: Remove personalization for true bulk
+    let processedSubject = step.subject
+    let processedContent = step.content
+    
+    // Remove template variables for bulk sending
+    processedSubject = processedSubject
+      .replace(/\{\{first_name\}\}/g, '')
+      .replace(/\{\{last_name\}\}/g, '')
+      .replace(/\{\{company\}\}/g, '')
+      .replace(/\{\{.*?\}\}/g, '') // Remove any other template variables
+      .trim()
+    
+    processedContent = processedContent
+      .replace(/Hi \{\{first_name\}\},?/g, 'Hi there,')
+      .replace(/Hello \{\{first_name\}\},?/g, 'Hello,')
+      .replace(/\{\{first_name\}\}/g, '')
+      .replace(/\{\{last_name\}\}/g, '')
+      .replace(/\{\{company\}\}/g, '')
+      .replace(/\{\{.*?\}\}/g, '') // Remove any other template variables
+      .trim()
 
-      console.log(`📊 Bulk send complete: ${successCount} sent, ${failedCount} failed`)
-      
-      return successCount
+    // **GENERATE HTML FOR BULK EMAIL**
+    const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe?campaign=${campaign.id}` // Generic unsubscribe
 
-    } catch (error) {
-      console.error('Bulk send error:', error)
-      
-      // Mark all as failed if bulk operation fails
-      const contactIds = contacts.map(c => c.id)
-      await supabase
-        .from('campaign_contacts')
-        .update({ 
-          status: 'failed',
-          last_error: error instanceof Error ? error.message : 'Bulk send failed',
-          updated_at: new Date().toISOString()
-        })
-        .in('id', contactIds)
+    const emailHTML = generateCampaignEmailHTML({
+      subject: processedSubject,
+      content: processedContent,
+      recipientName: '', // No personalization for bulk
+      unsubscribeUrl,
+      companyName: campaign.from_name || 'LeadFlow'
+    })
 
-      return 0
+    // **SEND ONE EMAIL TO ALL RECIPIENTS**
+    const result = await resend.emails.send({
+      from: campaign.from_email || 'noreply@resend.dev',
+      to: emailAddresses, // <-- THIS IS THE KEY: Array of all emails
+      subject: processedSubject,
+      html: emailHTML,
+      replyTo: campaign.reply_to || undefined,
+      tags: [
+        { name: 'campaign_id', value: campaignId },
+        { name: 'step_number', value: '1' },
+        { name: 'bulk_batch', value: 'true' },
+        { name: 'recipient_count', value: emailAddresses.length.toString() }
+      ]
+    })
+
+    if (result.error) {
+      throw new Error(result.error.message)
     }
+
+    // **MARK ALL CONTACTS AS SENT**
+    await supabase
+      .from('campaign_contacts')
+      .update({ 
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        last_email_id: result.data?.id,
+        updated_at: new Date().toISOString()
+      })
+      .in('id', contactIds)
+
+    console.log(`✅ Bulk email sent successfully to ${emailAddresses.length} recipients`)
+    console.log(`📊 Message ID: ${result.data?.id}`)
+    
+    return emailAddresses.length
+
+  } catch (error) {
+    console.error('Bulk send error:', error)
+    
+    // Mark all as failed if bulk operation fails
+    const contactIds = contacts.map(c => c.id)
+    await supabase
+      .from('campaign_contacts')
+      .update({ 
+        status: 'failed',
+        last_error: error instanceof Error ? error.message : 'Bulk send failed',
+        updated_at: new Date().toISOString()
+      })
+      .in('id', contactIds)
+
+    return 0
   }
+}
 
   // Keep existing retry and cleanup methods...
   static async retryFailedJobs(maxRetries: number = 3): Promise<number> {
