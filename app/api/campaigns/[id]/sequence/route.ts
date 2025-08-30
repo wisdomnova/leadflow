@@ -25,7 +25,7 @@ export async function GET(
       .select('organization_id')
       .eq('id', campaignId)
       .single()
-
+ 
     if (campaignError || !campaign) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
     }

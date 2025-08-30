@@ -515,183 +515,221 @@ static async checkRateLimits(organizationId: string): Promise<{ canSend: boolean
   }
 }
 
-  static async processEmailJob(campaignContactId: string): Promise<{ success: boolean, error?: string }> {
-    try {
-      console.log(`Processing campaign contact: ${campaignContactId}`)
-      
-      // Get the campaign contact with related data
-      const { data: campaignContact, error: contactError } = await supabase
-        .from('campaign_contacts')
-        .select(`
-          *,
-          contacts (
-            id,
-            email,
-            first_name,
-            last_name,
-            company,
-            phone,
-            status,
-            custom_fields
-          ),
-          campaigns (
-            id,
-            from_name,
-            from_email,
-            reply_to,
-            organization_id,
-            track_opens,
-            track_clicks
-          )
-        `)
-        .eq('id', campaignContactId)
-        .single()
+static async processEmailJob(campaignContactId: string): Promise<{ success: boolean, error?: string }> {
+  try {
+    console.log(`Processing campaign contact: ${campaignContactId}`)
+    
+    // Get the campaign contact with related data
+    const { data: campaignContact, error: contactError } = await supabase
+      .from('campaign_contacts')
+      .select(`
+        *,
+        contacts (
+          id,
+          email,
+          first_name,
+          last_name,
+          company,
+          phone,
+          status,
+          custom_fields
+        ),
+        campaigns (
+          id,
+          name,
+          subject,
+          content,
+          from_name,
+          from_email,
+          reply_to,
+          organization_id,
+          track_opens,
+          track_clicks
+        )
+      `)
+      .eq('id', campaignContactId)
+      .single()
 
-      if (contactError || !campaignContact) {
-        throw new Error('Campaign contact not found')
-      }
+    if (contactError || !campaignContact) {
+      throw new Error('Campaign contact not found')
+    }
 
-      // Check if contact is ready to process
-      const now = new Date()
-      const scheduledTime = new Date(campaignContact.scheduled_send_time || now)
-      
-      if (scheduledTime > now) {
-        return { success: false, error: 'Contact not ready yet' }
-      }
+    // Check if contact is ready to process
+    const now = new Date()
+    const scheduledTime = new Date(campaignContact.scheduled_send_time || now)
+    
+    if (scheduledTime > now) {
+      return { success: false, error: 'Contact not ready yet' }
+    }
 
-      if (campaignContact.status !== 'pending') {
-        return { success: false, error: 'Contact already processed' }
-      }
+    if (campaignContact.status !== 'pending') {
+      return { success: false, error: 'Contact already processed' }
+    }
 
-      // Check if contact is active
-      if (campaignContact.contacts?.status !== 'active') {
-        await supabase
-          .from('campaign_contacts')
-          .update({
-            status: 'skipped',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', campaignContactId)
-        return { success: false, error: 'Contact not active' }
-      }
-
-      // Check rate limits
-      const rateLimitCheck = await this.checkRateLimits(campaignContact.campaigns?.organization_id)
-      if (!rateLimitCheck.canSend) {
-        // Reschedule for later
-        await supabase
-          .from('campaign_contacts')
-          .update({ 
-            scheduled_send_time: new Date(now.getTime() + 15 * 60 * 1000).toISOString()
-          })
-          .eq('id', campaignContactId)
-        
-        return { success: false, error: rateLimitCheck.reason }
-      }
-
-      // Mark as processing
+    // Check if contact is active
+    if (campaignContact.contacts?.status !== 'active') {
       await supabase
         .from('campaign_contacts')
-        .update({ 
-          status: 'processing',
+        .update({
+          status: 'skipped',
           updated_at: new Date().toISOString()
         })
         .eq('id', campaignContactId)
+      return { success: false, error: 'Contact not active' }
+    }
 
-      // Get the sequence step for this campaign (start with step 1)
-      const { data: step, error: stepError } = await supabase
-        .from('sequence_steps')
-        .select('*')
-        .eq('campaign_id', campaignContact.campaign_id)
-        .eq('step_number', 1)
+    // Check rate limits
+    const rateLimitCheck = await this.checkRateLimits(campaignContact.campaigns?.organization_id)
+    if (!rateLimitCheck.canSend) {
+      // Reschedule for later
+      await supabase
+        .from('campaign_contacts')
+        .update({ 
+          scheduled_send_time: new Date(now.getTime() + 15 * 60 * 1000).toISOString()
+        })
+        .eq('id', campaignContactId)
+      
+      return { success: false, error: rateLimitCheck.reason }
+    }
+
+    // Mark as processing
+    await supabase
+      .from('campaign_contacts')
+      .update({ 
+        status: 'processing',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', campaignContactId)
+
+    // *** UPDATED: Use 'campaign_steps' table instead of 'sequences' ***
+    const { data: steps, error: stepError } = await supabase
+      .from('campaign_steps') // <-- Changed from 'sequences' to 'campaign_steps'
+      .select('*')
+      .eq('campaign_id', campaignContact.campaign_id)
+      .order('order_index') // <-- Use order_index instead of step_number
+
+    if (stepError) {
+      throw new Error(`Error fetching campaign steps: ${stepError.message}`)
+    }
+
+    let step: any
+
+    if (!steps || steps.length === 0) {
+      // CREATE A DEFAULT CAMPAIGN STEP IF NONE EXISTS
+      console.warn(`No campaign steps found for campaign ${campaignContact.campaign_id}, creating default step`)
+      
+      const { data: newStep, error: createError } = await supabase
+        .from('campaign_steps') // <-- Use campaign_steps table
+        .insert({
+          campaign_id: campaignContact.campaign_id,
+          type: 'email',
+          subject: campaignContact.campaigns?.subject || 'Hello {{first_name}}!',
+          content: campaignContact.campaigns?.content || `Hi {{first_name}},
+
+Thank you for your interest! We'd love to connect with you.
+
+Best regards,
+${campaignContact.campaigns?.from_name || 'The Team'}`,
+          delay_days: 0,
+          delay_hours: 0,
+          order_index: 0
+        })
+        .select()
         .single()
 
-      if (stepError || !step) {
-        throw new Error(`No sequence step found for campaign ${campaignContact.campaign_id}`)
+      if (createError) {
+        throw new Error(`Failed to create default campaign step: ${createError.message}`)
       }
 
-      // Process template variables using your existing function
-      const contact = campaignContact.contacts
-      const campaign = campaignContact.campaigns
+      console.log(`Created default campaign step for campaign ${campaignContact.campaign_id}`)
+      step = newStep
+    } else {
+      // Use the first step (order_index = 0)
+      step = steps[0]
+    }
 
-      // Use your existing replaceTemplateVariables function
-      const processedSubject = replaceTemplateVariables(
-        step.subject, 
-        contact, 
-        contact.custom_fields || {}
-      )
+    // Process template variables using your existing function
+    const contact = campaignContact.contacts
+    const campaign = campaignContact.campaigns
 
-      const processedContent = replaceTemplateVariables(
-        step.content, 
-        contact, 
-        contact.custom_fields || {}
-      )
+    // Use your existing replaceTemplateVariables function
+    const processedSubject = replaceTemplateVariables(
+      step.subject, 
+      contact, 
+      contact.custom_fields || {}
+    )
 
-      // Generate unsubscribe URL
-      const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe?campaign=${campaign.id}&contact=${contact.id}`
+    const processedContent = replaceTemplateVariables(
+      step.content, 
+      contact, 
+      contact.custom_fields || {}
+    )
 
-      // Generate professional HTML email with tracking
-      const emailHTML = generateCampaignEmailHTML({
-        subject: processedSubject,
-        content: processedContent,
-        recipientName: contact.first_name,
-        unsubscribeUrl,
-        companyName: campaign.from_name || 'LeadFlow'
+    // Generate unsubscribe URL
+    const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe?campaign=${campaign.id}&contact=${contact.id}`
+
+    // Generate professional HTML email with tracking
+    const emailHTML = generateCampaignEmailHTML({
+      subject: processedSubject,
+      content: processedContent,
+      recipientName: contact.first_name,
+      unsubscribeUrl,
+      companyName: campaign.from_name || 'LeadFlow'
+    })
+
+    // Send email using EmailService (with tracking)
+    const emailResult = await EmailService.sendEmail({
+      to: contact.email,
+      subject: processedSubject,
+      html: emailHTML,
+      campaignId: campaign.id,
+      contactId: contact.id,
+      stepNumber: (step.order_index || 0) + 1, // <-- Use order_index + 1 for step number
+      from: campaign.from_email ? 
+        `${campaign.from_name || 'LeadFlow'} <${campaign.from_email}>` : 
+        undefined,
+      replyTo: campaign.reply_to || undefined,
+      trackOpens: campaign.track_opens !== false,
+      trackClicks: campaign.track_clicks !== false
+    })
+
+    if (!emailResult.success) {
+      throw new Error(emailResult.error || 'Email send failed')
+    }
+
+    // Mark as sent
+    await supabase
+      .from('campaign_contacts')
+      .update({ 
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_email_id: emailResult.messageId
       })
+      .eq('id', campaignContactId)
 
-      // Send email using EmailService (with tracking)
-      const emailResult = await EmailService.sendEmail({
-        to: contact.email,
-        subject: processedSubject,
-        html: emailHTML,
-        campaignId: campaign.id,
-        contactId: contact.id,
-        stepNumber: step.step_number,
-        from: campaign.from_email ? 
-          `${campaign.from_name || 'LeadFlow'} <${campaign.from_email}>` : 
-          undefined,
-        replyTo: campaign.reply_to || undefined,
-        trackOpens: campaign.track_opens !== false,
-        trackClicks: campaign.track_clicks !== false
+    console.log(`✅ Email sent to ${contact.email}`)
+    return { success: true }
+
+  } catch (error) {
+    console.error('Email processing error:', error)
+    
+    // Mark as failed
+    await supabase
+      .from('campaign_contacts')
+      .update({ 
+        status: 'failed',
+        last_error: error instanceof Error ? error.message : 'Unknown error',
+        updated_at: new Date().toISOString()
       })
+      .eq('id', campaignContactId)
 
-      if (!emailResult.success) {
-        throw new Error(emailResult.error || 'Email send failed')
-      }
-
-      // Mark as sent
-      await supabase
-        .from('campaign_contacts')
-        .update({ 
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          last_email_id: emailResult.messageId
-        })
-        .eq('id', campaignContactId)
-
-      console.log(`✅ Email sent to ${contact.email}`)
-      return { success: true }
-
-    } catch (error) {
-      console.error('Email processing error:', error)
-      
-      // Mark as failed
-      await supabase
-        .from('campaign_contacts')
-        .update({ 
-          status: 'failed',
-          last_error: error instanceof Error ? error.message : 'Unknown error',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', campaignContactId)
-
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
     }
   }
+}
 
   static async processPendingJobs(batchSize: number = 10): Promise<number> {
     try {

@@ -889,7 +889,7 @@ export default function CreateCampaignPage() {
                       
                       if (selectedContacts.length === 0) {
                         alert('Please select at least one contact for your campaign.')
-                        return
+                        return 
                       }
                       
                       try {

@@ -27,7 +27,7 @@ export async function GET(
     if (userError || !userData) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
+ 
     // Get campaign
     const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
