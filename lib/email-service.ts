@@ -11,7 +11,7 @@ interface SendEmailOptions {
   html: string
   campaignId: string
   contactId: string 
-  stepNumber?: number
+  stepNumber?: number 
   from?: string
   replyTo?: string
   trackOpens?: boolean
@@ -160,69 +160,106 @@ export class EmailService {
     }
   }
 
-  static async logEmailEvent(event: {
-    campaignId: string
-    contactId: string
-    stepNumber: number
-    type: 'delivery' | 'open' | 'click' | 'bounce' | 'complaint' | 'unsubscribe'
-    messageId?: string
-    url?: string
-    userAgent?: string
-    ipAddress?: string
-    metadata?: any
-  }): Promise<void> {
-    try {
-      await supabase
-        .from('email_events')
-        .insert({
-          campaign_id: event.campaignId,
-          contact_id: event.contactId,
-          step_number: event.stepNumber,
-          event_type: event.type,
-          message_id: event.messageId,
-          url: event.url,
-          user_agent: event.userAgent,
-          ip_address: event.ipAddress,
-          metadata: event.metadata,
-          created_at: new Date().toISOString()
-        })
+static async logEmailEvent(event: {
+  campaignId: string
+  contactId: string
+  stepNumber: number
+  type: 'delivery' | 'open' | 'click' | 'bounce' | 'complaint' | 'unsubscribe'
+  messageId?: string
+  url?: string
+  userAgent?: string
+  ipAddress?: string
+  metadata?: any
+}): Promise<void> {
+  try {
+    console.log('🔍 EmailService.logEmailEvent called with:', {
+      campaignId: event.campaignId,
+      contactId: event.contactId,
+      stepNumber: event.stepNumber,
+      type: event.type,
+      messageId: event.messageId
+    })
 
-      // Update contact timestamps based on event type
-      const updates: any = {}
-      
-      switch (event.type) {
-        case 'open':
-          updates.opened_at = new Date().toISOString()
-          if (!updates.status || updates.status === 'sent') {
-            updates.status = 'opened'
-          }
-          break
-        case 'click':
-          updates.clicked_at = new Date().toISOString()
-          updates.status = 'clicked'
-          break
-        case 'bounce':
-          updates.bounced_at = new Date().toISOString()
-          updates.status = 'bounced'
-          break
-        case 'complaint':
-          updates.status = 'complained'
-          break
-        case 'unsubscribe':
-          updates.unsubscribed_at = new Date().toISOString()
-          updates.status = 'unsubscribed'
-          break
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await supabase
-          .from('campaign_contacts')
-          .update(updates)
-          .eq('id', event.contactId)
-      }
-
-    } catch (error) {
-      console.error('Failed to log email event:', error)
+    const eventData = {
+      campaign_id: event.campaignId,
+      contact_id: event.contactId,
+      step_number: event.stepNumber,
+      event_type: event.type,
+      message_id: event.messageId,
+      url: event.url,
+      user_agent: event.userAgent,
+      ip_address: event.ipAddress,
+      metadata: event.metadata,
+      created_at: new Date().toISOString()
     }
+
+    console.log('📝 Inserting email event data:', eventData)
+
+    const { data, error } = await supabase
+      .from('email_events')
+      .insert(eventData)
+      .select() // Add select to see what was inserted
+
+    if (error) {
+      console.error('❌ Failed to insert email event:', error)
+      console.error('Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
+    } else {
+      console.log('✅ Email event inserted successfully:', data)
+    }
+
+    // Update contact timestamps based on event type
+    const updates: any = {}
+    
+    switch (event.type) {
+      case 'delivery':
+        // Don't update status for delivery, keep it as 'sent'
+        console.log('📧 Delivery event - not updating contact status')
+        break
+      case 'open':
+        updates.opened_at = new Date().toISOString()
+        if (!updates.status || updates.status === 'sent') {
+          updates.status = 'opened'
+        }
+        break
+      case 'click':
+        updates.clicked_at = new Date().toISOString()
+        updates.status = 'clicked'
+        break
+      case 'bounce':
+        updates.bounced_at = new Date().toISOString()
+        updates.status = 'bounced'
+        break
+      case 'complaint':
+        updates.status = 'complained'
+        break
+      case 'unsubscribe':
+        updates.unsubscribed_at = new Date().toISOString()
+        updates.status = 'unsubscribed'
+        break
+    }
+
+    if (Object.keys(updates).length > 0) {
+      console.log('📝 Updating campaign_contacts with:', updates)
+      
+      const { error: updateError } = await supabase
+        .from('campaign_contacts')
+        .update(updates)
+        .eq('id', event.contactId)
+
+      if (updateError) {
+        console.error('❌ Failed to update campaign_contacts:', updateError)
+      } else {
+        console.log('✅ Campaign contact updated successfully')
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Failed to log email event:', error)
   }
+}
 }

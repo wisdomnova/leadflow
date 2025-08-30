@@ -77,12 +77,13 @@ export async function POST(request: NextRequest) {
           campaignId,
           contactId,
           stepNumber,
-          type: 'delivery', // or 'sent' - depends on your EmailService implementation
-          messageId: event.data?.id,
+          type: 'delivery',
+          messageId: event.data?.email_id, // ✅ Fixed: use email_id instead of id
           metadata: {
             to: event.data?.to,
             subject: event.data?.subject,
-            sentAt: event.created_at
+            from: event.data?.from,
+            sentAt: event.data?.created_at || event.created_at
           }
         })
         console.log('✅ Logged email sent event')
@@ -94,10 +95,12 @@ export async function POST(request: NextRequest) {
           contactId,
           stepNumber,
           type: 'delivery',
-          messageId: event.data?.id,
+          messageId: event.data?.email_id, // ✅ Fixed: use email_id instead of id
           metadata: {
-            deliveredAt: event.created_at,
-            to: event.data?.to
+            to: event.data?.to,
+            subject: event.data?.subject,
+            from: event.data?.from,
+            deliveredAt: event.data?.created_at || event.created_at
           }
         })
         console.log('✅ Logged email delivery event')
