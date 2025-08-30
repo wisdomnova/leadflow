@@ -51,17 +51,19 @@ export async function POST(request: NextRequest) {
       tags: event.data?.tags
     })
     
-    // Extract campaign and contact info from tags
-    const tags = event.data?.tags || []
-    const campaignId = tags.find((tag: any) => tag.name === 'campaign_id')?.value
-    const contactId = tags.find((tag: any) => tag.name === 'contact_id')?.value
-    const stepNumber = parseInt(tags.find((tag: any) => tag.name === 'step_number')?.value || '1')
+    // *** FIXED: Extract tags correctly (tags is an object, not an array) ***
+    const tags = event.data?.tags || {}
+    const campaignId = tags.campaign_id
+    const contactId = tags.contact_id
+    const stepNumber = parseInt(tags.step_number || '1')
+
+    console.log('Extracted from tags:', { campaignId, contactId, stepNumber, tagsType: typeof tags })
 
     if (!campaignId || !contactId) {
       console.warn('Missing campaign or contact ID in webhook event:', { 
         campaignId, 
         contactId, 
-        availableTags: tags.map((t: any) => t.name) 
+        availableTags: Object.keys(tags)
       })
       return NextResponse.json({ received: true, warning: 'Missing required tags' })
     }
