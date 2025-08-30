@@ -1,3 +1,388 @@
+// // ./lib/email-processor.ts
+// import { Resend } from 'resend'
+// import { supabase } from '@/lib/supabase'
+// import { replaceTemplateVariables } from '@/lib/template-variables'
+// import { EmailService } from '@/lib/email-service'
+// import { generateCampaignEmailHTML } from '@/lib/email-templates/campaign-template'
+
+// const resend = new Resend(process.env.RESEND_API_KEY)
+
+// interface PlanLimits {
+//   emailsPerMonth: number
+//   emailsPerDay: number
+//   emailsPerHour: number
+// }
+
+// const PLAN_LIMITS: Record<string, PlanLimits> = { 
+//   starter: {
+//     emailsPerMonth: 5000,
+//     emailsPerDay: 200,
+//     emailsPerHour: 50
+//   },
+//   pro: {
+//     emailsPerMonth: 25000,
+//     emailsPerDay: 1000,  
+//     emailsPerHour: 200
+//   },
+//   enterprise: {
+//     emailsPerMonth: 100000,
+//     emailsPerDay: 5000,
+//     emailsPerHour: 1000
+//   }
+// }
+
+// export class EmailProcessor {
+//   static async checkRateLimits(organizationId: string): Promise<{ canSend: boolean, reason?: string }> {
+//     try {
+//       // Get organization plan
+//       const { data: org, error: orgError } = await supabase
+//         .from('organizations')
+//         .select('subscription_plan')
+//         .eq('id', organizationId)
+//         .single()
+
+//       if (orgError || !org) {
+//         return { canSend: false, reason: 'Organization not found' }
+//       }
+
+//       const plan = org.subscription_plan || 'starter'
+//       const limits = PLAN_LIMITS[plan]
+
+//       if (!limits) {
+//         return { canSend: false, reason: 'Invalid plan' }
+//       }
+
+//       const now = new Date()
+      
+//       // Check hourly limit
+//       const hourStart = new Date(now)
+//       hourStart.setMinutes(0, 0, 0)
+      
+//       const { count: hourlyCount, error: hourlyError } = await supabase
+//         .from('email_queue')
+//         .select('*', { count: 'exact', head: true })
+//         .eq('status', 'sent')
+//         .gte('updated_at', hourStart.toISOString())
+//         .lte('updated_at', now.toISOString())
+
+//       if (hourlyError) {
+//         console.error('Error checking hourly limit:', hourlyError)
+//         return { canSend: false, reason: 'Rate limit check failed' }
+//       }
+
+//       if ((hourlyCount || 0) >= limits.emailsPerHour) {
+//         return { canSend: false, reason: `Hourly limit reached (${limits.emailsPerHour}/hour)` }
+//       }
+
+//       // Check daily limit
+//       const dayStart = new Date(now)
+//       dayStart.setHours(0, 0, 0, 0)
+      
+//       const { count: dailyCount, error: dailyError } = await supabase
+//         .from('email_queue')
+//         .select('*', { count: 'exact', head: true })
+//         .eq('status', 'sent')
+//         .gte('updated_at', dayStart.toISOString())
+//         .lte('updated_at', now.toISOString())
+
+//       if (dailyError) {
+//         console.error('Error checking daily limit:', dailyError)
+//         return { canSend: false, reason: 'Rate limit check failed' }
+//       }
+
+//       if ((dailyCount || 0) >= limits.emailsPerDay) {
+//         return { canSend: false, reason: `Daily limit reached (${limits.emailsPerDay}/day)` }
+//       }
+
+//       // Check monthly limit
+//       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      
+//       const { count: monthlyCount, error: monthlyError } = await supabase
+//         .from('email_queue')
+//         .select('*', { count: 'exact', head: true })
+//         .eq('status', 'sent')
+//         .gte('updated_at', monthStart.toISOString())
+//         .lte('updated_at', now.toISOString())
+
+//       if (monthlyError) {
+//         console.error('Error checking monthly limit:', monthlyError)
+//         return { canSend: false, reason: 'Rate limit check failed' }
+//       }
+
+//       if ((monthlyCount || 0) >= limits.emailsPerMonth) {
+//         return { canSend: false, reason: `Monthly limit reached (${limits.emailsPerMonth}/month)` }
+//       }
+
+//       return { canSend: true }
+//     } catch (error) {
+//       console.error('Rate limit check error:', error)
+//       return { canSend: false, reason: 'Rate limit check failed' }
+//     }
+//   }
+
+//   static async processEmailJob(jobId: string): Promise<{ success: boolean, error?: string }> {
+//     try {
+//       // Get the email job with related data
+//       const { data: job, error: jobError } = await supabase
+//         .from('email_queue')
+//         .select(`
+//           *,
+//           campaign_steps (
+//             subject,
+//             content,
+//             order_index
+//           ),
+//           campaign_contacts (
+//             id,
+//             email,
+//             first_name,
+//             last_name,
+//             company,
+//             phone,
+//             custom_fields
+//           ),
+//           campaigns (
+//             id,
+//             from_name,
+//             from_email,
+//             reply_to,
+//             organization_id,
+//             track_opens,
+//             track_clicks
+//           )
+//         `)
+//         .eq('id', jobId)
+//         .single()
+
+//       if (jobError || !job) {
+//         throw new Error('Email job not found')
+//       }
+
+//       // Check if job is ready to process
+//       const now = new Date()
+//       const scheduledTime = new Date(job.scheduled_for)
+      
+//       if (scheduledTime > now) {
+//         return { success: false, error: 'Job not ready yet' }
+//       }
+
+//       if (job.status !== 'pending') {
+//         return { success: false, error: 'Job already processed' }
+//       }
+
+//       // Check rate limits
+//       const rateLimitCheck = await this.checkRateLimits(job.campaigns.organization_id)
+//       if (!rateLimitCheck.canSend) {
+//         // Reschedule for later
+//         await supabase
+//           .from('email_queue')
+//           .update({ 
+//             scheduled_for: new Date(now.getTime() + 15 * 60 * 1000).toISOString() // Try again in 15 minutes
+//           })
+//           .eq('id', jobId)
+        
+//         return { success: false, error: rateLimitCheck.reason }
+//       }
+
+//       // Mark as processing
+//       await supabase
+//         .from('email_queue')
+//         .update({ 
+//           status: 'processing',
+//           attempt_count: job.attempt_count + 1
+//         })
+//         .eq('id', jobId)
+
+//       // Process template variables using your existing function
+//       const contact = job.campaign_contacts
+//       const step = job.campaign_steps
+//       const campaign = job.campaigns
+
+//       // Use your existing replaceTemplateVariables function
+//       const processedSubject = replaceTemplateVariables(
+//         step.subject, 
+//         contact, 
+//         contact.custom_fields || {}
+//       )
+
+//       const processedContent = replaceTemplateVariables(
+//         step.content, 
+//         contact, 
+//         contact.custom_fields || {}
+//       )
+
+//       // Generate unsubscribe URL
+//       const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe?campaign=${campaign.id}&contact=${contact.id}`
+
+//       // Generate professional HTML email with tracking
+//       const emailHTML = generateCampaignEmailHTML({
+//         subject: processedSubject,
+//         content: processedContent,
+//         recipientName: contact.first_name,
+//         unsubscribeUrl,
+//         companyName: campaign.from_name || 'LeadFlow'
+//       })
+
+//       // Send email using EmailService (with tracking)
+//       const emailResult = await EmailService.sendEmail({
+//         to: contact.email,
+//         subject: processedSubject,
+//         html: emailHTML,
+//         campaignId: campaign.id,
+//         contactId: contact.id,
+//         stepNumber: (step.order_index || 0) + 1,
+//         from: campaign.from_email ? 
+//           `${campaign.from_name || 'LeadFlow'} <${campaign.from_email}>` : 
+//           undefined,
+//         replyTo: campaign.reply_to || undefined,
+//         trackOpens: campaign.track_opens !== false,
+//         trackClicks: campaign.track_clicks !== false
+//       })
+
+//       if (!emailResult.success) {
+//         throw new Error(emailResult.error || 'Email send failed')
+//       }
+
+//       // Mark as sent
+//       await supabase
+//         .from('email_queue')
+//         .update({ 
+//           status: 'sent',
+//           updated_at: new Date().toISOString()
+//         })
+//         .eq('id', jobId)
+
+//       // Update contact status (EmailService already does this, but ensure consistency)
+//       await supabase
+//         .from('campaign_contacts')
+//         .update({ 
+//           status: 'sent',
+//           sent_at: new Date().toISOString(),
+//           last_email_id: emailResult.messageId
+//         })
+//         .eq('id', job.contact_id)
+
+//       return { success: true }
+
+//     } catch (error) {
+//       console.error('Email processing error:', error)
+      
+//       // Mark as failed
+//       await supabase
+//         .from('email_queue')
+//         .update({ 
+//           status: 'failed',
+//           last_error: error instanceof Error ? error.message : 'Unknown error'
+//         })
+//         .eq('id', jobId)
+
+//       return { 
+//         success: false, 
+//         error: error instanceof Error ? error.message : 'Unknown error' 
+//       }
+//     }
+//   }
+
+//   static async processPendingJobs(batchSize: number = 10): Promise<number> {
+//     try {
+//       // Get pending jobs that are ready to process
+//       const now = new Date()
+//       const { data: jobs, error: jobsError } = await supabase
+//         .from('email_queue')
+//         .select('id')
+//         .eq('status', 'pending')
+//         .lte('scheduled_for', now.toISOString())
+//         .order('scheduled_for')
+//         .limit(batchSize)
+
+//       if (jobsError) {
+//         console.error('Error fetching pending jobs:', jobsError)
+//         return 0
+//       }
+
+//       if (!jobs || jobs.length === 0) {
+//         return 0
+//       }
+
+//       // Process each job
+//       const processPromises = jobs.map(job => this.processEmailJob(job.id))
+//       const results = await Promise.allSettled(processPromises)
+
+//       let successCount = 0
+//       results.forEach((result, index) => {
+//         if (result.status === 'fulfilled' && result.value.success) { 
+//           successCount++
+//         } else {
+//           console.error(`Job ${jobs[index].id} failed:`, 
+//             result.status === 'fulfilled' ? result.value.error : result.reason)
+//         }
+//       })
+
+//       return successCount
+//     } catch (error) {
+//       console.error('Error processing pending jobs:', error)
+//       return 0
+//     }
+//   }
+
+//   static async retryFailedJobs(maxAttempts: number = 3): Promise<number> {
+//     try {
+//       const { data: failedJobs, error } = await supabase
+//         .from('email_queue')
+//         .select('id')
+//         .eq('status', 'failed')
+//         .lt('attempt_count', maxAttempts)
+
+//       if (error || !failedJobs) {
+//         return 0
+//       }
+
+//       let retriedCount = 0
+//       for (const job of failedJobs) {
+//         await supabase
+//           .from('email_queue')
+//           .update({ 
+//             status: 'pending',
+//             updated_at: new Date().toISOString()
+//           })
+//           .eq('id', job.id)
+//         retriedCount++
+//       }
+
+//       console.log(`Reset ${retriedCount} jobs for retry`)
+//       return retriedCount
+
+//     } catch (error) {
+//       console.error('Retry failed jobs error:', error)
+//       return 0
+//     }
+//   }
+
+//   static async cleanupOldJobs(daysOld: number = 30): Promise<number> {
+//     try {
+//       const cutoffDate = new Date()
+//       cutoffDate.setDate(cutoffDate.getDate() - daysOld)
+
+//       const { count, error } = await supabase
+//         .from('email_queue')
+//         .delete()
+//         .eq('status', 'sent')
+//         .lt('created_at', cutoffDate.toISOString())
+
+//       if (error) {
+//         console.error('Cleanup error:', error)
+//         return 0
+//       }
+
+//       return count || 0
+
+//     } catch (error) {
+//       console.error('Cleanup old jobs error:', error)
+//       return 0
+//     }
+//   }
+// }
+
 // ./lib/email-processor.ts
 import { Resend } from 'resend'
 import { supabase } from '@/lib/supabase'
@@ -54,16 +439,16 @@ export class EmailProcessor {
 
       const now = new Date()
       
-      // Check hourly limit
+      // Check hourly limit - using campaign_contacts instead of email_queue
       const hourStart = new Date(now)
       hourStart.setMinutes(0, 0, 0)
       
       const { count: hourlyCount, error: hourlyError } = await supabase
-        .from('email_queue')
+        .from('campaign_contacts')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'sent')
-        .gte('updated_at', hourStart.toISOString())
-        .lte('updated_at', now.toISOString())
+        .gte('sent_at', hourStart.toISOString())
+        .lte('sent_at', now.toISOString())
 
       if (hourlyError) {
         console.error('Error checking hourly limit:', hourlyError)
@@ -79,11 +464,11 @@ export class EmailProcessor {
       dayStart.setHours(0, 0, 0, 0)
       
       const { count: dailyCount, error: dailyError } = await supabase
-        .from('email_queue')
+        .from('campaign_contacts')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'sent')
-        .gte('updated_at', dayStart.toISOString())
-        .lte('updated_at', now.toISOString())
+        .gte('sent_at', dayStart.toISOString())
+        .lte('sent_at', now.toISOString())
 
       if (dailyError) {
         console.error('Error checking daily limit:', dailyError)
@@ -98,11 +483,11 @@ export class EmailProcessor {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
       
       const { count: monthlyCount, error: monthlyError } = await supabase
-        .from('email_queue')
+        .from('campaign_contacts')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'sent')
-        .gte('updated_at', monthStart.toISOString())
-        .lte('updated_at', now.toISOString())
+        .gte('sent_at', monthStart.toISOString())
+        .lte('sent_at', now.toISOString())
 
       if (monthlyError) {
         console.error('Error checking monthly limit:', monthlyError)
@@ -120,25 +505,23 @@ export class EmailProcessor {
     }
   }
 
-  static async processEmailJob(jobId: string): Promise<{ success: boolean, error?: string }> {
+  static async processEmailJob(campaignContactId: string): Promise<{ success: boolean, error?: string }> {
     try {
-      // Get the email job with related data
-      const { data: job, error: jobError } = await supabase
-        .from('email_queue')
+      console.log(`Processing campaign contact: ${campaignContactId}`)
+      
+      // Get the campaign contact with related data
+      const { data: campaignContact, error: contactError } = await supabase
+        .from('campaign_contacts')
         .select(`
           *,
-          campaign_steps (
-            subject,
-            content,
-            order_index
-          ),
-          campaign_contacts (
+          contacts (
             id,
             email,
             first_name,
             last_name,
             company,
             phone,
+            status,
             custom_fields
           ),
           campaigns (
@@ -151,52 +534,75 @@ export class EmailProcessor {
             track_clicks
           )
         `)
-        .eq('id', jobId)
+        .eq('id', campaignContactId)
         .single()
 
-      if (jobError || !job) {
-        throw new Error('Email job not found')
+      if (contactError || !campaignContact) {
+        throw new Error('Campaign contact not found')
       }
 
-      // Check if job is ready to process
+      // Check if contact is ready to process
       const now = new Date()
-      const scheduledTime = new Date(job.scheduled_for)
+      const scheduledTime = new Date(campaignContact.scheduled_send_time || now)
       
       if (scheduledTime > now) {
-        return { success: false, error: 'Job not ready yet' }
+        return { success: false, error: 'Contact not ready yet' }
       }
 
-      if (job.status !== 'pending') {
-        return { success: false, error: 'Job already processed' }
+      if (campaignContact.status !== 'pending') {
+        return { success: false, error: 'Contact already processed' }
+      }
+
+      // Check if contact is active
+      if (campaignContact.contacts?.status !== 'active') {
+        await supabase
+          .from('campaign_contacts')
+          .update({
+            status: 'skipped',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', campaignContactId)
+        return { success: false, error: 'Contact not active' }
       }
 
       // Check rate limits
-      const rateLimitCheck = await this.checkRateLimits(job.campaigns.organization_id)
+      const rateLimitCheck = await this.checkRateLimits(campaignContact.campaigns?.organization_id)
       if (!rateLimitCheck.canSend) {
         // Reschedule for later
         await supabase
-          .from('email_queue')
+          .from('campaign_contacts')
           .update({ 
-            scheduled_for: new Date(now.getTime() + 15 * 60 * 1000).toISOString() // Try again in 15 minutes
+            scheduled_send_time: new Date(now.getTime() + 15 * 60 * 1000).toISOString()
           })
-          .eq('id', jobId)
+          .eq('id', campaignContactId)
         
         return { success: false, error: rateLimitCheck.reason }
       }
 
       // Mark as processing
       await supabase
-        .from('email_queue')
+        .from('campaign_contacts')
         .update({ 
           status: 'processing',
-          attempt_count: job.attempt_count + 1
+          updated_at: new Date().toISOString()
         })
-        .eq('id', jobId)
+        .eq('id', campaignContactId)
+
+      // Get the sequence step for this campaign (start with step 1)
+      const { data: step, error: stepError } = await supabase
+        .from('sequence_steps')
+        .select('*')
+        .eq('campaign_id', campaignContact.campaign_id)
+        .eq('step_number', 1)
+        .single()
+
+      if (stepError || !step) {
+        throw new Error(`No sequence step found for campaign ${campaignContact.campaign_id}`)
+      }
 
       // Process template variables using your existing function
-      const contact = job.campaign_contacts
-      const step = job.campaign_steps
-      const campaign = job.campaigns
+      const contact = campaignContact.contacts
+      const campaign = campaignContact.campaigns
 
       // Use your existing replaceTemplateVariables function
       const processedSubject = replaceTemplateVariables(
@@ -230,7 +636,7 @@ export class EmailProcessor {
         html: emailHTML,
         campaignId: campaign.id,
         contactId: contact.id,
-        stepNumber: (step.order_index || 0) + 1,
+        stepNumber: step.step_number,
         from: campaign.from_email ? 
           `${campaign.from_name || 'LeadFlow'} <${campaign.from_email}>` : 
           undefined,
@@ -245,23 +651,16 @@ export class EmailProcessor {
 
       // Mark as sent
       await supabase
-        .from('email_queue')
-        .update({ 
-          status: 'sent',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', jobId)
-
-      // Update contact status (EmailService already does this, but ensure consistency)
-      await supabase
         .from('campaign_contacts')
         .update({ 
           status: 'sent',
           sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
           last_email_id: emailResult.messageId
         })
-        .eq('id', job.contact_id)
+        .eq('id', campaignContactId)
 
+      console.log(`✅ Email sent to ${contact.email}`)
       return { success: true }
 
     } catch (error) {
@@ -269,12 +668,13 @@ export class EmailProcessor {
       
       // Mark as failed
       await supabase
-        .from('email_queue')
+        .from('campaign_contacts')
         .update({ 
           status: 'failed',
-          last_error: error instanceof Error ? error.message : 'Unknown error'
+          last_error: error instanceof Error ? error.message : 'Unknown error',
+          updated_at: new Date().toISOString()
         })
-        .eq('id', jobId)
+        .eq('id', campaignContactId)
 
       return { 
         success: false, 
@@ -285,39 +685,45 @@ export class EmailProcessor {
 
   static async processPendingJobs(batchSize: number = 10): Promise<number> {
     try {
-      // Get pending jobs that are ready to process
+      console.log('📧 Looking for pending campaign contacts...')
+      
+      // Get pending campaign contacts that are ready to process
       const now = new Date()
-      const { data: jobs, error: jobsError } = await supabase
-        .from('email_queue')
+      const { data: pendingContacts, error: contactsError } = await supabase
+        .from('campaign_contacts')
         .select('id')
         .eq('status', 'pending')
-        .lte('scheduled_for', now.toISOString())
-        .order('scheduled_for')
+        .lte('scheduled_send_time', now.toISOString())
+        .order('scheduled_send_time')
         .limit(batchSize)
 
-      if (jobsError) {
-        console.error('Error fetching pending jobs:', jobsError)
+      if (contactsError) {
+        console.error('Error fetching pending contacts:', contactsError)
         return 0
       }
 
-      if (!jobs || jobs.length === 0) {
+      if (!pendingContacts || pendingContacts.length === 0) {
+        console.log('No pending contacts found')
         return 0
       }
 
-      // Process each job
-      const processPromises = jobs.map(job => this.processEmailJob(job.id))
+      console.log(`Found ${pendingContacts.length} pending contacts`)
+
+      // Process each contact
+      const processPromises = pendingContacts.map(contact => this.processEmailJob(contact.id))
       const results = await Promise.allSettled(processPromises)
 
       let successCount = 0
       results.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value.success) {
+        if (result.status === 'fulfilled' && result.value.success) { 
           successCount++
         } else {
-          console.error(`Job ${jobs[index].id} failed:`, 
+          console.error(`Contact ${pendingContacts[index].id} failed:`, 
             result.status === 'fulfilled' ? result.value.error : result.reason)
         }
       })
 
+      console.log(`✅ Successfully processed ${successCount} emails`)
       return successCount
     } catch (error) {
       console.error('Error processing pending jobs:', error)
@@ -325,48 +731,66 @@ export class EmailProcessor {
     }
   }
 
-  static async retryFailedJobs(maxAttempts: number = 3): Promise<number> {
+  static async retryFailedJobs(maxRetries: number = 3): Promise<number> {
     try {
-      const { data: failedJobs, error } = await supabase
-        .from('email_queue')
-        .select('id')
+      console.log('🔄 Looking for failed contacts to retry...')
+      
+      // Get failed contacts from last 24 hours that haven't exceeded max retries
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      
+      const { data: failedContacts, error } = await supabase
+        .from('campaign_contacts')
+        .select('id, retry_count')
         .eq('status', 'failed')
-        .lt('attempt_count', maxAttempts)
+        .gte('updated_at', oneDayAgo.toISOString())
+        .lt('retry_count', maxRetries)
+        .limit(maxRetries)
 
-      if (error || !failedJobs) {
+      if (error || !failedContacts || failedContacts.length === 0) {
+        console.log('No failed contacts to retry')
         return 0
       }
 
       let retriedCount = 0
-      for (const job of failedJobs) {
+      for (const contact of failedContacts) {
         await supabase
-          .from('email_queue')
+          .from('campaign_contacts')
           .update({ 
             status: 'pending',
-            updated_at: new Date().toISOString()
+            retry_count: (contact.retry_count || 0) + 1,
+            last_error: null,
+            updated_at: new Date().toISOString(),
+            scheduled_send_time: new Date().toISOString() // Retry immediately
           })
-          .eq('id', job.id)
+          .eq('id', contact.id)
         retriedCount++
       }
 
-      console.log(`Reset ${retriedCount} jobs for retry`)
+      console.log(`Reset ${retriedCount} contacts for retry`)
       return retriedCount
 
     } catch (error) {
-      console.error('Retry failed jobs error:', error)
+      console.error('Retry failed contacts error:', error)
       return 0
     }
   }
 
   static async cleanupOldJobs(daysOld: number = 30): Promise<number> {
     try {
+      console.log(`🧹 Cleaning up campaign contacts older than ${daysOld} days...`)
+      
       const cutoffDate = new Date()
       cutoffDate.setDate(cutoffDate.getDate() - daysOld)
 
+      // For campaign_contacts, we probably don't want to delete them
+      // Instead, we might want to archive very old sent emails or just return 0
+      // Keeping campaign history is usually important for analytics
+      
+      // Optional: Clean up very old failed contacts
       const { count, error } = await supabase
-        .from('email_queue')
+        .from('campaign_contacts')
         .delete()
-        .eq('status', 'sent')
+        .eq('status', 'failed')
         .lt('created_at', cutoffDate.toISOString())
 
       if (error) {
@@ -374,10 +798,11 @@ export class EmailProcessor {
         return 0
       }
 
+      console.log(`Cleaned up ${count || 0} old failed contacts`)
       return count || 0
 
     } catch (error) {
-      console.error('Cleanup old jobs error:', error)
+      console.error('Cleanup old contacts error:', error)
       return 0
     }
   }

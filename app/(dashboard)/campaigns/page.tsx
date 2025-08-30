@@ -92,6 +92,7 @@ const CampaignCard = ({
         dot: 'bg-blue-500'
       }
       case 'sending':
+      case 'active':
         return {
           color: 'bg-green-100 text-green-800 border-green-200',
           icon: <Activity className="h-3 w-3" />,
@@ -266,7 +267,7 @@ const CampaignCard = ({
               </button>
             )}
 
-            {campaign.status === 'sending' && (
+            {(campaign.status === 'sending' || campaign.status === 'active') && (
               <button
                 onClick={() => onAction('pause')}
                 disabled={actionLoading}
@@ -453,7 +454,7 @@ export default function CampaignsPage() {
     },
     {
       label: 'Active Campaigns',
-      value: allCampaigns.filter(c => ['sending', 'scheduled'].includes(c.status)).length,
+      value: allCampaigns.filter(c => ['sending', 'active', 'scheduled'].includes(c.status)).length, // Add 'active' here
       icon: Activity,
       color: 'text-green-600',
       bgColor: 'bg-green-100'
@@ -567,6 +568,7 @@ export default function CampaignsPage() {
               >
                 <option value="all">All Status</option>
                 <option value="draft">Draft</option>
+                <option value="active">Active</option> {/* Add this */}
                 <option value="sending">Sending</option>
                 <option value="paused">Paused</option>
                 <option value="completed">Completed</option>

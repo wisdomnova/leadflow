@@ -23,4 +23,4 @@ export async function POST(
       error: error instanceof Error ? error.message : 'Failed to pause campaign' 
     }, { status: 500 })
   }
-}
+} 

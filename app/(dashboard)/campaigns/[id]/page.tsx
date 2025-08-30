@@ -123,6 +123,7 @@ const CampaignStatusCard = ({
           description: 'Campaign is ready to be launched'
         }
       case 'sending':
+      case 'active': // Add this line
         return {
           color: 'bg-green-100 text-green-800 border-green-200',
           icon: <Activity className="h-4 w-4" />,
@@ -183,7 +184,7 @@ const CampaignStatusCard = ({
             <Users className="h-4 w-4 mr-2" />
             <span className="font-medium">{contactCount}</span>
             <span className="ml-1">{contactCount === 1 ? 'contact' : 'contacts'}</span>
-            {['sending', 'scheduled'].includes(campaign.status) && (
+            {['sending', 'active', 'scheduled'].includes(campaign.status) && (
               <>
                 <div className="mx-3 w-1 h-1 bg-gray-400 rounded-full"></div>
                 <Activity className="h-4 w-4 mr-1 text-green-500" />
@@ -211,7 +212,7 @@ const CampaignStatusCard = ({
           </button>
         )}
 
-        {(campaign.status === 'sending' || campaign.status === 'scheduled') && (
+        {(campaign.status === 'sending' || campaign.status === 'active' || campaign.status === 'scheduled') && (
           <>
             <button
               onClick={() => handleAction('pause')}

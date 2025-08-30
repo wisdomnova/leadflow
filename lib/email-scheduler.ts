@@ -2,6 +2,7 @@
 import { supabase } from '@/lib/supabase'
 import { EmailService } from './email-service'
 import { generateCampaignEmailHTML } from './email-templates/campaign-template'
+import { replaceTemplateVariables } from './template-variables'
 
 export interface EmailJob {
   id?: string
@@ -18,65 +19,49 @@ export interface EmailJob {
 
 export class EmailScheduler {
   static async scheduleContactForCampaign(
-    campaignId: string, 
+    campaignId: string,  
     contactId: string, 
     startImmediately: boolean = true
   ) {
     try {
-      // Get campaign steps
+      // Get campaign sequence steps (updated table name)
       const { data: steps, error: stepsError } = await supabase
-        .from('campaign_steps')
+        .from('sequence_steps')
         .select('*')
         .eq('campaign_id', campaignId)
-        .order('order_index')
+        .order('step_number')
 
       if (stepsError || !steps || steps.length === 0) {
-        throw new Error('No campaign steps found')
+        throw new Error('No sequence steps found')
       }
 
       const now = new Date()
-      const jobs: Omit<EmailJob, 'id'>[] = []
 
-      // Schedule each step
-      for (let i = 0; i < steps.length; i++) {
-        const step = steps[i]
-        const scheduledTime = new Date(now)
+      // For now, just schedule the first step - we'll handle multi-step sequences later
+      const firstStep = steps[0]
+      const scheduledTime = new Date(now)
 
-        if (i === 0 && startImmediately) {
-          // First step sends immediately (or within a few minutes for processing)
-          scheduledTime.setMinutes(scheduledTime.getMinutes() + 1)
-        } else {
-          // Calculate cumulative delay
-          let totalDelayMinutes = 0
-          for (let j = 0; j <= i; j++) {
-            const prevStep = steps[j]
-            totalDelayMinutes += (prevStep.delay_days || 0) * 24 * 60
-            totalDelayMinutes += (prevStep.delay_hours || 0) * 60
-          }
-          scheduledTime.setMinutes(scheduledTime.getMinutes() + totalDelayMinutes)
-        }
+      if (startImmediately) {
+        // Send immediately (within 1 minute for processing)
+        scheduledTime.setMinutes(scheduledTime.getMinutes() + 1)
+      }
 
-        jobs.push({
-          campaign_id: campaignId,
-          contact_id: contactId,
-          step_id: step.id,
-          scheduled_for: scheduledTime.toISOString(),
+      // Update or insert campaign_contact with scheduled time
+      const { error: contactError } = await supabase
+        .from('campaign_contacts')
+        .update({
           status: 'pending',
-          attempt_count: 0
+          scheduled_send_time: scheduledTime.toISOString(),
+          updated_at: new Date().toISOString()
         })
+        .eq('campaign_id', campaignId)
+        .eq('contact_id', contactId)
+
+      if (contactError) {
+        throw contactError
       }
 
-      // Insert jobs into queue
-      const { data: createdJobs, error: jobError } = await supabase
-        .from('email_queue')
-        .insert(jobs)
-        .select()
-
-      if (jobError) {
-        throw jobError
-      }
-
-      return createdJobs
+      return { success: true }
     } catch (error) {
       console.error('Failed to schedule contact for campaign:', error)
       throw error
@@ -86,41 +71,52 @@ export class EmailScheduler {
   static async launchCampaign(campaignId: string) {
     try {
       // Get all contacts for this campaign
-      const { data: contacts, error: contactsError } = await supabase
+      const { data: campaignContacts, error: contactsError } = await supabase
         .from('campaign_contacts')
-        .select('id, status')
+        .select('id, contact_id, status')
         .eq('campaign_id', campaignId)
-        .eq('status', 'pending')
+        .neq('status', 'sent') // Don't re-launch already sent contacts
 
       if (contactsError) {
         throw contactsError
       }
 
-      if (!contacts || contacts.length === 0) {
-        throw new Error('No pending contacts found for campaign')
+      if (!campaignContacts || campaignContacts.length === 0) {
+        throw new Error('No contacts found for campaign')
       }
 
-      // Schedule all contacts
-      const schedulePromises = contacts.map(contact =>
-        this.scheduleContactForCampaign(campaignId, contact.id)
-      )
-
-      await Promise.all(schedulePromises)
-
-      // Update campaign status
+      // Schedule all contacts for immediate sending
+      const now = new Date()
       const { error: updateError } = await supabase
-        .from('campaigns')
-        .update({ 
-          status: 'active',
-          launched_at: new Date().toISOString()
+        .from('campaign_contacts')
+        .update({
+          status: 'pending',
+          scheduled_send_time: now.toISOString(),
+          updated_at: now.toISOString()
         })
-        .eq('id', campaignId)
+        .eq('campaign_id', campaignId)
+        .in('status', ['ready', 'draft', 'paused'])
 
       if (updateError) {
         throw updateError
       }
 
-      return { success: true, contactsScheduled: contacts.length }
+      // Update campaign status
+      const { error: campaignUpdateError } = await supabase
+        .from('campaigns')
+        .update({ 
+          status: 'active',
+          launched_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', campaignId)
+
+      if (campaignUpdateError) {
+        throw campaignUpdateError
+      }
+
+      console.log(`Campaign ${campaignId} launched with ${campaignContacts.length} contacts`)
+      return { success: true, contactsScheduled: campaignContacts.length }
     } catch (error) {
       console.error('Failed to launch campaign:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
@@ -129,27 +125,35 @@ export class EmailScheduler {
 
   static async pauseCampaign(campaignId: string) {
     try {
-      // Cancel pending jobs
-      const { error: queueError } = await supabase
-        .from('email_queue')
-        .update({ status: 'cancelled' })
+      // Pause pending campaign contacts
+      const { error: contactsError } = await supabase
+        .from('campaign_contacts')
+        .update({ 
+          status: 'paused',
+          updated_at: new Date().toISOString()
+        })
         .eq('campaign_id', campaignId)
         .eq('status', 'pending')
 
-      if (queueError) {
-        throw queueError
+      if (contactsError) {
+        throw contactsError
       }
 
       // Update campaign status
       const { error: updateError } = await supabase
         .from('campaigns')
-        .update({ status: 'paused' })
+        .update({ 
+          status: 'paused',
+          paused_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
         .eq('id', campaignId)
 
       if (updateError) {
         throw updateError
       }
 
+      console.log(`Campaign ${campaignId} paused successfully`)
       return { success: true }
     } catch (error) {
       console.error('Failed to pause campaign:', error)
@@ -159,27 +163,35 @@ export class EmailScheduler {
 
   static async resumeCampaign(campaignId: string) {
     try {
-      // Reactivate cancelled jobs
-      const { error: queueError } = await supabase
-        .from('email_queue')
-        .update({ status: 'pending' })
+      // Resume paused campaign contacts
+      const { error: contactsError } = await supabase
+        .from('campaign_contacts')
+        .update({ 
+          status: 'pending',
+          updated_at: new Date().toISOString()
+        })
         .eq('campaign_id', campaignId)
-        .eq('status', 'cancelled')
+        .eq('status', 'paused')
 
-      if (queueError) {
-        throw queueError
+      if (contactsError) {
+        throw contactsError
       }
 
       // Update campaign status
       const { error: updateError } = await supabase
         .from('campaigns') 
-        .update({ status: 'active' })
+        .update({ 
+          status: 'active',
+          resumed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
         .eq('id', campaignId)
 
       if (updateError) {
         throw updateError
       }
 
+      console.log(`Campaign ${campaignId} resumed successfully`)
       return { success: true }
     } catch (error) {
       console.error('Failed to resume campaign:', error)
@@ -187,63 +199,181 @@ export class EmailScheduler {
     }
   }
 
-  // NEW: Process individual email job using EmailService
-  static async processEmailJob(jobId: string): Promise<{ success: boolean; error?: string }> {
+  static async stopCampaign(campaignId: string) {
     try {
-      // Get the job details
-      const { data: job, error: jobError } = await supabase
-        .from('email_queue')
-        .select(`
-          *,
-          campaigns(*),
-          campaign_contacts(*),
-          campaign_steps(*)
-        `)
-        .eq('id', jobId)
+      // Verify campaign exists and can be stopped
+      const { data: campaign, error: campaignError } = await supabase
+        .from('campaigns')
+        .select('id, status')
+        .eq('id', campaignId)
         .single()
 
-      if (jobError || !job) {
-        throw new Error('Job not found')
+      if (campaignError || !campaign) {
+        throw new Error('Campaign not found')
       }
 
-      // Mark job as processing
+      if (!['sending', 'active', 'paused', 'scheduled'].includes(campaign.status)) {
+        throw new Error('Campaign cannot be stopped in current status')
+      }
+
+      // Cancel all pending campaign contacts
+      const { error: contactsError } = await supabase
+        .from('campaign_contacts')
+        .update({ 
+          status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('campaign_id', campaignId)
+        .in('status', ['pending', 'paused', 'scheduled'])
+
+      if (contactsError) {
+        console.error('Error cancelling campaign contacts:', contactsError)
+        // Don't throw here - continue with campaign update
+      }
+
+      // Update campaign status to stopped
+      const { error: updateError } = await supabase
+        .from('campaigns')
+        .update({ 
+          status: 'stopped',
+          stopped_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', campaignId)
+
+      if (updateError) {
+        throw updateError
+      }
+
+      console.log(`Campaign ${campaignId} stopped successfully`)
+      return { 
+        success: true, 
+        message: 'Campaign stopped successfully' 
+      }
+      
+    } catch (error) {
+      console.error('Error stopping campaign:', error)
+      throw error
+    }
+  }
+
+  // Process individual campaign contact (updated to work with campaign_contacts)
+  static async processEmailJob(campaignContactId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Get the campaign contact with related data
+      const { data: campaignContact, error: contactError } = await supabase
+        .from('campaign_contacts')
+        .select(`
+          *,
+          contacts (
+            id,
+            email,
+            first_name,
+            last_name,
+            company,
+            phone,
+            status,
+            custom_fields
+          ),
+          campaigns (
+            id,
+            name,
+            from_name,
+            from_email,
+            reply_to,
+            organization_id,
+            track_opens,
+            track_clicks
+          )
+        `)
+        .eq('id', campaignContactId)
+        .single()
+
+      if (contactError || !campaignContact) {
+        throw new Error('Campaign contact not found')
+      }
+
+      // Check if contact is ready to process
+      const now = new Date()
+      const scheduledTime = new Date(campaignContact.scheduled_send_time || now)
+      
+      if (scheduledTime > now) {
+        return { success: false, error: 'Contact not ready yet' }
+      }
+
+      if (campaignContact.status !== 'pending') {
+        return { success: false, error: 'Contact already processed' }
+      }
+
+      // Check if contact is active
+      if (campaignContact.contacts?.status !== 'active') {
+        await supabase
+          .from('campaign_contacts')
+          .update({
+            status: 'skipped',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', campaignContactId)
+        return { success: false, error: 'Contact not active' }
+      }
+
+      // Mark as processing
       await supabase
-        .from('email_queue')
+        .from('campaign_contacts')
         .update({ 
           status: 'processing',
           updated_at: new Date().toISOString()
         })
-        .eq('id', jobId)
+        .eq('id', campaignContactId)
 
-      // Get step content
-      const step = job.campaign_steps
-      const campaign = job.campaigns
-      const contact = job.campaign_contacts
+      // Get the first sequence step for this campaign
+      const { data: step, error: stepError } = await supabase
+        .from('sequence_steps')
+        .select('*')
+        .eq('campaign_id', campaignContact.campaign_id)
+        .eq('step_number', 1)
+        .single()
 
-      // Personalize content
-      const personalizedContent = this.personalizeContent(step.content, contact)
-      const personalizedSubject = this.personalizeContent(step.subject, contact)
+      if (stepError || !step) {
+        throw new Error(`No sequence step found for campaign ${campaignContact.campaign_id}`)
+      }
+
+      // Process template variables
+      const contact = campaignContact.contacts
+      const campaign = campaignContact.campaigns
+
+      const processedSubject = replaceTemplateVariables(
+        step.subject, 
+        contact, 
+        contact.custom_fields || {}
+      )
+
+      const processedContent = replaceTemplateVariables(
+        step.content, 
+        contact, 
+        contact.custom_fields || {}
+      )
 
       // Generate unsubscribe URL
       const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe?campaign=${campaign.id}&contact=${contact.id}`
 
       // Generate professional HTML email
       const emailHTML = generateCampaignEmailHTML({
-        subject: personalizedSubject,
-        content: personalizedContent,
+        subject: processedSubject,
+        content: processedContent,
         recipientName: contact.first_name,
         unsubscribeUrl,
         companyName: campaign.from_name || 'LeadFlow'
       })
 
       // Send email using EmailService
-      const result = await EmailService.sendEmail({
+      const emailResult = await EmailService.sendEmail({
         to: contact.email,
-        subject: personalizedSubject,
+        subject: processedSubject,
         html: emailHTML,
         campaignId: campaign.id,
         contactId: contact.id,
-        stepNumber: step.order_index + 1,
+        stepNumber: step.step_number,
         from: campaign.from_email ? 
           `${campaign.from_name || 'LeadFlow'} <${campaign.from_email}>` : 
           undefined,
@@ -252,41 +382,36 @@ export class EmailScheduler {
         trackClicks: campaign.track_clicks !== false
       })
 
-      // Update job status based on result
-      if (result.success) {
-        await supabase
-          .from('email_queue')
-          .update({ 
-            status: 'sent',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobId)
-      } else {
-        await supabase
-          .from('email_queue')
-          .update({ 
-            status: 'failed',
-            attempt_count: job.attempt_count + 1,
-            last_error: result.error,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobId)
+      if (!emailResult.success) {
+        throw new Error(emailResult.error || 'Email send failed')
       }
 
-      return result
+      // Mark as sent
+      await supabase
+        .from('campaign_contacts')
+        .update({ 
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          last_email_id: emailResult.messageId
+        })
+        .eq('id', campaignContactId)
+
+      console.log(`✅ Email sent to ${contact.email}`)
+      return { success: true }
 
     } catch (error) {
-      console.error('Failed to process email job:', error)
+      console.error('Email processing error:', error)
       
-      // Mark job as failed
+      // Mark as failed
       await supabase
-        .from('email_queue')
+        .from('campaign_contacts')
         .update({ 
           status: 'failed',
           last_error: error instanceof Error ? error.message : 'Unknown error',
           updated_at: new Date().toISOString()
         })
-        .eq('id', jobId)
+        .eq('id', campaignContactId)
 
       return { 
         success: false, 
@@ -295,34 +420,51 @@ export class EmailScheduler {
     }
   }
 
-  // NEW: Get pending jobs ready to be sent
+  // Get pending campaign contacts ready to be sent (updated for campaign_contacts)
   static async getPendingJobs(limit: number = 10) {
     try {
-      const { data: jobs, error } = await supabase
-        .from('email_queue')
+      const { data: pendingContacts, error } = await supabase
+        .from('campaign_contacts')
         .select(`
           *,
-          campaigns(*),
-          campaign_contacts(*),
-          campaign_steps(*)
+          contacts (
+            id,
+            email,
+            first_name,
+            last_name,
+            company,
+            phone,
+            status,
+            custom_fields
+          ),
+          campaigns (
+            id,
+            name,
+            from_name,
+            from_email,
+            reply_to,
+            organization_id,
+            track_opens,
+            track_clicks
+          )
         `)
         .eq('status', 'pending')
-        .lte('scheduled_for', new Date().toISOString())
+        .lte('scheduled_send_time', new Date().toISOString())
+        .order('scheduled_send_time')
         .limit(limit)
-        .order('scheduled_for')
 
       if (error) {
         throw error
       }
 
-      return jobs || []
+      return pendingContacts || []
     } catch (error) {
-      console.error('Failed to get pending jobs:', error)
+      console.error('Failed to get pending contacts:', error)
       return []
     }
   }
 
-  // Helper method for personalizing content
+  // Helper method for personalizing content (kept for backward compatibility)
   private static personalizeContent(content: string, contact: any): string {
     return content
       .replace(/\{\{first_name\}\}/g, contact.first_name || '')

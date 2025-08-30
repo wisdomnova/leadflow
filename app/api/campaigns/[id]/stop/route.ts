@@ -1,4 +1,4 @@
-// ./app/api/campaigns/[id]/resume/route.ts
+// ./app/api/campaigns/[id]/stop/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { EmailScheduler } from '@/lib/email-scheduler'
 import jwt from 'jsonwebtoken'
@@ -14,13 +14,13 @@ export async function POST(
     }
 
     const { id: campaignId } = await params
-    const result = await EmailScheduler.resumeCampaign(campaignId)
+    const result = await EmailScheduler.stopCampaign(campaignId)
     
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Resume campaign error:', error)
+    console.error('Stop campaign error:', error)
     return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Failed to resume campaign' 
+      error: error instanceof Error ? error.message : 'Failed to stop campaign' 
     }, { status: 500 })
   }
-} 
+}
