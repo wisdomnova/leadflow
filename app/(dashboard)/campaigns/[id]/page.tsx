@@ -304,42 +304,57 @@ const CampaignStatusCard = ({
 
 // Performance Stats Component
 const PerformanceStats = ({ contacts }: { contacts: Contact[] }) => {
+  // Calculate stats based on actual contact statuses (now driven by email_events)
+  const totalContacts = contacts.length
+  const deliveredCount = contacts.filter(c => ['delivered', 'opened', 'clicked'].includes(c.status)).length
+  const openedCount = contacts.filter(c => ['opened', 'clicked'].includes(c.status)).length
+  const clickedCount = contacts.filter(c => c.status === 'clicked').length
+  const bouncedCount = contacts.filter(c => c.status === 'bounced').length
+
   const stats = [
     {
       label: 'Total Contacts',
-      value: contacts.length,
+      value: totalContacts,
       icon: Users,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100'
     },
     {
       label: 'Delivered',
-      value: contacts.filter(c => ['delivered', 'opened', 'clicked'].includes(c.status)).length,
+      value: deliveredCount,
       icon: CheckCircle,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
-      percentage: contacts.length > 0 ? Math.round((contacts.filter(c => ['delivered', 'opened', 'clicked'].includes(c.status)).length / contacts.length) * 100) : 0
+      percentage: totalContacts > 0 ? Math.round((deliveredCount / totalContacts) * 100) : 0
     },
     {
       label: 'Opened',
-      value: contacts.filter(c => ['opened', 'clicked'].includes(c.status)).length,
+      value: openedCount,
       icon: Eye,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
-      percentage: contacts.length > 0 ? Math.round((contacts.filter(c => ['opened', 'clicked'].includes(c.status)).length / contacts.length) * 100) : 0
+      percentage: deliveredCount > 0 ? Math.round((openedCount / deliveredCount) * 100) : 0 // Open rate based on delivered
     },
     {
       label: 'Clicked',
-      value: contacts.filter(c => c.status === 'clicked').length,
+      value: clickedCount,
       icon: MousePointer,
       color: 'text-orange-600',
       bgColor: 'bg-orange-100',
-      percentage: contacts.length > 0 ? Math.round((contacts.filter(c => c.status === 'clicked').length / contacts.length) * 100) : 0
+      percentage: openedCount > 0 ? Math.round((clickedCount / openedCount) * 100) : 0 // Click rate based on opened
+    },
+    {
+      label: 'Bounced',
+      value: bouncedCount,
+      icon: XCircle,
+      color: 'text-red-600',
+      bgColor: 'bg-red-100',
+      percentage: totalContacts > 0 ? Math.round((bouncedCount / totalContacts) * 100) : 0
     }
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
       {stats.map((stat, index) => {
         const Icon = stat.icon
         return (

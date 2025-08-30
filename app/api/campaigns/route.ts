@@ -24,15 +24,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Get campaigns for the organization with recipient counts
+    // Get campaigns for the organization
     const { data: campaigns, error: campaignError } = await supabase
       .from('campaigns')
       .select(`
         *,
-        campaign_contacts(
-          id,
-          status
-        )
+        campaign_contacts(id, contact_id),
+        email_events(event_type, contact_id)
       `)
       .eq('organization_id', userData.organization_id)
       .order('created_at', { ascending: false })
@@ -42,17 +40,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch campaigns' }, { status: 500 })
     }
 
-    // Process campaigns to add computed fields
+    // Process campaigns to calculate stats from email_events
     const processedCampaigns = campaigns?.map(campaign => {
       const contacts = campaign.campaign_contacts || []
+      const events = campaign.email_events || []
+      
+      // Get unique contacts for each event type
+      const deliveredContacts = new Set(events.filter((e: { event_type: string }) => e.event_type === 'delivery').map((e: { contact_id: any }) => e.contact_id))
+      const openedContacts = new Set(events.filter((e: { event_type: string }) => e.event_type === 'open').map((e: { contact_id: any }) => e.contact_id))
+      const clickedContacts = new Set(events.filter((e: { event_type: string }) => e.event_type === 'click').map((e: { contact_id: any }) => e.contact_id))
+      const bouncedContacts = new Set(events.filter((e: { event_type: string }) => e.event_type === 'bounce').map((e: { contact_id: any }) => e.contact_id))
+      const complainedContacts = new Set(events.filter((e: { event_type: string }) => e.event_type === 'complaint').map((e: { contact_id: any }) => e.contact_id))
+      const unsubscribedContacts = new Set(events.filter((e: { event_type: string }) => e.event_type === 'unsubscribe').map((e: { contact_id: any }) => e.contact_id))
       
       return {
         ...campaign,
         total_recipients: contacts.length,
-        sent: contacts.filter((c: { status: string }) => ['sent', 'delivered', 'opened', 'clicked'].includes(c.status)).length,
-        opened: contacts.filter((c: { status: string }) => ['opened', 'clicked'].includes(c.status)).length,
-        clicked: contacts.filter((c: { status: string }) => c.status === 'clicked').length,
-        campaign_contacts: undefined // Remove to clean up response
+        delivered: deliveredContacts.size,
+        opened: openedContacts.size,
+        clicked: clickedContacts.size,
+        bounced: bouncedContacts.size,
+        complained: complainedContacts.size,
+        unsubscribed: unsubscribedContacts.size,
+        // Clean up nested data
+        campaign_contacts: undefined,
+        email_events: undefined
       }
     }) || []
 
@@ -119,8 +131,8 @@ export async function POST(request: NextRequest) {
       delivered: 0,
       opened: 0,
       clicked: 0,
-      bounced: 0,
-      unsubscribed: 0,
+      bounced: 0, 
+      unsubscribed: 0, 
       
       // Settings
       send_rate: body.send_rate || 50,

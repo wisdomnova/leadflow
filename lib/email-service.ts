@@ -22,7 +22,7 @@ interface TrackingData {
   campaignId: string
   contactId: string
   stepNumber: number
-  type: 'open' | 'click' | 'bounce' | 'complaint' | 'delivery'
+  type: 'sent' | 'open' | 'click' | 'bounce' | 'complaint' | 'delivery'
   url?: string
 }
 
@@ -164,7 +164,7 @@ static async logEmailEvent(event: {
   campaignId: string
   contactId: string
   stepNumber: number
-  type: 'delivery' | 'open' | 'click' | 'bounce' | 'complaint' | 'unsubscribe'
+  type: 'sent' | 'delivery' | 'open' | 'click' | 'bounce' | 'complaint' | 'unsubscribe'
   messageId?: string
   url?: string
   userAgent?: string

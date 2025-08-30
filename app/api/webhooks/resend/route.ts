@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
           campaignId,
           contactId,
           stepNumber,
-          type: 'delivery',
+          type: 'sent',
           messageId: event.data?.email_id, // ✅ Fixed: use email_id instead of id
           metadata: {
             to: event.data?.to,
