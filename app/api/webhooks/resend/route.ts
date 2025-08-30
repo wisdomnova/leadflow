@@ -29,7 +29,14 @@ export async function POST(request: NextRequest) {
   try {
     const payload = await request.text()
     const signature = request.headers.get('resend-signature') || 
-                     request.headers.get('x-resend-signature') || ''
+                     request.headers.get('x-resend-signature') || 
+                     request.headers.get('webhook-signature') || ''
+
+    console.log('Webhook received:', {
+      payloadLength: payload.length,
+      signature: signature ? signature.substring(0, 20) + '...' : 'none',
+      headers: Object.fromEntries(request.headers.entries())
+    })
 
     // Verify webhook signature
     if (!verifyWebhookSignature(payload, signature)) {
@@ -38,7 +45,13 @@ export async function POST(request: NextRequest) {
     }
 
     const event = JSON.parse(payload)
-    console.log('Resend webhook event:', event.type, event.data?.id)
+    console.log('Resend webhook event:', {
+      type: event.type,
+      messageId: event.data?.id,
+      to: event.data?.to,
+      subject: event.data?.subject,
+      tags: event.data?.tags
+    })
     
     // Extract campaign and contact info from tags
     const tags = event.data?.tags || []
@@ -47,9 +60,15 @@ export async function POST(request: NextRequest) {
     const stepNumber = parseInt(tags.find((tag: any) => tag.name === 'step_number')?.value || '1')
 
     if (!campaignId || !contactId) {
-      console.warn('Missing campaign or contact ID in webhook event:', { campaignId, contactId })
+      console.warn('Missing campaign or contact ID in webhook event:', { 
+        campaignId, 
+        contactId, 
+        availableTags: tags.map((t: any) => t.name) 
+      })
       return NextResponse.json({ received: true, warning: 'Missing required tags' })
     }
+
+    console.log('Processing webhook for:', { campaignId, contactId, stepNumber, eventType: event.type })
 
     // Handle different event types
     switch (event.type) {
@@ -62,9 +81,26 @@ export async function POST(request: NextRequest) {
           messageId: event.data?.id,
           metadata: {
             to: event.data?.to,
-            subject: event.data?.subject
+            subject: event.data?.subject,
+            sentAt: event.created_at
           }
         })
+        console.log('✅ Logged email sent event')
+        break
+
+      case 'email.delivered':
+        await EmailService.logEmailEvent({
+          campaignId,
+          contactId,
+          stepNumber,
+          type: 'delivery',
+          messageId: event.data?.id,
+          metadata: {
+            deliveredAt: event.created_at,
+            to: event.data?.to
+          }
+        })
+        console.log('✅ Logged email delivery event')
         break
 
       case 'email.bounced':
@@ -80,6 +116,7 @@ export async function POST(request: NextRequest) {
             diagnostic: event.data?.bounce?.diagnostic
           }
         })
+        console.log('✅ Logged email bounce event')
         break
 
       case 'email.complained':
@@ -94,21 +131,7 @@ export async function POST(request: NextRequest) {
             userAgent: event.data?.complaint?.userAgent
           }
         })
-        break
-
-      case 'email.delivered':
-        // Update delivery confirmation
-        await EmailService.logEmailEvent({
-          campaignId,
-          contactId,
-          stepNumber,
-          type: 'delivery',
-          messageId: event.data?.id,
-          metadata: {
-            deliveredAt: event.created_at,
-            to: event.data?.to
-          }
-        })
+        console.log('✅ Logged email complaint event')
         break
 
       default:
@@ -118,7 +141,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       received: true, 
       eventType: event.type,
-      messageId: event.data?.id 
+      messageId: event.data?.id,
+      campaignId,
+      contactId
     })
 
   } catch (error) {
