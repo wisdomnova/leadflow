@@ -742,7 +742,7 @@ export default function SequenceBuilder({
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
           <div className="flex">
             <AlertCircle className="h-5 w-5 text-yellow-400" />
-            <div className="ml-3">
+            <div className="ml-3"> 
               <h3 className="text-sm font-medium text-yellow-800">
                 Incomplete Steps
               </h3>
@@ -755,4 +755,4 @@ export default function SequenceBuilder({
       )}
     </div>
   )
-}
+} 

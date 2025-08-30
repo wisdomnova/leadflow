@@ -14,7 +14,7 @@ import {
   Pause, 
   Copy, 
   Trash2, 
-  Calendar,
+  Calendar, 
   Users,
   TrendingUp,
   Eye,
@@ -254,7 +254,7 @@ const CampaignCard = ({
           <div className="flex items-center space-x-2">
             {(campaign.status === 'draft' || campaign.status === 'ready') && (
               <button
-                onClick={() => onAction('launch')}
+                onClick={() => onAction('launch')} 
                 disabled={actionLoading || campaign.total_recipients === 0}
                 className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium transition-colors"
               >

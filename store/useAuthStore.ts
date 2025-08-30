@@ -12,7 +12,7 @@ interface User {
   organizations?: { 
     id: string
     name: string 
-  }
+  } 
 }
 
 interface AuthState {

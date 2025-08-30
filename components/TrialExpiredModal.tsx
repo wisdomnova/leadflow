@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useTrialStatus } from '@/hooks/useTrialStatus'
-import { AlertTriangle, CreditCard, X } from 'lucide-react'
+import { AlertTriangle, CreditCard, X } from 'lucide-react' 
 import Link from 'next/link'
 
 export default function TrialExpiredModal() {

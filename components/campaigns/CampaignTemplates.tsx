@@ -14,7 +14,7 @@ interface Template {
   duration: string
   subject_line: string
   preview: string
-  popular?: boolean
+  popular?: boolean 
   steps: {
     subject: string
     content: string

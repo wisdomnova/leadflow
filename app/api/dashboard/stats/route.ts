@@ -1,3 +1,5 @@
+// ./app/api/dashboard/stats/route.ts - Fixed to match campaigns approach
+
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
@@ -23,38 +25,85 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const orgId = userData.organization_id
+    const organizationId = userData.organization_id
 
-    // Get total contacts
+    // Get total contacts count
     const { count: totalContacts } = await supabase
       .from('contacts')
       .select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .eq('status', 'active')
+      .eq('organization_id', organizationId)
 
-    // Get active campaigns
+    // Get active campaigns count - match your campaigns page logic
     const { count: activeCampaigns } = await supabase
       .from('campaigns')
       .select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .eq('status', 'active')
+      .eq('organization_id', organizationId)
+      .in('status', ['active', 'sending', 'scheduled']) // Match campaigns page logic
 
-    // Get total emails sent
-    const { data: emailStats } = await supabase
+    // Get campaigns with their email events - SAME as campaigns route
+    const { data: campaigns, error: campaignError } = await supabase
       .from('campaigns')
-      .select('emails_sent, emails_opened')
-      .eq('organization_id', orgId)
+      .select(`
+        id,
+        campaign_contacts(id, contact_id),
+        email_events(event_type, contact_id)
+      `)
+      .eq('organization_id', organizationId)
 
-    const totalEmailsSent = emailStats?.reduce((sum, campaign) => sum + (campaign.emails_sent || 0), 0) || 0
-    const totalEmailsOpened = emailStats?.reduce((sum, campaign) => sum + (campaign.emails_opened || 0), 0) || 0
-    const openRate = totalEmailsSent > 0 ? Math.round((totalEmailsOpened / totalEmailsSent) * 100) : 0
+    if (campaignError) {
+      console.error('Campaign fetch error:', campaignError)
+      return NextResponse.json({ error: 'Failed to fetch campaigns' }, { status: 500 })
+    }
 
-    return NextResponse.json({
+    // Process campaigns to calculate stats - SAME logic as campaigns route
+    let totalEmailsSent = 0
+    let totalDelivered = 0
+    let totalOpened = 0
+    let totalRecipients = 0
+
+    if (campaigns && campaigns.length > 0) {
+      campaigns.forEach(campaign => {
+        const contacts = campaign.campaign_contacts || []
+        const events = campaign.email_events || []
+        
+        // Count total recipients across all campaigns
+        totalRecipients += contacts.length
+        
+        // Get unique contacts for each event type - SAME logic as campaigns
+        const deliveredContacts = new Set(
+          events.filter((e: { event_type: string }) => e.event_type === 'delivery')
+               .map((e: { contact_id: any }) => e.contact_id)
+        )
+        const openedContacts = new Set(
+          events.filter((e: { event_type: string }) => e.event_type === 'open')
+               .map((e: { contact_id: any }) => e.contact_id)
+        )
+        const sentEvents = events.filter((e: { event_type: string }) => 
+          ['sent', 'delivery'].includes(e.event_type)
+        )
+        
+        totalEmailsSent += sentEvents.length
+        totalDelivered += deliveredContacts.size
+        totalOpened += openedContacts.size
+      })
+    }
+
+    // Calculate open rate (opened/delivered * 100) - SAME logic as campaigns
+    const openRate = totalDelivered > 0 ? 
+      Math.round((totalOpened / totalDelivered) * 100 * 10) / 10 : 0
+
+    const stats = {
       totalContacts: totalContacts || 0,
       activeCampaigns: activeCampaigns || 0,
       emailsSent: totalEmailsSent,
-      openRate: openRate
-    })
+      openRate,
+      emailsDelivered: totalDelivered,
+      emailsOpened: totalOpened
+    }
+
+    console.log('📊 Dashboard stats calculated:', stats)
+
+    return NextResponse.json(stats)
 
   } catch (error) {
     console.error('Dashboard stats error:', error)

@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         delivered: deliveredContacts.size,
         opened: openedContacts.size,
         clicked: clickedContacts.size,
-        bounced: bouncedContacts.size,
+        bounced: bouncedContacts.size, 
         complained: complainedContacts.size,
         unsubscribed: unsubscribedContacts.size,
         // Clean up nested data

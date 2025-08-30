@@ -6,7 +6,7 @@ interface Campaign {
   from_email: string
   from_name: string 
   id: string 
-  organization_id: string
+  organization_id: string 
   name: string
   subject: string
   content: string

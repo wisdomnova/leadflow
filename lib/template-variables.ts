@@ -2,7 +2,7 @@
 export interface TemplateVariable {
   key: string
   label: string
-  description: string
+  description: string 
   example: string
 }
 
@@ -10,7 +10,7 @@ export const BUILT_IN_VARIABLES: TemplateVariable[] = [
   {
     key: 'first_name', 
     label: 'First Name',
-    description: 'Contact\'s first name',
+    description: 'Contact\'s first name', 
     example: 'John'
   },
   {
@@ -100,5 +100,21 @@ export function validateTemplateVariables(
   return {
     isValid: invalidVariables.length === 0,
     invalidVariables
+  }
+}
+
+export const TEMPLATE_VARIABLES = {
+  contact: {
+    first_name: { label: 'First Name', example: 'John' },
+    last_name: { label: 'Last Name', example: 'Smith' },
+    email: { label: 'Email', example: 'john@company.com' },
+    company: { label: 'Company', example: 'Acme Corp' },
+    phone: { label: 'Phone', example: '+1 (555) 123-4567' }
+  },
+  campaign: {
+    sender_name: { label: 'Sender Name', example: 'Sarah Johnson' },
+    sender_title: { label: 'Sender Title', example: 'Sales Manager' },
+    company_name: { label: 'Company Name', example: 'LeadFlow' },
+    unsubscribe_url: { label: 'Unsubscribe URL', example: 'https://app.leadflow.com/unsubscribe' }
   }
 }

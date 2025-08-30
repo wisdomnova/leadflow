@@ -1,23 +1,27 @@
+// ./components/layout/Header.tsx - Removed glass transparency effects
+
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useNotificationStore } from '@/store/useNotificationStore'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Bell, 
   User, 
   Settings, 
   LogOut, 
   UserCircle,
-  CreditCard,
+  CreditCard, 
   HelpCircle,
   ChevronDown,
   X,
   CheckCircle,
   AlertCircle,
   Info,
-  AlertTriangle
+  AlertTriangle,
+  Menu
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -114,7 +118,7 @@ export function Header() {
   }
 
   return (
-    <header className="bg-white border-b border-gray-200">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 justify-between items-center">
           <div className="flex-1 min-w-0">
@@ -123,108 +127,136 @@ export function Header() {
             </h1>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             {/* Notifications */}
             <div className="relative" ref={notificationRef}>
-              <button 
+              <motion.button 
                 onClick={() => setNotificationOpen(!notificationOpen)}
-                className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+                className="relative p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-xl transition-all duration-200 hover:shadow-sm"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 bg-red-600 rounded-full text-xs text-white flex items-center justify-center font-medium">
+                  <motion.span 
+                    className="absolute -top-1 -right-1 h-5 w-5 bg-gradient-to-r from-red-500 to-red-600 rounded-full text-xs text-white flex items-center justify-center font-medium shadow-lg"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  >
                     {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
+                  </motion.span>
                 )}
-              </button>
+              </motion.button>
 
               {/* Notification Dropdown */}
-              {notificationOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                  <div className="p-4 border-b border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
-                      <div className="flex items-center space-x-2">
-                        {unreadCount > 0 && (
+              <AnimatePresence>
+                {notificationOpen && (
+                  <motion.div 
+                    className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-gray-200 z-50"
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="p-6 border-b border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
+                        <div className="flex items-center space-x-3">
+                          {unreadCount > 0 && (
+                            <button
+                              onClick={markAllAsRead}
+                              className="text-xs text-blue-600 hover:text-blue-700 font-medium px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                            >
+                              Mark all read
+                            </button>
+                          )}
                           <button
-                            onClick={markAllAsRead}
-                            className="text-xs text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
+                            onClick={() => setNotificationOpen(false)}
+                            className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg transition-colors"
                           >
-                            Mark all read
+                            <X className="h-4 w-4" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => setNotificationOpen(false)}
-                          className="text-gray-400 hover:text-gray-600 cursor-pointer"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="max-h-96 overflow-y-auto">
-                    {loading ? (
-                      <div className="p-4 text-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
-                      </div>
-                    ) : notifications.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500">
-                        <Bell className="h-8 w-8 mx-auto text-gray-300 mb-2" />
-                        <p className="text-sm">No notifications yet</p>
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-gray-100">
-                        {notifications.map((notification) => (
-                          <div
-                            key={notification.id}
-                            onClick={() => handleNotificationClick(notification)}
-                            className={clsx(
-                              'p-4 hover:bg-gray-50 cursor-pointer transition-colors',
-                              !notification.read_at && 'bg-blue-50'
-                            )}
-                          >
-                            <div className="flex items-start space-x-3">
-                              <div className="flex-shrink-0 mt-1">
-                                {getSeverityIcon(notification.severity)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className={clsx(
-                                  'text-sm font-medium text-gray-900',
-                                  !notification.read_at && 'font-semibold'
-                                )}>
-                                  {notification.title}
-                                </p>
-                                <p className="text-sm text-gray-600 mt-1">
-                                  {notification.message}
-                                </p>
-                                <p className="text-xs text-gray-400 mt-2">
-                                  {formatTimeAgo(notification.created_at)}
-                                </p>
-                              </div>
-                              {!notification.read_at && (
-                                <div className="flex-shrink-0">
-                                  <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                                </div>
-                              )}
-                            </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {loading ? (
+                        <div className="p-8 text-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500">
+                          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <Bell className="h-8 w-8 text-gray-300" />
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                          <p className="text-sm font-medium">No notifications yet</p>
+                          <p className="text-xs text-gray-400 mt-1">We'll notify you when something happens</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-gray-100">
+                          {notifications.map((notification, index) => (
+                            <motion.div
+                              key={notification.id}
+                              onClick={() => handleNotificationClick(notification)}
+                              className={clsx(
+                                'p-4 hover:bg-gray-50 cursor-pointer transition-all duration-200',
+                                !notification.read_at && 'bg-blue-50'
+                              )}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: index * 0.05 }}
+                              whileHover={{ x: 4 }}
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className="flex-shrink-0 mt-1">
+                                  <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-200">
+                                    {getSeverityIcon(notification.severity)}
+                                  </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className={clsx(
+                                    'text-sm font-medium text-gray-900',
+                                    !notification.read_at && 'font-semibold'
+                                  )}>
+                                    {notification.title}
+                                  </p>
+                                  <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                    {notification.message}
+                                  </p>
+                                  <p className="text-xs text-gray-400 mt-2">
+                                    {formatTimeAgo(notification.created_at)}
+                                  </p>
+                                </div>
+                                {!notification.read_at && (
+                                  <div className="flex-shrink-0">
+                                    <div className="w-2.5 h-2.5 bg-blue-600 rounded-full shadow-sm"></div>
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* User Menu */}
             <div className="relative" ref={userMenuRef}>
-              <button
+              <motion.button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center space-x-3 p-1 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                className="flex items-center space-x-3 p-2 rounded-xl hover:bg-gray-50 transition-all duration-200 hover:shadow-sm"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200">
-                  <User className="h-4 w-4 text-gray-600" />
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-2 border-white shadow-sm">
+                  <span className="text-sm font-bold text-blue-700">
+                    {user?.first_name?.charAt(0) || 'U'}
+                  </span>
                 </div>
                 <div className="hidden md:block text-left">
                   <p className="text-sm font-medium text-gray-900">
@@ -234,85 +266,82 @@ export function Header() {
                     {user?.organizations?.name}
                   </p>
                 </div>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              </button>
+                <ChevronDown className={clsx(
+                  "h-4 w-4 text-gray-400 transition-transform duration-200",
+                  userMenuOpen && "rotate-180"
+                )} />
+              </motion.button>
 
               {/* User Dropdown */}
-              {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                  <div className="p-3 border-b border-gray-100">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200">
-                        <User className="h-5 w-5 text-gray-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {user?.first_name} {user?.last_name}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {user?.email}
-                        </p>
+              <AnimatePresence>
+                {userMenuOpen && (
+                  <motion.div 
+                    className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 z-50"
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="p-4 border-b border-gray-200">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-2 border-white shadow-sm">
+                          <span className="text-lg font-bold text-blue-700">
+                            {user?.first_name?.charAt(0) || 'U'}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {user?.first_name} {user?.last_name}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {user?.email}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        router.push('/settings/profile')
-                        setUserMenuOpen(false)
-                      }}
-                      className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <UserCircle className="h-4 w-4 mr-3 text-gray-400" />
-                      Profile Settings
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        router.push('/settings/billing')
-                        setUserMenuOpen(false)
-                      }}
-                      className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <CreditCard className="h-4 w-4 mr-3 text-gray-400" />
-                      Billing & Usage
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        router.push('/settings')
-                        setUserMenuOpen(false)
-                      }}
-                      className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <Settings className="h-4 w-4 mr-3 text-gray-400" />
-                      Account Settings
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        router.push('/help')
-                        setUserMenuOpen(false)
-                      }}
-                      className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <HelpCircle className="h-4 w-4 mr-3 text-gray-400" />
-                      Help & Support
-                    </button>
-                  </div>
+                    <div className="py-2">
+                      {[
+                        { icon: Settings, label: 'Settings', href: '/settings' },
+                        { icon: CreditCard, label: 'Billing', href: '/billing' },
+                        { icon: HelpCircle, label: 'Help & Support', href: '/help' }
+                      ].map((item, index) => (
+                        <motion.button
+                          key={item.label}
+                          onClick={() => {
+                            router.push(item.href)
+                            setUserMenuOpen(false)
+                          }}
+                          className="w-full flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                        >
+                          <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center mr-3">
+                            <item.icon className="h-4 w-4 text-gray-600" />
+                          </div>
+                          {item.label}
+                        </motion.button>
+                      ))}
+                    </div>
 
-                  <div className="border-t border-gray-100 py-1">
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full flex items-center px-4 py-2 text-sm text-red-700 hover:bg-red-50 cursor-pointer"
-                    >
-                      <LogOut className="h-4 w-4 mr-3 text-red-500" />
-                      Sign out
-                    </button>
-                  </div>
-                </div>
-              )}
+                    <div className="border-t border-gray-200 py-2">
+                      <motion.button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center px-4 py-3 text-sm text-red-700 hover:bg-red-50 transition-all duration-200"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.15 }}
+                      >
+                        <div className="w-8 h-8 rounded-xl bg-red-100 flex items-center justify-center mr-3">
+                          <LogOut className="h-4 w-4 text-red-500" />
+                        </div>
+                        Sign out
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>

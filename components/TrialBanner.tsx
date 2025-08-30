@@ -20,7 +20,7 @@ export default function TrialBanner() {
   return (
     <div className={`${urgencyColor} border rounded-lg p-4 mb-6`}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3"> 
           <Clock className={`h-5 w-5 ${iconColor}`} />
           <div>
             <p className={`text-sm font-medium ${textColor}`}>

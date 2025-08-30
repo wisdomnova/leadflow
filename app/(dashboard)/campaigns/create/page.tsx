@@ -896,7 +896,7 @@ export default function CreateCampaignPage() {
                         console.log('Completing campaign setup with contacts:', selectedContacts)
                         
                         // 1. Update campaign with all current data
-                        const finalCampaignData = {
+                        const finalCampaignData = { 
                           name: campaignData.name,
                           description: campaignData.description,
                           from_name: campaignData.from_name,

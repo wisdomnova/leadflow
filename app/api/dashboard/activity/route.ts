@@ -1,3 +1,5 @@
+// ./app/api/dashboard/activity/route.ts - Fixed activity route
+
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
@@ -18,31 +20,68 @@ export async function GET(request: NextRequest) {
       .select('organization_id')
       .eq('id', decoded.userId)
       .single()
-
+ 
     if (userError || !userData) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Get recent activity
-    const { data: activities, error: activityError } = await supabase
-      .from('activity_logs')
-      .select('*')
-      .eq('organization_id', userData.organization_id)
+    // Get recent email events as activity - using the SAME join as campaigns
+    const { data: emailEvents, error: eventsError } = await supabase
+      .from('email_events')
+      .select(`
+        *,
+        campaigns!inner(organization_id, name)
+      `)
+      .eq('campaigns.organization_id', userData.organization_id)
       .order('created_at', { ascending: false })
       .limit(10)
 
-    if (activityError) {
-      return NextResponse.json({ error: 'Failed to fetch activity' }, { status: 500 })
+    if (eventsError) {
+      console.warn('Email events fetch error:', eventsError)
     }
 
-    // Format activities
-    const formattedActivities = activities?.map(activity => ({
-      id: activity.id,
-      message: activity.description,
-      timestamp: new Date(activity.created_at).toLocaleString()
-    })) || []
+    // Format activities from email events
+    const activities: any[] = []
 
-    return NextResponse.json(formattedActivities)
+    if (emailEvents && emailEvents.length > 0) {
+      emailEvents.forEach(event => {
+        let message = ''
+        const campaignName = event.campaigns?.name || 'Unknown Campaign'
+        
+        switch (event.event_type) {
+          case 'sent':
+            message = `Email sent in campaign "${campaignName}"`
+            break
+          case 'delivery':
+            message = `Email delivered in campaign "${campaignName}"`
+            break
+          case 'open':
+            message = `Email opened in campaign "${campaignName}"`
+            break
+          case 'click':
+            message = `Email clicked in campaign "${campaignName}"`
+            break
+          case 'bounce':
+            message = `Email bounced in campaign "${campaignName}"`
+            break
+          default:
+            message = `Email ${event.event_type} in campaign "${campaignName}"`
+        }
+
+        activities.push({
+          id: `email-${event.id}`,
+          message,
+          timestamp: new Date(event.created_at).toLocaleString()
+        })
+      })
+    }
+
+    // If no email events, show empty state
+    if (activities.length === 0) {
+      return NextResponse.json([])
+    } 
+
+    return NextResponse.json(activities)
 
   } catch (error) {
     console.error('Dashboard activity error:', error)

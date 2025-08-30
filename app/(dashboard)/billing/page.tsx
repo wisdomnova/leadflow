@@ -1,11 +1,17 @@
+// ./app/(dashboard)/billing/page.tsx - Removed gradients for cleaner design
+
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTrialStatus } from '@/hooks/useTrialStatus'
-import { CreditCard, Calendar, DollarSign, AlertCircle, ExternalLink, Check } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { 
+  CreditCard, 
+  ExternalLink, 
+  AlertCircle
+} from 'lucide-react'
 import Link from 'next/link'
-import TrialBanner from '@/components/TrialBanner'
 
 interface BillingInfo {
   subscription: any
@@ -18,6 +24,24 @@ interface UsageStats {
   contacts: { used: number; limit: number }
   campaigns: { used: number; limit: number }
   emails: { used: number; limit: number }
+}
+
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 }
+}
+
+const staggerContainer = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
+
+const staggerItem = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 }
 }
 
 export default function BillingPage() {
@@ -95,16 +119,18 @@ export default function BillingPage() {
   }
 
   const getStatusBadge = (status: string) => {
-    const statusStyles = {
-      trial: 'bg-blue-100 text-blue-800',
-      active: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-      past_due: 'bg-yellow-100 text-yellow-800'
+    const statusConfig = {
+      trial: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Free Trial' },
+      active: { bg: 'bg-green-100', text: 'text-green-800', label: 'Active' },
+      cancelled: { bg: 'bg-red-100', text: 'text-red-800', label: 'Cancelled' },
+      past_due: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Past Due' }
     }
 
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.trial
+
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyles[status as keyof typeof statusStyles] || 'bg-gray-100 text-gray-800'}`}>
-        {status === 'trial' ? 'Free Trial' : status.replace('_', ' ').toUpperCase()}
+      <span className={`inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-medium ${config.bg} ${config.text}`}>
+        {config.label}
       </span>
     )
   }
@@ -129,179 +155,248 @@ export default function BillingPage() {
     return Math.min((used / limit) * 100, 100)
   }
 
+  const getUsageColor = (percentage: number) => {
+    if (percentage >= 90) return 'bg-red-500'
+    if (percentage >= 75) return 'bg-yellow-500'
+    return 'bg-blue-600'
+  }
+
+  const usageItems = [
+    {
+      label: 'Contacts',
+      used: usageStats.contacts.used,
+      limit: usageStats.contacts.limit
+    },
+    {
+      label: 'Email Campaigns This Month',
+      used: usageStats.campaigns.used,
+      limit: usageStats.campaigns.limit
+    },
+    {
+      label: 'Emails Sent This Month',
+      used: usageStats.emails.used,
+      limit: usageStats.emails.limit
+    }
+  ]
+
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Billing & Subscription</h1>
-        <p className="mt-2 text-gray-600">Manage your subscription and billing information</p>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Header */}
+        <motion.div 
+          className="mb-8"
+          initial="initial"
+          animate="animate"
+          variants={fadeInUp}
+        >
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Billing & Subscription
+          </h1>
+          <p className="text-xl text-gray-600">
+            Manage your subscription and billing information
+          </p>
+        </motion.div>
 
-      <TrialBanner />
-
-      {/* Current Plan */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-            <CreditCard className="h-5 w-5 mr-2 text-blue-600" />
-            Current Plan
-          </h2>
-          {getStatusBadge(subscriptionStatus)}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <p className="text-sm font-medium text-gray-500">Plan</p>
-            <p className="text-lg font-semibold text-gray-900">{getPlanDisplayName(planType)}</p>
-          </div>
-          
-          {isTrialActive ? (
-            <div>
-              <p className="text-sm font-medium text-gray-500">Trial Days Remaining</p>
-              <p className="text-lg font-semibold text-gray-900">{daysRemaining} days</p>
+        <motion.div
+          className="space-y-8"
+          variants={staggerContainer}
+          initial="initial"
+          animate="animate"
+        >
+          {/* Current Plan */}
+          <motion.div 
+            className="bg-white rounded-3xl border border-gray-200 shadow-sm p-10"
+            variants={staggerItem}
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-gray-900">Current Plan</h2>
+              {getStatusBadge(subscriptionStatus)}
             </div>
-          ) : (
-            <div>
-              <p className="text-sm font-medium text-gray-500">Billing Cycle</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {billingInfo.subscription?.billing_cycle ? billingInfo.subscription.billing_cycle.charAt(0).toUpperCase() + billingInfo.subscription.billing_cycle.slice(1) : 'Monthly'}
-              </p>
-            </div>
-          )}
 
-          <div>
-            <p className="text-sm font-medium text-gray-500">Status</p>
-            <p className="text-lg font-semibold text-gray-900">
-              {subscriptionStatus === 'trial' ? 'Free Trial' : 'Active'}
-            </p>
-          </div>
-        </div>
-
-        {subscriptionStatus === 'trial' ? (
-          <div className="mt-6 flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/billing/upgrade"
-              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Upgrade Now
-            </Link>
-          </div>
-        ) : (
-          <div className="mt-6 flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={handleManageBilling}
-              disabled={isLoadingPortal}
-              className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              {isLoadingPortal ? 'Loading...' : 'Manage Billing'}
-            </button>
-            <Link
-              href="/billing/upgrade"
-              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Change Plan
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* Usage Limits */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-          <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
-          Usage & Limits
-        </h2>
-
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="font-medium text-gray-700">Contacts</span>
-              <span className="text-gray-500">
-                {usageStats.contacts.used.toLocaleString()} / {usageStats.contacts.limit.toLocaleString()}
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full" 
-                style={{ width: `${calculatePercentage(usageStats.contacts.used, usageStats.contacts.limit)}%` }}
-              ></div>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="font-medium text-gray-700">Email Campaigns This Month</span>
-              <span className="text-gray-500">
-                {usageStats.campaigns.used} / {usageStats.campaigns.limit}
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full" 
-                style={{ width: `${calculatePercentage(usageStats.campaigns.used, usageStats.campaigns.limit)}%` }}
-              ></div>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="font-medium text-gray-700">Emails Sent This Month</span>
-              <span className="text-gray-500">
-                {usageStats.emails.used.toLocaleString()} / {usageStats.emails.limit.toLocaleString()}
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full" 
-                style={{ width: `${calculatePercentage(usageStats.emails.used, usageStats.emails.limit)}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Billing History */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-          <Calendar className="h-5 w-5 mr-2 text-blue-600" />
-          Billing History
-        </h2>
-
-        {subscriptionStatus === 'trial' ? (
-          <div className="text-center py-8">
-            <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No billing history yet. Your free trial is currently active.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {billingInfo.isLoading ? (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+              <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+                <p className="text-sm font-medium text-gray-600 mb-2">Plan</p>
+                <p className="text-2xl font-bold text-gray-900">{getPlanDisplayName(planType)}</p>
               </div>
-            ) : billingInfo.subscription ? (
-              <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                <div>
-                  <p className="font-medium text-gray-900">
-                    LeadFlow {getPlanDisplayName(planType)} - {billingInfo.subscription?.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Till {billingInfo.nextBilling ? formatDate(billingInfo.nextBilling) : 'Processing...'}
+              
+              {isTrialActive ? (
+                <div className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
+                  <p className="text-sm font-medium text-blue-600 mb-2">Trial Days Remaining</p>
+                  <p className="text-2xl font-bold text-blue-900">{daysRemaining} days</p>
+                </div>
+              ) : (
+                <div className="bg-green-50 rounded-2xl p-6 border border-green-200">
+                  <p className="text-sm font-medium text-green-600 mb-2">Billing Cycle</p>
+                  <p className="text-2xl font-bold text-green-900">
+                    {billingInfo.subscription?.billing_cycle ? billingInfo.subscription.billing_cycle.charAt(0).toUpperCase() + billingInfo.subscription.billing_cycle.slice(1) : 'Monthly'}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="font-medium text-gray-900">
-                    ${getPlanPrice(planType, billingInfo.subscription?.billing_cycle || 'monthly')}.00
-                  </p>
-                  <p className="text-sm text-green-600">Paid</p>
+              )}
+
+              <div className="bg-purple-50 rounded-2xl p-6 border border-purple-200">
+                <p className="text-sm font-medium text-purple-600 mb-2">Status</p>
+                <p className="text-2xl font-bold text-purple-900">
+                  {subscriptionStatus === 'trial' ? 'Free Trial' : 'Active'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4">
+              {subscriptionStatus === 'trial' ? (
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Link
+                    href="/billing/upgrade"
+                    className="inline-flex items-center justify-center px-8 py-4 text-base font-bold rounded-2xl text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
+                  >
+                    <CreditCard className="h-5 w-5 mr-3" />
+                    Upgrade Now
+                  </Link>
+                </motion.div>
+              ) : (
+                <>
+                  <motion.button
+                    onClick={handleManageBilling}
+                    disabled={isLoadingPortal}
+                    className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-2xl text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <ExternalLink className="h-5 w-5 mr-2" />
+                    {isLoadingPortal ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                        Loading...
+                      </div>
+                    ) : (
+                      'Manage Billing'
+                    )}
+                  </motion.button>
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                    <Link
+                      href="/billing/upgrade"
+                      className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-2xl text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
+                    >
+                      Change Plan
+                    </Link>
+                  </motion.div>
+                </>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Usage Limits */}
+          <motion.div 
+            className="bg-white rounded-3xl border border-gray-200 shadow-sm p-10"
+            variants={staggerItem}
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-8">Usage & Limits</h2>
+
+            <div className="space-y-6">
+              {usageItems.map((item, index) => {
+                const percentage = calculatePercentage(item.used, item.limit)
+                
+                return (
+                  <motion.div
+                    key={item.label} 
+                    className="bg-gray-50 rounded-2xl p-6 border border-gray-200"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="font-semibold text-gray-900 text-base">{item.label}</span>
+                      <span className="text-gray-600 font-medium text-base">
+                        {item.used.toLocaleString()} / {item.limit.toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                      <motion.div 
+                        className={`h-full rounded-full ${getUsageColor(percentage)}`}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percentage}%` }}
+                        transition={{ duration: 1, ease: "easeOut", delay: index * 0.2 }}
+                      />
+                    </div>
+                    
+                    <div className="flex justify-between mt-3 text-sm">
+                      <span className={`font-medium ${
+                        percentage >= 90 ? 'text-red-600' :
+                        percentage >= 75 ? 'text-yellow-600' :
+                        'text-gray-500'
+                      }`}>
+                        {percentage.toFixed(1)}% used
+                      </span>
+                      {percentage >= 90 && (
+                        <span className="text-red-600 font-medium">Consider upgrading</span>
+                      )}
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </motion.div>
+
+          {/* Billing History */}
+          <motion.div 
+            className="bg-white rounded-3xl border border-gray-200 shadow-sm p-10"
+            variants={staggerItem}
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-8">Billing History</h2>
+
+            {subscriptionStatus === 'trial' ? (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                  <AlertCircle className="h-10 w-10 text-gray-400" />
                 </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No billing history yet</h3>
+                <p className="text-gray-600 text-base">Your free trial is currently active.</p>
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No billing history available.</p>
+              <div className="space-y-4">
+                {billingInfo.isLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  </div>
+                ) : billingInfo.subscription ? (
+                  <motion.div 
+                    className="bg-gray-50 rounded-2xl p-6 border border-gray-200"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-900 text-lg">
+                          LeadFlow {getPlanDisplayName(planType)} - {billingInfo.subscription?.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'}
+                        </p>
+                        <p className="text-gray-600 text-base mt-1">
+                          Next billing: {billingInfo.nextBilling ? formatDate(billingInfo.nextBilling) : 'Processing...'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-gray-900">
+                          ${getPlanPrice(planType, billingInfo.subscription?.billing_cycle || 'monthly')}.00
+                        </p>
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                          Paid
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                      <AlertCircle className="h-10 w-10 text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No billing history</h3>
+                    <p className="text-gray-600 text-base">Billing history will appear here once you subscribe.</p>
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
+          </motion.div>
+        </motion.div>
       </div>
     </div>
   )

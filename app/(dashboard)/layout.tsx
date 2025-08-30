@@ -15,7 +15,7 @@ export default function DashboardLayout({
   const { checkAuth, loading } = useAuthStore()
 
   useEffect(() => {
-    checkAuth()
+    checkAuth() 
   }, [checkAuth])
  
   if (loading) { 

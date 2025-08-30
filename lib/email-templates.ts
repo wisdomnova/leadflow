@@ -4,14 +4,203 @@ interface EmailVerificationProps {
 }
 
 interface PasswordResetProps {
-  name: string
+  name: string  
   resetUrl: string
 }
+
+export interface CampaignTemplate {
+  id: string
+  name: string
+  description: string
+  category: 'sales' | 'marketing' | 'onboarding' | 'nurture' | 'follow-up'
+  popular?: boolean
+  steps: {
+    subject: string
+    content: string
+    delay_days: number
+    delay_hours: number
+  }[]
+}
+
+export const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
+  {
+    id: 'welcome-series',
+    name: 'Welcome Series',
+    description: 'Onboard new customers with a warm welcome sequence',
+    category: 'onboarding',
+    popular: true,
+    steps: [
+      {
+        subject: 'Welcome to {{company}}!',
+        content: `Hi {{first_name}},
+
+Welcome to {{company}}! We're thrilled to have you on board.
+
+Over the next few days, I'll be sending you some helpful resources to get you started.
+
+Best regards,
+The {{company}} Team`,
+        delay_days: 0,
+        delay_hours: 0
+      },
+      {
+        subject: 'Your quick start guide',
+        content: `Hi {{first_name}},
+
+Here's your quick start guide to get the most out of {{company}}.
+
+Let me know if you have any questions!
+
+Best,
+The {{company}} Team`,
+        delay_days: 2,
+        delay_hours: 0
+      },
+      {
+        subject: 'How are things going?',
+        content: `Hi {{first_name}},
+
+It's been a week since you joined us. How are things going so far?
+
+I'd love to hear your feedback!
+
+Best,
+The {{company}} Team`,
+        delay_days: 7,
+        delay_hours: 0
+      }
+    ]
+  },
+  {
+    id: 'sales-followup',
+    name: 'Sales Follow-up',
+    description: 'Professional follow-up sequence for sales prospects',
+    category: 'sales',
+    popular: true,
+    steps: [
+      {
+        subject: 'Following up on our conversation',
+        content: `Hi {{first_name}},
+
+I wanted to follow up on our conversation about {{company}}'s needs.
+
+Based on what you shared, I believe our solution could help you achieve your goals.
+
+Would you be open to a quick call this week?
+
+Best regards,
+{{sender_name}}`,
+        delay_days: 0,
+        delay_hours: 0
+      },
+      {
+        subject: 'Quick question about {{company}}',
+        content: `Hi {{first_name}},
+
+I know you're busy, so I'll keep this brief.
+
+I was thinking about our conversation and had a quick question about your priorities for this quarter.
+
+Worth a quick chat?
+
+Best,
+{{sender_name}}`,
+        delay_days: 3,
+        delay_hours: 0
+      },
+      {
+        subject: 'Helpful resource for {{company}}',
+        content: `Hi {{first_name}},
+
+I came across this resource and thought you might find it interesting.
+
+No agenda here, just thought it might be valuable for you and your team.
+
+Hope it helps!
+
+{{sender_name}}`,
+        delay_days: 7,
+        delay_hours: 0
+      }
+    ]
+  },
+  {
+    id: 'product-launch',
+    name: 'Product Launch',
+    description: 'Announce and promote your new product launch',
+    category: 'marketing',
+    steps: [
+      {
+        subject: 'Something exciting is coming!',
+        content: `Hi {{first_name}},
+
+We've been working on something special and can't wait to share it with you.
+
+Stay tuned for the big reveal!
+
+Excited to share more soon,
+The {{company}} Team`,
+        delay_days: 0,
+        delay_hours: 0
+      },
+      {
+        subject: "It's here! Introducing our new product",
+        content: `Hi {{first_name}},
+
+The wait is over! Our new product is officially live.
+
+Check it out and let us know what you think.
+
+Cheers,
+The {{company}} Team`,
+        delay_days: 3,
+        delay_hours: 0
+      }
+    ]
+  },
+  {
+    id: 'reengagement',
+    name: 'Re-engagement',
+    description: 'Win back inactive customers with a gentle approach',
+    category: 'nurture',
+    steps: [
+      {
+        subject: 'We miss you, {{first_name}}',
+        content: `Hi {{first_name}},
+
+It's been a while since we've seen you, and we wanted to reach out.
+
+Is there anything we can help you with?
+
+We're here and listening.
+
+Warm regards,
+The {{company}} Team`,
+        delay_days: 0,
+        delay_hours: 0
+      },
+      {
+        subject: 'What you\'ve been missing',
+        content: `Hi {{first_name}},
+
+Since you've been away, we've made some exciting improvements.
+
+We'd love to show you what's new!
+
+Hope to see you soon!
+
+The {{company}} Team`,
+        delay_days: 5,
+        delay_hours: 0
+      }
+    ]
+  }
+]
 
 export const emailVerificationTemplate = ({ name, verificationUrl }: EmailVerificationProps) => `
 <!DOCTYPE html>
 <html> 
-<head>
+<head> 
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Verify Your Email</title>

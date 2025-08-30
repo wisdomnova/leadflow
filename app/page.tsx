@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Check, Upload, Zap, BarChart3, Users, Mail, Brain } from "lucide-react";
+import { Check, Upload, Zap, BarChart3, Users, Mail, Brain, Play, Star, Quote } from "lucide-react";
 import { useState } from "react";
 
 const fadeInUp = {
@@ -24,7 +24,7 @@ const fadeInRight = {
   transition: { duration: 0.8, delay: 0.2 }
 };
 
-const staggerContainer = {
+const staggerContainer = { 
   animate: {
     transition: {
       staggerChildren: 0.2
@@ -45,35 +45,53 @@ export default function Home() {
     {
       id: 'starter',
       name: 'Starter',
-      monthly: 29,
-      yearly: 290,
-      description: 'Perfect for small businesses and startups',
+      monthly: 49,
+      yearly: 490,
+      description: 'Perfect for individual sales professionals',
       features: [
-        '1,000 contacts',
-        '10 email campaigns per month',
-        '5,000 emails per month', 
-        'Basic analytics',
+        '1 user',
+        '2 active campaigns',
+        '500 contacts',
+        'Basic automation',
         'Email support',
         'CSV import/export'
       ]
     },
     {
-      id: 'pro',
-      name: 'Pro',
-      monthly: 79,
-      yearly: 790,
-      description: 'Best for growing businesses',
+      id: 'growth',
+      name: 'Growth',
+      monthly: 149,
+      yearly: 1490,
+      description: 'Best for growing sales teams',
       features: [
-        '10,000 contacts',
-        '50 email campaigns per month',
-        '50,000 emails per month',
-        'Advanced analytics',
+        '3 users',
+        '10 active campaigns',
+        '5,000 contacts',
+        'Full automation workflows',
+        'AI text assist',
         'Priority support',
         'API access',
-        'Custom fields',
-        'Automation workflows'
+        'Custom fields'
       ],
       popular: true
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      monthly: 399,
+      yearly: 3990,
+      description: 'For enterprise teams at scale',
+      features: [
+        '10 users',
+        'Unlimited campaigns',
+        '50,000 contacts',
+        'Advanced AI features',
+        'Sequence suggestions',
+        'Premium support',
+        'Custom integrations',
+        'Advanced analytics',
+        'White-label options'
+      ]
     }
   ];
 
@@ -82,6 +100,38 @@ export default function Home() {
     const discount = ((starter.monthly * 12 - starter.yearly) / (starter.monthly * 12)) * 100
     return Math.round(discount)
   }
+
+  // Social proof companies
+  const companies = [
+    { name: 'Microsoft', logo: '/logos/microsoft.svg' },
+    { name: 'Slack', logo: '/logos/slack.svg' },
+    { name: 'Notion', logo: '/logos/notion.svg' },
+    { name: 'Stripe', logo: '/logos/stripe.svg' },
+    { name: 'Zoom', logo: '/logos/zoom.svg' },
+    { name: 'Shopify', logo: '/logos/shopify.svg' }
+  ];
+
+  // Testimonials
+  const testimonials = [
+    {
+      id: 1,
+      content: "LeadFlow transformed our outreach completely. We went from 12% to 44% reply rates in just 3 weeks. The AI personalization is incredible.",
+      author: "Sarah Chen",
+      title: "VP of Sales",
+      company: "TechFlow",
+      avatar: "/avatars/sarah.jpg",
+      rating: 5
+    },
+    {
+      id: 2,
+      content: "Setting up campaigns used to take hours. Now I can launch a new sequence in under 5 minutes. The automation handles everything perfectly.",
+      author: "Marcus Rodriguez",
+      title: "Sales Director",
+      company: "GrowthLabs",
+      avatar: "/avatars/marcus.jpg",
+      rating: 5
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-white">
@@ -96,7 +146,7 @@ export default function Home() {
           <div className="flex justify-between items-center">
             {/* Logo */}
             <motion.div 
-              className="flex items-center"
+              className="flex items-center" 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
@@ -150,12 +200,29 @@ export default function Home() {
         </div>
       </motion.header>
 
-      {/* Hero Section with How It Works */}
-      <section className="bg-white py-24 lg:py-32 relative overflow-hidden">
+      {/* Hero Section */}
+      <section className="bg-white py-20 lg:py-28 relative overflow-hidden">
+        {/* Floating Gradient Blur */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div
+            className="absolute -right-80 top-1/2 -translate-y-1/2 w-[800px] h-[400px] opacity-60"
+            style={{
+              background: `
+                radial-gradient(ellipse 60% 80% at 30% 50%, rgba(31, 190, 57, 0.3) 0%, transparent 70%),
+                radial-gradient(ellipse 80% 60% at 70% 30%, rgba(24, 106, 229, 0.4) 0%, transparent 70%),
+                radial-gradient(ellipse 70% 70% at 50% 70%, rgba(147, 51, 234, 0.2) 0%, transparent 60%),
+                radial-gradient(ellipse 90% 50% at 20% 80%, rgba(31, 190, 57, 0.2) 0%, transparent 80%),
+                radial-gradient(ellipse 50% 90% at 80% 60%, rgba(24, 106, 229, 0.3) 0%, transparent 75%)
+              `,
+              filter: "blur(120px)",
+              transform: "scale(1.2)",
+            }}
+          />
+        </div>
 
         <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
           {/* Hero Content */}
-          <div className="grid lg:grid-cols-2 gap-16 items-center mb-32">
+          <div className="grid lg:grid-cols-2 gap-16 items-center mb-24">
             
             {/* Text Content - Left */}
             <motion.div 
@@ -191,20 +258,24 @@ export default function Home() {
                 className="text-[22px] text-gray-600 font-normal leading-relaxed max-w-2xl"
                 variants={fadeInLeft}
               >
-                Send thousands of personalized cold emails that actually get replies. 
-                LeadFlow automates your entire outreach process so you can focus on closing deals.
+                Launch campaigns in under 5 minutes and get +32% reply rates with AI-powered personalization. 
+                LeadFlow automates your entire outreach process.
               </motion.p>
               
               <motion.div 
-                className="pt-4"
+                className="flex flex-col sm:flex-row gap-4 pt-4"
                 variants={fadeInLeft}
               >
                 <Link 
                   href="/auth/sign-up" 
-                  className="inline-flex items-center bg-blue-600 text-white px-12 py-5 rounded-2xl text-xl font-bold hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105"
+                  className="inline-flex items-center justify-center bg-blue-600 text-white px-12 py-5 rounded-2xl text-xl font-bold hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105"
                 >
                   Start Free Trial
                 </Link>
+                <button className="inline-flex items-center justify-center bg-transparent border-2 border-gray-300 text-gray-700 px-12 py-5 rounded-2xl text-xl font-bold hover:bg-gray-50 transition-all transform hover:scale-105">
+                  <Play className="w-5 h-5 mr-2" />
+                  Watch Demo
+                </button>
               </motion.div>
 
               {/* Trial Benefits */}
@@ -223,170 +294,97 @@ export default function Home() {
               </motion.div>
             </motion.div>
 
-            {/* Dashboard Preview - Right */}
+            {/* Dashboard Image - Right */}
             <motion.div 
-              className="relative w-full max-w-2xl mx-auto"
+              className="relative w-full max-w-4xl mx-auto"
               variants={fadeInRight}
               initial="initial"
               animate="animate"
             >
-              {/* Mac Window Frame */}
-              <div className="bg-gray-100 rounded-xl shadow-2xl overflow-hidden border border-gray-200">
-                {/* Mac Title Bar */}
-                <div className="bg-gray-200 px-4 py-3 flex items-center space-x-2 border-b border-gray-300">
-                  <div className="flex space-x-1.5">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  </div>
-                  <div className="flex-1 text-center">
-                    <span className="text-gray-600 text-sm font-medium">LeadFlow Dashboard</span>
-                  </div>
-                </div>
-
-                {/* Dashboard Content */}
-                <div className="bg-white flex">
-                  {/* Sidebar */}
-                  <div className="bg-gray-50 w-48 p-4 border-r border-gray-200">
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-3 p-2 bg-blue-100 text-blue-700 rounded-lg">
-                        <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                        <span className="text-sm font-medium" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                          Dashboard
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-3 p-2 text-gray-600 rounded-lg hover:bg-gray-100">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                        <span className="text-sm" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                          Campaigns
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-3 p-2 text-gray-600 rounded-lg hover:bg-gray-100">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                        <span className="text-sm" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                          Contacts
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-3 p-2 text-gray-600 rounded-lg hover:bg-gray-100">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                        <span className="text-sm" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                          Analytics
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Main Content */}
-                  <div className="flex-1 p-6">
-                    {/* Dashboard Header */}
-                    <div className="mb-6">
-                      <h2 className="text-2xl font-bold text-gray-900 mb-1" style={{ fontFamily: 'SF Pro Display, system-ui, sans-serif' }}>
-                        Dashboard
-                      </h2>
-                      <p className="text-gray-600 text-sm" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                        Welcome back, Sarah
-                      </p>
-                    </div>
-
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-lg border border-blue-200">
-                        <div className="text-blue-600 text-xs font-semibold mb-1" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                          EMAILS SENT
-                        </div>
-                        <div className="text-lg font-bold text-blue-700" style={{ fontFamily: 'SF Pro Display, system-ui, sans-serif' }}>
-                          12,847
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-lg border border-blue-200">
-                        <div className="text-green-600 text-xs font-semibold mb-1" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                          REPLY RATE
-                        </div>
-                        <div className="text-lg font-bold text-green-700" style={{ fontFamily: 'SF Pro Display, system-ui, sans-serif' }}>
-                          23.4%
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-lg border border-purple-200">
-                        <div className="text-purple-600 text-xs font-semibold mb-1" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                          ACTIVE LEADS
-                        </div>
-                        <div className="text-lg font-bold text-purple-700" style={{ fontFamily: 'SF Pro Display, system-ui, sans-serif' }}>
-                          1,249
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Campaign List */}
-                    <div className="space-y-3">
-                      <h3 className="text-lg font-bold text-gray-900" style={{ fontFamily: 'SF Pro Display, system-ui, sans-serif' }}>
-                        Recent Campaigns
-                      </h3>
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <div>
-                            <div className="font-semibold text-gray-900 text-sm" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                              SaaS Outreach Q1
-                            </div>
-                            <div className="text-xs text-gray-600" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                              1,247 contacts • 23.4% reply
-                            </div>
-                          </div>
-                          <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                            ACTIVE
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <div>
-                            <div className="font-semibold text-gray-900 text-sm" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                              Enterprise Follow-up
-                            </div>
-                            <div className="text-xs text-gray-600" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                              856 contacts • 31.2% reply
-                            </div>
-                          </div>
-                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold" style={{ fontFamily: 'SF Pro Text, system-ui, sans-serif' }}>
-                            DONE
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div className="relative rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
+                <Image
+                  src="/dashboard.png"
+                  alt="LeadFlow Dashboard"
+                  width={1200}
+                  height={800}
+                  className="w-full h-auto"
+                  priority
+                />
               </div>
             </motion.div>
           </div>
 
-          {/* Floating Gradient Blur */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div
-              className="absolute -right-80 top-1/2 -translate-y-1/2 w-[800px] h-[400px] opacity-60"
-              style={{
-                background: `
-                  radial-gradient(ellipse 60% 80% at 30% 50%, rgba(31, 190, 57, 0.3) 0%, transparent 70%),
-                  radial-gradient(ellipse 80% 60% at 70% 30%, rgba(24, 106, 229, 0.4) 0%, transparent 70%),
-                  radial-gradient(ellipse 70% 70% at 50% 70%, rgba(147, 51, 234, 0.2) 0%, transparent 60%),
-                  radial-gradient(ellipse 90% 50% at 20% 80%, rgba(31, 190, 57, 0.2) 0%, transparent 80%),
-                  radial-gradient(ellipse 50% 90% at 80% 60%, rgba(24, 106, 229, 0.3) 0%, transparent 75%)
-                `,
-                filter: "blur(120px)",
-                transform: "scale(1.2)",
-              }}
-            />
-          </div>
+          {/* Social Proof - Company Logos */}
+          <motion.div 
+            className="mb-20"
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true }}
+            variants={staggerContainer}
+          >
+            <motion.p 
+              className="text-center text-gray-500 mb-8 text-sm font-medium"
+              variants={staggerItem}
+            >
+              Trusted by sales teams at
+            </motion.p>
+            <motion.div 
+              className="flex flex-wrap justify-center items-center gap-8 lg:gap-12 opacity-60"
+              variants={staggerItem}
+            >
+              {companies.map((company, index) => (
+                <div key={index} className="h-8 w-20 bg-gray-300 rounded flex items-center justify-center">
+                  <span className="text-xs text-gray-600 font-medium">{company.name}</span>
+                </div>
+              ))}
+            </motion.div>
+          </motion.div>
+
+          {/* Testimonials */}
+          <motion.div 
+            className="grid md:grid-cols-2 gap-8 mb-32"
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true }}
+            variants={staggerContainer}
+          >
+            {testimonials.map((testimonial, index) => (
+              <motion.div
+                key={testimonial.id}
+                className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm"
+                variants={staggerItem}
+              >
+                <div className="flex items-center mb-4">
+                  {[...Array(testimonial.rating)].map((_, i) => (
+                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+                <Quote className="w-8 h-8 text-gray-300 mb-4" />
+                <p className="text-gray-700 mb-6 text-lg leading-relaxed">
+                  "{testimonial.content}"
+                </p>
+                <div className="flex items-center">
+                  <div className="w-12 h-12 bg-gray-200 rounded-full mr-4"></div>
+                  <div>
+                    <div className="font-semibold text-gray-900">{testimonial.author}</div>
+                    <div className="text-sm text-gray-600">{testimonial.title}, {testimonial.company}</div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
 
           {/* How It Works Content */}
           <div className="mt-32">
             {/* Section Label */}
             <motion.div 
-              className="mb-30"
+              className="mb-20"
               initial="initial"
               whileInView="animate"
               viewport={{ once: true }}
               variants={staggerItem}
             >
-              <p className="text-[40px] text-gray-700 font-normal lowercase tracking-widest">
+              <p className="text-[40px] text-gray-700 font-normal lowercase tracking-widest text-center">
                 how it works
               </p>
             </motion.div>
@@ -412,7 +410,7 @@ export default function Home() {
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">Upload & Setup</h3>
                 <p className="text-gray-600 leading-relaxed">
                   Import your contact list and create email templates. 
-                  Our AI helps you write compelling subject lines and personalized messages.
+                  Our AI helps you write compelling subject lines and personalized messages in under 5 minutes.
                 </p>
               </motion.div>
 
@@ -430,7 +428,7 @@ export default function Home() {
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">Automate & Send</h3>
                 <p className="text-gray-600 leading-relaxed">
                   Set up email sequences and let LeadFlow automatically send personalized emails 
-                  at optimal times for maximum open rates.
+                  at optimal times for maximum open rates and +32% reply rates.
                 </p>
               </motion.div>
 
@@ -448,7 +446,7 @@ export default function Home() {
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">Track & Optimize</h3>
                 <p className="text-gray-600 leading-relaxed">
                   Monitor reply rates, track conversions, and optimize your campaigns 
-                  with detailed analytics and A/B testing.
+                  with detailed analytics and A/B testing to continuously improve results.
                 </p>
               </motion.div>
             </motion.div>
@@ -562,8 +560,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Lead Management Section */}
-      <section className="bg-white py-32 relative overflow-hidden">
+      {/* Contact Management Section */}
+      <section id="features" className="bg-white py-32 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <motion.div 
             className="grid lg:grid-cols-2 gap-20 items-center"
@@ -579,7 +577,7 @@ export default function Home() {
             >
               <div className="flex items-center space-x-4 mb-6">
                 <h2 className="text-5xl font-bold">
-                  <span className="text-gray-900">Lead </span>
+                  <span className="text-gray-900">Contact </span>
                   <span 
                     style={{
                       background: 'linear-gradient(135deg, #1fbe39 0%, #186ae5 100%)',
@@ -594,82 +592,31 @@ export default function Home() {
               </div>
               
               <p className="text-xl text-gray-600 leading-relaxed">
-                Import and organize your contacts with CSV upload, automatic deduplication, and smart segmentation tools.
+                Import and organize your contacts with CSV upload, automatic deduplication, and smart segmentation tools. 
+                Manage up to 50,000 contacts with advanced filtering.
               </p>
             </motion.div>
 
-            {/* Mac Window - Right */}
+            {/* Contacts Screenshot */}
             <motion.div 
-              className="relative w-full max-w-2xl mx-auto"
+              className="relative w-full max-w-4xl mx-auto"
               variants={staggerItem}
             >
-              <div className="bg-gray-100 rounded-xl shadow-2xl overflow-hidden border border-gray-200">
-                {/* Mac Title Bar */}
-                <div className="bg-gray-200 px-4 py-3 flex items-center space-x-2 border-b border-gray-300">
-                  <div className="flex space-x-1.5">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  </div>
-                  <div className="flex-1 text-center">
-                    <span className="text-gray-600 text-sm font-medium">Lead Management</span>
-                  </div>
-                </div>
-
-                {/* Window Content */}
-                <div className="bg-white p-8">
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-2xl font-bold text-gray-900">Contacts</h3>
-                      <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                        Import CSV
-                      </button>
-                    </div>
-
-                    {/* Contact List */}
-                    <div className="space-y-3">
-                      {[
-                        { name: "Sarah Johnson", email: "sarah@company.com", status: "Active", tag: "SaaS" },
-                        { name: "Mike Chen", email: "mike@startup.io", status: "Replied", tag: "Enterprise" },
-                        { name: "Emma Davis", email: "emma@tech.co", status: "Pending", tag: "SMB" },
-                        { name: "Alex Rivera", email: "alex@growth.com", status: "Active", tag: "SaaS" }
-                      ].map((contact, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
-                          <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                              <span className="text-blue-600 font-semibold text-sm">
-                                {contact.name.split(' ').map(n => n[0]).join('')}
-                              </span>
-                            </div>
-                            <div>
-                              <div className="font-semibold text-gray-900 text-sm">{contact.name}</div>
-                              <div className="text-xs text-gray-600">{contact.email}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              contact.status === 'Active' ? 'bg-green-100 text-green-700' :
-                              contact.status === 'Replied' ? 'bg-blue-100 text-blue-700' :
-                              'bg-yellow-100 text-yellow-700'
-                            }`}>
-                              {contact.status}
-                            </span>
-                            <span className="px-2 py-1 bg-gray-200 text-gray-700 rounded-full text-xs">
-                              {contact.tag}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+              <div className="relative rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
+                <Image
+                  src="/contacts.png"
+                  alt="LeadFlow Contacts Management"
+                  width={1200}
+                  height={800}
+                  className="w-full h-auto"
+                />
               </div>
             </motion.div>
           </motion.div>
         </div>
       </section>
 
-      {/* Automated Sequences Section */}
+      {/* Campaign Management Section */}
       <section className="bg-gray-50 py-32 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <motion.div 
@@ -679,66 +626,19 @@ export default function Home() {
             viewport={{ once: true }}
             variants={staggerContainer}
           >
-            {/* Mac Window - Left */}
+            {/* Campaigns Screenshot */}
             <motion.div 
-              className="relative w-full max-w-2xl mx-auto order-2 lg:order-1"
+              className="relative w-full max-w-4xl mx-auto order-2 lg:order-1"
               variants={staggerItem}
             >
-              <div className="bg-gray-100 rounded-xl shadow-2xl overflow-hidden border border-gray-200">
-                {/* Mac Title Bar */}
-                <div className="bg-gray-200 px-4 py-3 flex items-center space-x-2 border-b border-gray-300">
-                  <div className="flex space-x-1.5">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  </div>
-                  <div className="flex-1 text-center">
-                    <span className="text-gray-600 text-sm font-medium">Email Sequences</span>
-                  </div>
-                </div>
-
-                {/* Window Content */}
-                <div className="bg-white p-8">
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-2xl font-bold text-gray-900">Campaign Sequence</h3>
-                      <button className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                        Add Step
-                      </button>
-                    </div>
-
-                    {/* Sequence Steps */}
-                    <div className="space-y-4">
-                      {[
-                        { step: 1, title: "Initial Outreach", delay: "Day 1", status: "sent" },
-                        { step: 2, title: "Follow-up #1", delay: "Day 4", status: "scheduled" },
-                        { step: 3, title: "Value Proposition", delay: "Day 8", status: "draft" },
-                        { step: 4, title: "Final Touch", delay: "Day 15", status: "draft" }
-                      ].map((item, index) => (
-                        <div key={index} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg border">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-                            item.status === 'sent' ? 'bg-green-500' :
-                            item.status === 'scheduled' ? 'bg-blue-500' :
-                            'bg-gray-400'
-                          }`}>
-                            {item.step}
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-semibold text-gray-900 text-sm">{item.title}</div>
-                            <div className="text-xs text-gray-600">{item.delay}</div>
-                          </div>
-                          <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            item.status === 'sent' ? 'bg-green-100 text-green-700' :
-                            item.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {item.status}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+              <div className="relative rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
+                <Image
+                  src="/campaigns.png"
+                  alt="LeadFlow Campaigns"
+                  width={1200}
+                  height={800}
+                  className="w-full h-auto"
+                />
               </div>
             </motion.div>
 
@@ -749,16 +649,7 @@ export default function Home() {
             >
               <div className="flex items-center space-x-4 mb-6">
                 <h2 className="text-5xl font-bold">
-                  <span 
-                    style={{
-                      background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 50%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text'
-                    }}
-                  >
-                    Automated 
-                  </span>
+                  <span className="text-gray-900">Email </span>
                   <span 
                     style={{
                       background: 'linear-gradient(135deg, #1fbe39 0%, #186ae5 100%)',
@@ -767,20 +658,21 @@ export default function Home() {
                       backgroundClip: 'text'
                     }}
                   >
-                    {' '}Sequences
+                    Sequences
                   </span>
                 </h2>
               </div>
               
               <p className="text-xl text-gray-600 leading-relaxed">
-                Create multi-step email campaigns with personalized templates and smart follow-ups that convert prospects into customers.
+                Create unlimited automated email sequences with smart follow-ups. 
+                Set precise timing, personalize at scale, and convert prospects into customers.
               </p>
             </motion.div>
           </motion.div>
         </div>
       </section>
 
-      {/* AI Personalization Section */}
+      {/* Analytics Section */}
       <section className="bg-white py-32 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <motion.div 
@@ -797,115 +689,39 @@ export default function Home() {
             >
               <div className="flex items-center space-x-4 mb-6">
                 <h2 className="text-5xl font-bold">
+                  <span className="text-gray-900">Advanced </span>
                   <span 
                     style={{
-                      background: 'linear-gradient(135deg, #000000 0%, #2a2a2a 70%)',
+                      background: 'linear-gradient(135deg, #1fbe39 0%, #186ae5 100%)',
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
                       backgroundClip: 'text'
                     }}
                   >
-                    AI 
-                  </span>
-                  <span 
-                    style={{
-                      background: 'linear-gradient(135deg, #9333ea 0%, #1fbe39 50%, #186ae5 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text'
-                    }}
-                  >
-                     &nbsp;Personalization
+                    Analytics
                   </span>
                 </h2>
               </div>
               
               <p className="text-xl text-gray-600 leading-relaxed">
-                Leverage advanced AI to personalize emails at scale with dynamic content, smart templates, and intelligent subject lines that increase open rates by 40%.
+                Track every metric that matters. Monitor reply rates, open rates, click-through rates, and conversions 
+                with real-time analytics and detailed reporting.
               </p>
             </motion.div>
 
-            {/* Mac Window - Right */}
+            {/* Analytics Screenshot */}
             <motion.div 
-              className="relative w-full max-w-2xl mx-auto"
+              className="relative w-full max-w-4xl mx-auto"
               variants={staggerItem}
             >
-              <div className="bg-gray-100 rounded-xl shadow-2xl overflow-hidden border border-gray-200">
-                {/* Mac Title Bar */}
-                <div className="bg-gray-200 px-4 py-3 flex items-center space-x-2 border-b border-gray-300">
-                  <div className="flex space-x-1.5">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  </div>
-                  <div className="flex-1 text-center">
-                    <span className="text-gray-600 text-sm font-medium">AI Email Generator</span>
-                  </div>
-                </div>
-
-                {/* Window Content */}
-                <div className="bg-white p-8">
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-2xl font-bold text-gray-900">AI Email Assistant</h3>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        <span className="text-sm text-green-600 font-medium">AI Active</span>
-                      </div>
-                    </div>
-
-                    {/* AI Suggestions */}
-                    <div className="space-y-4">
-                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Brain className="w-4 h-4 text-purple-600" />
-                          <span className="text-sm font-semibold text-purple-700">AI Suggestion</span>
-                        </div>
-                        <p className="text-sm text-gray-700">
-                          <span className="font-semibold">Subject:</span> "Quick question about {'{'}company_name{'}'}'s recent funding round"
-                        </p>
-                        <div className="mt-2 flex items-center space-x-2">
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">+42% open rate</span>
-                          <button className="text-xs text-purple-600 hover:text-purple-700 font-medium">Use this</button>
-                        </div>
-                      </div>
-
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Brain className="w-4 h-4 text-blue-600" />
-                          <span className="text-sm font-semibold text-blue-700">Personalization</span>
-                        </div>
-                        <p className="text-sm text-gray-700">
-                          "Hi {'{'}first_name{'}'}, I noticed {'{'}company_name{'}'} just expanded to {'{'}location{'}'}. Congratulations on the growth!"
-                        </p>
-                        <div className="mt-2">
-                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Dynamic content</span>
-                        </div>
-                      </div>
-
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Brain className="w-4 h-4 text-green-600" />
-                          <span className="text-sm font-semibold text-green-700">Tone Analysis</span>
-                        </div>
-                        <p className="text-sm text-gray-700">
-                          Your email tone: Professional & Friendly
-                        </p>
-                        <div className="mt-2 flex items-center space-x-2">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
-                            <div className="bg-green-500 h-2 rounded-full w-4/5"></div>
-                          </div>
-                          <span className="text-xs text-green-600">Optimized</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Generate Button */}
-                    <button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-medium text-sm hover:from-purple-700 hover:to-blue-700 transition-all">
-                      Generate Personalized Email
-                    </button>
-                  </div>
-                </div>
+              <div className="relative rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
+                <Image
+                  src="/analytics.png"
+                  alt="LeadFlow Analytics Dashboard"
+                  width={1200}
+                  height={800}
+                  className="w-full h-auto"
+                />
               </div>
             </motion.div>
           </motion.div>
@@ -987,7 +803,7 @@ export default function Home() {
 
           {/* Pricing Cards */}
           <motion.div 
-            className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto"
+            className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto"
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
@@ -998,11 +814,11 @@ export default function Home() {
                 key={plan.id}
                 className={`relative bg-white rounded-3xl shadow-xl border-2 p-8 ${
                   plan.popular 
-                    ? 'border-blue-500 ring-4 ring-blue-100' 
+                    ? 'border-blue-500 ring-4 ring-blue-100 scale-105' 
                     : 'border-gray-200'
                 }`}
                 variants={staggerItem}
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ scale: plan.popular ? 1.05 : 1.02 }}
                 transition={{ duration: 0.3 }}
               >
                 {plan.popular && (
@@ -1019,7 +835,7 @@ export default function Home() {
                   
                   <div className="mb-4">
                     <span className="text-5xl font-bold text-gray-900">
-                      ${billingCycle === 'monthly' ? plan.monthly : plan.yearly}
+                      €{billingCycle === 'monthly' ? plan.monthly : plan.yearly}
                     </span>
                     <span className="text-gray-600 text-xl">
                       /{billingCycle === 'monthly' ? 'month' : 'year'}
@@ -1028,7 +844,7 @@ export default function Home() {
 
                   {billingCycle === 'yearly' && (
                     <p className="text-green-600 font-semibold">
-                      Save ${(plan.monthly * 12) - plan.yearly} per year
+                      Save €{(plan.monthly * 12) - plan.yearly} per year
                     </p>
                   )}
                 </div>
@@ -1087,7 +903,7 @@ export default function Home() {
 
       {/* Final CTA Section */}
       <section className="relative overflow-hidden">
-        {/* Swirling Gradient Background */}
+        {/* Background */}
         <div 
           className="absolute inset-0 z-0"
           style={{
@@ -1095,50 +911,10 @@ export default function Home() {
               radial-gradient(ellipse 80% 50% at 20% 0%, rgba(31, 190, 57, 0.3) 0%, transparent 50%),
               radial-gradient(ellipse 60% 80% at 80% 50%, rgba(24, 106, 229, 0.4) 0%, transparent 50%),
               radial-gradient(ellipse 100% 60% at 40% 100%, rgba(147, 51, 234, 0.3) 0%, transparent 50%),
-              radial-gradient(ellipse 120% 40% at 90% 10%, rgba(31, 190, 57, 0.2) 0%, transparent 60%),
-              radial-gradient(ellipse 70% 90% at 10% 80%, rgba(24, 106, 229, 0.3) 0%, transparent 50%),
               linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #000000 50%, #0f0f0f 75%, #000000 100%)
             `
           }}
         />
-        
-        {/* Animated Swirl Overlays */}
-        <div className="absolute inset-0 z-1">
-          <div 
-            className="absolute w-96 h-96 opacity-20 animate-spin"
-            style={{
-              top: '10%',
-              left: '10%',
-              background: 'conic-gradient(from 0deg, transparent, rgba(31, 190, 57, 0.4), transparent, rgba(24, 106, 229, 0.3), transparent)',
-              borderRadius: '50%',
-              animationDuration: '20s',
-              filter: 'blur(60px)'
-            }}
-          />
-          <div 
-            className="absolute w-80 h-80 opacity-15 animate-spin"
-            style={{
-              top: '40%',
-              right: '5%',
-              background: 'conic-gradient(from 180deg, transparent, rgba(147, 51, 234, 0.4), transparent, rgba(31, 190, 57, 0.3), transparent)',
-              borderRadius: '50%',
-              animationDuration: '15s',
-              animationDirection: 'reverse',
-              filter: 'blur(80px)'
-            }}
-          />
-          <div 
-            className="absolute w-72 h-72 opacity-25 animate-spin"
-            style={{
-              bottom: '20%',
-              left: '30%',
-              background: 'conic-gradient(from 90deg, transparent, rgba(24, 106, 229, 0.5), transparent, rgba(147, 51, 234, 0.3), transparent)',
-              borderRadius: '50%',
-              animationDuration: '25s',
-              filter: 'blur(40px)'
-            }}
-          />
-        </div>
 
         {/* CTA Content */}
         <div className="relative z-10 py-32">
@@ -1150,7 +926,6 @@ export default function Home() {
               viewport={{ once: true }}
               variants={staggerContainer}
             >
-              {/* Main Headline */}
               <motion.h2 
                 className="text-6xl lg:text-7xl font-bold mb-8 leading-tight"
                 variants={staggerItem}
@@ -1168,34 +943,29 @@ export default function Home() {
                 </span>
               </motion.h2>
               
-              {/* Subheading */}
               <motion.p 
                 className="text-2xl text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed"
                 variants={staggerItem}
               >
-                Automate your entire cold email process and focus on closing deals instead of writing emails.
+                Launch campaigns in under 5 minutes and achieve +32% reply rates with automated sequences.
               </motion.p>
               
-              {/* CTA Buttons */}
               <motion.div 
                 className="flex flex-col sm:flex-row items-center justify-center gap-6"
                 variants={staggerItem}
               >
                 <Link 
                   href="/auth/sign-up" 
-                  className="inline-flex items-center bg-blue-600 text-white px-12 py-5 rounded-2xl text-xl font-bold hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105 relative z-20"
+                  className="inline-flex items-center bg-blue-600 text-white px-12 py-5 rounded-2xl text-xl font-bold hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105"
                 >
                   Start Free Trial
                 </Link>
-                <Link 
-                  href="#pricing" 
-                  className="inline-flex items-center bg-transparent border-2 border-white text-white px-12 py-5 rounded-2xl text-xl font-bold hover:bg-white hover:text-black transition-all transform hover:scale-105 relative z-20"
-                >
-                  View Pricing
-                </Link>
+                <button className="inline-flex items-center bg-transparent border-2 border-white text-white px-12 py-5 rounded-2xl text-xl font-bold hover:bg-white hover:text-black transition-all transform hover:scale-105">
+                  <Play className="w-5 h-5 mr-2" />
+                  Watch Demo
+                </button>
               </motion.div>
 
-              {/* Bottom Benefits */}
               <motion.div 
                 className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-12 pt-12"
                 variants={staggerItem}
@@ -1210,18 +980,17 @@ export default function Home() {
                 </div>
                 <div className="flex items-center space-x-3">
                   <Check className="w-6 h-6 text-green-400" />
-                  <span className="text-gray-300 text-lg font-medium">Setup in 10 minutes</span>
+                  <span className="text-gray-300 text-lg font-medium">Setup in 5 minutes</span>
                 </div>
               </motion.div>
             </motion.div>
           </div>
         </div>
 
-        {/* Footer Content */}
+        {/* Footer */}
         <footer className="relative z-10">
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
             
-            {/* Main Footer Content */}
             <div className="py-16">
               <motion.div 
                 className="grid lg:grid-cols-4 md:grid-cols-2 gap-12"
@@ -1231,7 +1000,6 @@ export default function Home() {
                 variants={staggerContainer}
               >
                 
-                {/* Logo & Description */}
                 <motion.div 
                   className="lg:col-span-2"
                   variants={staggerItem}
@@ -1249,16 +1017,15 @@ export default function Home() {
                     The most powerful cold email automation platform. Scale your outreach and focus on closing deals.
                   </p>
                   
-                  {/* Trust Elements */}
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-6">
                       <div className="flex items-center space-x-2">
                         <Check className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-400 text-sm">GDPR Compliant</span>
+                        <span className="text-gray-400 text-sm">GDPR Ready</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Check className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-400 text-sm">SOC 2 Certified</span>
+                        <span className="text-gray-400 text-sm">TLS/SSL Encrypted</span>
                       </div>
                     </div>
                     
@@ -1269,13 +1036,12 @@ export default function Home() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <Check className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-400 text-sm">256-bit SSL</span>
+                        <span className="text-gray-400 text-sm">99.9% Uptime</span>
                       </div>
                     </div>
                   </div>
                 </motion.div>
 
-                {/* Product Links */}
                 <motion.div variants={staggerItem}>
                   <h3 className="text-white font-bold text-lg mb-6">Product</h3>
                   <ul className="space-y-4">
@@ -1292,7 +1058,6 @@ export default function Home() {
                   </ul>
                 </motion.div>
 
-                {/* Support Links */}
                 <motion.div variants={staggerItem}>
                   <h3 className="text-white font-bold text-lg mb-6">Support</h3>
                   <ul className="space-y-4">
@@ -1302,8 +1067,8 @@ export default function Home() {
                       </Link>
                     </li>
                     <li>
-                      <Link href="/contact" className="text-gray-400 hover:text-white transition-colors">
-                        Contact Us
+                      <Link href="/security" className="text-gray-400 hover:text-white transition-colors">
+                        Security
                       </Link>
                     </li>
                   </ul>
@@ -1311,7 +1076,6 @@ export default function Home() {
               </motion.div>
             </div>
 
-            {/* Bottom Section */}
             <motion.div 
               className="border-t border-gray-800 py-8"
               initial="initial"
@@ -1321,12 +1085,10 @@ export default function Home() {
             >
               <div className="flex flex-col lg:flex-row items-center justify-between space-y-4 lg:space-y-0">
                 
-                {/* Copyright */}
                 <div className="text-gray-400 text-sm">
                   © {new Date().getFullYear()} LeadFlow. All rights reserved.
                 </div>
 
-                {/* Legal Links */}
                 <div className="flex flex-wrap items-center space-x-8">
                   <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors text-sm">
                     Privacy Policy
@@ -1334,23 +1096,15 @@ export default function Home() {
                   <Link href="/terms" className="text-gray-400 hover:text-white transition-colors text-sm">
                     Terms of Service
                   </Link>
-                  <Link href="/cookies" className="text-gray-400 hover:text-white transition-colors text-sm">
-                    Cookie Policy
-                  </Link>
                   <Link href="/security" className="text-gray-400 hover:text-white transition-colors text-sm">
                     Security
                   </Link>
                 </div>
 
-                {/* Trust Badges */}
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2 bg-gray-800 px-3 py-1 rounded-full">
-                    <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                    <span className="text-gray-400 text-xs">99.9% Uptime</span>
-                  </div>
-                  <div className="flex items-center space-x-2 bg-gray-800 px-3 py-1 rounded-full">
-                    <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                    <span className="text-gray-400 text-xs">Enterprise Ready</span>
+                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                    <span className="text-gray-400 text-xs">System Operational</span>
                   </div>
                 </div>
               </div>
