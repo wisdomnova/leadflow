@@ -5,7 +5,45 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useCampaignStore } from '@/store/useCampaignStore'
 import SequenceBuilder from '@/components/campaigns/SequenceBuilder'
-import { ArrowLeft, Save, Eye, Settings, Clock, Calendar, Send, CheckCircle, Pause } from 'lucide-react'
+import ContactSelector from '@/components/campaigns/ContactSelector'
+import { 
+  ArrowLeft, 
+  Save, 
+  Eye, 
+  Settings, 
+  Clock, 
+  Calendar, 
+  Send, 
+  CheckCircle, 
+  Pause, 
+  Mail,
+  Users,
+  Target,
+  Activity,
+  Square,
+  AlertCircle
+} from 'lucide-react'
+import { motion } from 'framer-motion'
+
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5 }
+}
+
+const staggerContainer = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
+
+const staggerItem = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5 }
+}
 
 export default function EditCampaignPage() {
   const params = useParams()
@@ -14,10 +52,10 @@ export default function EditCampaignPage() {
   
   const { campaigns, fetchCampaigns, updateCampaign, loading } = useCampaignStore()
   const [campaign, setCampaign] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<'sequence' | 'settings'>('sequence')
+  const [activeStep, setActiveStep] = useState<'settings' | 'sequence' | 'contacts'>('settings')
   const [campaignData, setCampaignData] = useState({
     name: '',
-    description: '',
+    description: '', 
     type: 'sequence' as 'sequence' | 'single',
     from_name: '',
     from_email: ''
@@ -25,14 +63,12 @@ export default function EditCampaignPage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    // Fetch campaigns if not already loaded
     if (campaigns.length === 0) {
       fetchCampaigns()
     }
   }, [campaigns.length, fetchCampaigns])
 
   useEffect(() => {
-    // Find the campaign once campaigns are loaded
     if (campaigns.length > 0 && campaignId) {
       const foundCampaign = campaigns.find(c => c.id === campaignId)
       if (foundCampaign) {
@@ -61,70 +97,71 @@ export default function EditCampaignPage() {
         from_email: campaignData.from_email
       })
       
-      // Update local campaign state
       setCampaign((prev: any) => ({
         ...prev,
         ...campaignData
       }))
       
-      // Show success feedback
-      alert('Campaign settings saved successfully!')
+      alert('✅ Campaign settings saved successfully!')
     } catch (error) {
       console.error('Failed to update campaign:', error)
-      alert('Failed to save campaign settings')
+      alert('❌ Failed to save campaign settings')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleSequenceSave = () => {
-    // Sequence is saved automatically in SequenceBuilder
-    console.log('Sequence saved!')
-  }
-
-  const getStatusBadge = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'draft':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-            <Clock className="h-4 w-4 mr-1" />
-            Draft
-          </span>
-        )
-      case 'scheduled':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-            <Calendar className="h-4 w-4 mr-1" />
-            Scheduled
-          </span>
-        )
+        return {
+          color: 'bg-gray-100 text-gray-800 border-gray-200',
+          icon: <Clock className="h-4 w-4" />,
+          label: 'Draft',
+          description: 'Campaign is being prepared'
+        }
+      case 'ready':
+        return {
+          color: 'bg-blue-100 text-blue-800 border-blue-200',
+          icon: <Target className="h-4 w-4" />,
+          label: 'Ready to Launch',
+          description: 'Campaign is ready to be launched'
+        }
       case 'sending':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-            <Send className="h-4 w-4 mr-1" />
-            Sending
-          </span>
-        )
-      case 'sent':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-            <CheckCircle className="h-4 w-4 mr-1" />
-            Sent
-          </span>
-        )
+        return {
+          color: 'bg-green-100 text-green-800 border-green-200',
+          icon: <Activity className="h-4 w-4" />,
+          label: 'Sending',
+          description: 'Emails are being sent'
+        }
       case 'paused':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
-            <Pause className="h-4 w-4 mr-1" />
-            Paused
-          </span>
-        )
+        return {
+          color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+          icon: <Pause className="h-4 w-4" />,
+          label: 'Paused',
+          description: 'Campaign is temporarily stopped'
+        }
+      case 'completed':
+        return {
+          color: 'bg-blue-100 text-blue-800 border-blue-200',
+          icon: <CheckCircle className="h-4 w-4" />,
+          label: 'Completed',
+          description: 'All emails have been sent'
+        }
+      case 'stopped':
+        return {
+          color: 'bg-red-100 text-red-800 border-red-200',
+          icon: <Square className="h-4 w-4" />,
+          label: 'Stopped',
+          description: 'Campaign was stopped'
+        }
       default:
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-            Unknown
-          </span>
-        )
+        return {
+          color: 'bg-gray-100 text-gray-800 border-gray-200',
+          icon: <Clock className="h-4 w-4" />,
+          label: status,
+          description: 'Campaign status'
+        }
     }
   }
 
@@ -136,285 +173,398 @@ export default function EditCampaignPage() {
     )
   }
 
-  const tabs = [
-    { id: 'sequence', name: 'Email Sequence', icon: Eye },
-    { id: 'settings', name: 'Campaign Settings', icon: Settings }
+  const statusConfig = getStatusConfig(campaign.status)
+  const canEditCampaign = ['draft', 'ready'].includes(campaign.status)
+
+  const steps = [
+    { 
+      id: 'settings', 
+      name: 'Campaign Settings', 
+      description: 'Basic information',
+      icon: Settings,
+      color: 'blue'
+    },
+    { 
+      id: 'sequence', 
+      name: 'Email Sequence', 
+      description: 'Create your emails',
+      icon: Mail,
+      color: 'purple'
+    },
+    { 
+      id: 'contacts', 
+      name: 'Contacts', 
+      description: 'Manage recipients',
+      icon: Users,
+      color: 'green'
+    }
   ]
 
+  const getStepStatus = (stepId: string) => {
+    if (stepId === activeStep) return 'current'
+    return 'available'
+  }
+
+  const getStepColor = (stepId: string) => {
+    const status = getStepStatus(stepId)
+    if (status === 'current') return 'bg-blue-600 border-blue-600'
+    return 'bg-gray-100 border-gray-300 hover:bg-gray-200'
+  }
+
+  const getStepTextColor = (stepId: string) => {
+    const status = getStepStatus(stepId)
+    if (status === 'current') return 'text-white'
+    return 'text-gray-500'
+  }
+
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/20">
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        
+        {/* Header */}
+        <motion.div 
+          className="mb-12"
+          initial="initial"
+          animate="animate"
+          variants={fadeInUp}
+        >
+          <div className="flex items-center justify-between mb-6">
             <button
               onClick={() => router.push(`/campaigns/${campaignId}`)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
             >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Campaign
             </button>
-            <div>
-              <div className="flex items-center space-x-3">
-                <h1 className="text-2xl font-bold text-gray-900">{campaign.name}</h1>
-                {getStatusBadge(campaign.status)}
-              </div>
-              <p className="text-gray-600">Edit your campaign</p>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => router.push(`/campaigns/${campaignId}`)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View Campaign
+              </button>
             </div>
           </div>
           
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => router.push(`/campaigns/${campaignId}`)}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                Edit Campaign
+              </h1>
+              <p className="text-xl text-gray-600">
+                {campaign.name}
+              </p>
+            </div>
+            
+            <div className="text-right">
+              <span className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium border ${statusConfig.color}`}>
+                {statusConfig.icon}
+                <span className="ml-2">{statusConfig.label}</span>
+              </span>
+              <p className="text-sm text-gray-600 mt-2">{statusConfig.description}</p>
+            </div>
+          </div>
+
+          {/* Warning for active campaigns */}
+          {!canEditCampaign && (
+            <motion.div 
+              className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
             >
-              <Eye className="h-4 w-4 mr-2" />
-              View Campaign
-            </button>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {tabs.map((tab) => {
-              const Icon = tab.icon
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as 'sequence' | 'settings')}
-                  className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <Icon className="h-4 w-4 mr-2" />
-                  {tab.name}
-                </button>
-              )
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        {activeTab === 'sequence' && (
-          <div className="p-6">
-            <SequenceBuilder 
-              campaignId={campaignId}
-              onSave={handleSequenceSave}
-            />
-          </div>
-        )}
-
-        {activeTab === 'settings' && (
-          <div className="p-6">
-            <div className="max-w-2xl">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Campaign Settings</h2>
-              
-              <div className="space-y-6">
-                {/* Basic Information */}
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-yellow-600 mr-3" />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Campaign Name
-                  </label>
-                  <input
-                    type="text"
-                    value={campaignData.name}
-                    onChange={(e) => setCampaignData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter campaign name"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={campaignData.description}
-                    onChange={(e) => setCampaignData(prev => ({ ...prev, description: e.target.value }))}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Describe your campaign"
-                  />
-                </div>
-
-                {/* Sender Information */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Sender Information
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">From Name</label>
-                      <input
-                        type="text"
-                        value={campaignData.from_name}
-                        onChange={(e) => setCampaignData(prev => ({ ...prev, from_name: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="John Doe"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">From Email</label>
-                      <input
-                        type="email"
-                        value={campaignData.from_email}
-                        onChange={(e) => setCampaignData(prev => ({ ...prev, from_email: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="john@company.com"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    This information will appear in the "From" field of your emails
+                  <p className="text-yellow-800 font-medium">Limited Editing Available</p>
+                  <p className="text-yellow-700 text-sm mt-1">
+                    This campaign is {campaign.status}. Some settings cannot be modified while the campaign is active.
                   </p>
                 </div>
+              </div>
+            </motion.div>
+          )}
+        </motion.div>
 
-                {/* Campaign Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Campaign Type
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div 
-                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        campaignData.type === 'sequence' 
-                          ? 'border-blue-600 bg-blue-50' 
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setCampaignData(prev => ({ ...prev, type: 'sequence' }))}
-                    >
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          name="campaignType"
-                          value="sequence"
-                          checked={campaignData.type === 'sequence'}
-                          onChange={() => setCampaignData(prev => ({ ...prev, type: 'sequence' }))}
-                          className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                        />
-                        <div className="ml-3">
-                          <div className="text-sm font-medium text-gray-900">Email Sequence</div>
-                          <div className="text-xs text-gray-500">2-5 emails with delays</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div 
-                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        campaignData.type === 'single' 
-                          ? 'border-blue-600 bg-blue-50' 
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setCampaignData(prev => ({ ...prev, type: 'single' }))}
-                    >
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          name="campaignType"
-                          value="single"
-                          checked={campaignData.type === 'single'}
-                          onChange={() => setCampaignData(prev => ({ ...prev, type: 'single' }))}
-                          className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                        />
-                        <div className="ml-3">
-                          <div className="text-sm font-medium text-gray-900">Single Email</div>
-                          <div className="text-xs text-gray-500">One email sent immediately</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Campaign Status */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Campaign Status
-                  </label>
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      {getStatusBadge(campaign.status)}
-                      <div>
-                        <div className="text-sm text-gray-900">
-                          {campaign.status === 'draft' && 'Campaign is in draft mode'}
-                          {campaign.status === 'scheduled' && 'Campaign is scheduled to launch'}
-                          {campaign.status === 'sending' && 'Campaign is currently sending'}
-                          {campaign.status === 'sent' && 'Campaign has been sent'}
-                          {campaign.status === 'paused' && 'Campaign is paused'}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {campaign.status === 'draft' && 'Add contacts and launch when ready'}
-                          {campaign.status === 'scheduled' && `Scheduled for ${campaign.scheduled_at ? new Date(campaign.scheduled_at).toLocaleDateString() : 'soon'}`}
-                          {campaign.status === 'sending' && 'Emails are being sent to contacts'}
-                          {campaign.status === 'sent' && `Completed on ${campaign.sent_at ? new Date(campaign.sent_at).toLocaleDateString() : 'unknown date'}`}
-                          {campaign.status === 'paused' && 'Campaign sending is paused'}
-                        </div>
-                      </div>
-                    </div>
+        {/* Navigation Steps */}
+        <motion.div 
+          className="mb-12"
+          initial="initial"
+          animate="animate"
+          variants={staggerContainer}
+        >
+          <div className="flex items-center justify-between max-w-4xl mx-auto">
+            {steps.map((step, index) => (
+              <motion.div 
+                key={step.id} 
+                className="flex items-center"
+                variants={staggerItem}
+              >
+                <div className="flex items-center">
+                  <button
+                    onClick={() => setActiveStep(step.id as any)}
+                    className={`relative flex items-center justify-center w-16 h-16 rounded-2xl border-2 transition-all duration-300 ${getStepColor(step.id)} cursor-pointer hover:scale-105 hover:shadow-lg ${activeStep === step.id ? 'shadow-xl shadow-blue-200' : ''}`}
+                  >
+                    <step.icon className={`w-8 h-8 ${getStepTextColor(step.id)}`} />
                     
-                    {campaign.status === 'draft' && (
-                      <button
-                        onClick={() => router.push(`/campaigns/${campaignId}`)}
-                        className="inline-flex items-center px-3 py-1 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100"
-                      >
-                        Add contacts to launch →
-                      </button>
+                    {activeStep === step.id && (
+                      <div className="absolute inset-0 rounded-2xl bg-blue-600 animate-ping opacity-20"></div>
                     )}
-                  </div>
-                </div>
-
-                {/* Campaign Metadata */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-200">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Created</label>
-                    <div className="text-sm text-gray-900">
-                      {new Date(campaign.created_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </div>
-                  </div>
+                  </button>
                   
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Last Updated</label>
-                    <div className="text-sm text-gray-900">
-                      {new Date(campaign.updated_at || campaign.created_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                  <div className="ml-4">
+                    <div className={`font-semibold transition-colors ${
+                      activeStep === step.id ? 'text-blue-600' : 'text-gray-500'
+                    }`}>
+                      {step.name}
                     </div>
+                    <div className="text-sm text-gray-500">{step.description}</div>
                   </div>
                 </div>
+                
+                {index < steps.length - 1 && (
+                  <div className="flex-1 mx-8">
+                    <div className="h-1 rounded-full bg-gray-200"></div>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
 
-                {/* Save Button */}
-                <div className="pt-6 border-t border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-500">
-                      Changes will be saved and applied to your campaign
+        {/* Step Content */}
+        <motion.div
+          key={activeStep}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          {activeStep === 'settings' && (
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+              <div className="p-12">
+                <div className="max-w-2xl">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign Settings</h2>
+                  <p className="text-gray-600 mb-8">Update your campaign's basic information and sender details.</p>
+                  
+                  <div className="space-y-8">
+                    {/* Basic Information */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+                      <div className="space-y-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Campaign Name
+                          </label>
+                          <input
+                            type="text"
+                            value={campaignData.name}
+                            onChange={(e) => setCampaignData(prev => ({ ...prev, name: e.target.value }))}
+                            disabled={!canEditCampaign}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+                            placeholder="Enter campaign name"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Description
+                          </label>
+                          <textarea
+                            value={campaignData.description}
+                            onChange={(e) => setCampaignData(prev => ({ ...prev, description: e.target.value }))}
+                            disabled={!canEditCampaign}
+                            rows={4}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+                            placeholder="Describe your campaign"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <button
-                      onClick={handleSaveCampaignDetails}
-                      disabled={saving}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
+
+                    {/* Sender Information */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Sender Information</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">From Name</label>
+                          <input
+                            type="text"
+                            value={campaignData.from_name}
+                            onChange={(e) => setCampaignData(prev => ({ ...prev, from_name: e.target.value }))}
+                            disabled={!canEditCampaign}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+                            placeholder="John Doe"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">From Email</label>
+                          <input
+                            type="email"
+                            value={campaignData.from_email}
+                            onChange={(e) => setCampaignData(prev => ({ ...prev, from_email: e.target.value }))}
+                            disabled={!canEditCampaign}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+                            placeholder="john@company.com"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-2">
+                        This information will appear in the "From" field of your emails
+                      </p>
+                    </div>
+
+                    {/* Campaign Type */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Campaign Type</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <motion.div 
+                          className={`p-6 border-2 rounded-2xl transition-all ${
+                            campaignData.type === 'sequence' 
+                              ? 'border-blue-600 bg-blue-50' 
+                              : 'border-gray-200'
+                          } ${canEditCampaign ? 'cursor-pointer hover:border-gray-300' : 'opacity-50'}`}
+                          onClick={() => canEditCampaign && setCampaignData(prev => ({ ...prev, type: 'sequence' }))}
+                          whileHover={canEditCampaign ? { scale: 1.02 } : {}}
+                          whileTap={canEditCampaign ? { scale: 0.98 } : {}}
+                        >
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              name="campaignType"
+                              value="sequence"
+                              checked={campaignData.type === 'sequence'}
+                              onChange={() => setCampaignData(prev => ({ ...prev, type: 'sequence' }))}
+                              disabled={!canEditCampaign}
+                              className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <div className="ml-3">
+                              <div className="text-sm font-medium text-gray-900">Email Sequence</div>
+                              <div className="text-xs text-gray-500">Multiple emails with delays</div>
+                            </div>
+                          </div>
+                        </motion.div>
+
+                        <motion.div 
+                          className={`p-6 border-2 rounded-2xl transition-all ${
+                            campaignData.type === 'single' 
+                              ? 'border-blue-600 bg-blue-50' 
+                              : 'border-gray-200'
+                          } ${canEditCampaign ? 'cursor-pointer hover:border-gray-300' : 'opacity-50'}`}
+                          onClick={() => canEditCampaign && setCampaignData(prev => ({ ...prev, type: 'single' }))}
+                          whileHover={canEditCampaign ? { scale: 1.02 } : {}}
+                          whileTap={canEditCampaign ? { scale: 0.98 } : {}}
+                        >
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              name="campaignType"
+                              value="single"
+                              checked={campaignData.type === 'single'}
+                              onChange={() => setCampaignData(prev => ({ ...prev, type: 'single' }))}
+                              disabled={!canEditCampaign}
+                              className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <div className="ml-3">
+                              <div className="text-sm font-medium text-gray-900">Single Email</div>
+                              <div className="text-xs text-gray-500">One email sent immediately</div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      </div>
+                    </div>
+
+                    {/* Campaign Metadata */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-200">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 mb-1">Created</label>
+                        <div className="text-sm text-gray-900">
+                          {new Date(campaign.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 mb-1">Last Updated</label>
+                        <div className="text-sm text-gray-900">
+                          {new Date(campaign.updated_at || campaign.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Save Button */}
+                    {canEditCampaign && (
+                      <div className="pt-6 border-t border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm text-gray-500">
+                            Changes will be saved and applied to your campaign
+                          </div>
+                          <button
+                            onClick={handleSaveCampaignDetails}
+                            disabled={saving}
+                            className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <Save className="h-4 w-4 mr-2" />
+                            {saving ? 'Saving...' : 'Save Changes'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {activeStep === 'sequence' && (
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+              <div className="p-12">
+                <SequenceBuilder 
+                  campaignId={campaignId}
+                  onSave={() => {
+                    alert('✅ Email sequence saved successfully!')
+                  }}
+                  readOnly={!canEditCampaign}
+                />
+              </div>
+            </div>
+          )}
+
+          {activeStep === 'contacts' && (
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+              <div className="p-12">
+                <ContactSelector
+                  campaignId={campaignId}
+                  onContactsSelected={(contactIds) => {
+                    console.log('Contacts selected:', contactIds)
+                  }}
+                  selectedContactIds={[]}
+                  readOnly={!canEditCampaign}
+                  onSaveAsDraft={async () => {
+                    if (canEditCampaign) {
+                      alert('✅ Contacts saved successfully!')
+                    }
+                  }}
+                  onNavigateToContacts={() => {
+                    router.push('/contacts')
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </motion.div>
       </div>
     </div>
   )

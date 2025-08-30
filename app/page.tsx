@@ -1288,7 +1288,7 @@ export default function Home() {
                       <Link href="#pricing" className="text-gray-400 hover:text-white transition-colors">
                         Pricing
                       </Link>
-                    </li>
+                    </li> 
                   </ul>
                 </motion.div>
 

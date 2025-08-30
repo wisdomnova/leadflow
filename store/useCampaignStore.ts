@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 
 interface Campaign {
   from_email: string
-  from_name: string
+  from_name: string 
   id: string 
   organization_id: string
   name: string
@@ -66,8 +66,44 @@ export const useCampaignStore = create<CampaignState>((set, get) => ({
         throw new Error(errorData.details || errorData.error || 'Failed to fetch campaigns')
       }
       
-      const campaigns = await response.json()
-      set({ campaigns: campaigns || [], loading: false })
+      const campaignsData = await response.json()
+      
+      // Fetch recipient counts for each campaign
+      const campaignsWithCounts = await Promise.all(
+        campaignsData.map(async (campaign: any) => {
+          try {
+            // Get actual recipient count from campaign_contacts
+            const contactsResponse = await fetch(`/api/campaigns/${campaign.id}/contacts`)
+            const contacts = contactsResponse.ok ? await contactsResponse.json() : []
+            
+            // Calculate stats from actual campaign contacts
+            const actualRecipients = contacts.length
+            const sent = contacts.filter((c: any) => ['sent', 'delivered', 'opened', 'clicked'].includes(c.status)).length
+            const opened = contacts.filter((c: any) => ['opened', 'clicked'].includes(c.status)).length
+            const clicked = contacts.filter((c: any) => c.status === 'clicked').length
+            
+            return {
+              ...campaign,
+              total_recipients: actualRecipients, // Use actual count, not stored value
+              sent,
+              opened,
+              clicked
+            }
+          } catch (error) {
+            console.error(`Failed to fetch contacts for campaign ${campaign.id}:`, error)
+            return {
+              ...campaign,
+              total_recipients: campaign.total_recipients || 0,
+              sent: 0,
+              opened: 0,
+              clicked: 0
+            }
+          }
+        })
+      )
+      
+      console.log('Campaigns with recipient counts:', campaignsWithCounts)
+      set({ campaigns: campaignsWithCounts || [], loading: false })
 
     } catch (error) {
       console.error('Failed to fetch campaigns:', error)

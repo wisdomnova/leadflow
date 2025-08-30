@@ -15,7 +15,7 @@ import {
   Building,
   MoreVertical,
   Trash2,
-  Edit,
+  Edit, 
   Eye,
   X,
   Tag,

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const now = new Date()
     let cleanupCount = 0
     if (now.getHours() === 2) {
-      cleanupCount = await EmailProcessor.cleanupOldJobs(30)
+      cleanupCount = await EmailProcessor.cleanupOldJobs(30) 
     }
      
     console.log(`✅ Processed ${processedCount} emails, retried ${retryCount}, cleaned ${cleanupCount}`)
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       success: true,  
       processedCount,
       retriedCount: retryCount,
-      cleanedCount: cleanupCount,
+      cleanedCount: cleanupCount, 
       timestamp: new Date().toISOString()
     })
 

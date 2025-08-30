@@ -14,7 +14,7 @@ export default function TemplateVariablePicker({
   onInsert, 
   customFields = [] 
 }: TemplateVariablePickerProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false) 
 
   const getVariableIcon = (key: string) => {
     switch (key) {

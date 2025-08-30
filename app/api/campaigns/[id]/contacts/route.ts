@@ -1,3 +1,4 @@
+// ./app/api/campaigns/[id]/contacts/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
@@ -109,6 +110,64 @@ export async function POST(
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
     }
 
+    // Handle bulk contact addition
+    if (body.contactIds && Array.isArray(body.contactIds)) {
+      // First, get the contact details from the contacts table
+      const { data: contactsData, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id, email, first_name, last_name, company, phone')
+        .in('id', body.contactIds)
+        .eq('organization_id', userData.organization_id)
+
+      if (contactsError) {
+        return NextResponse.json({ error: 'Failed to fetch contact details' }, { status: 500 })
+      }
+
+      if (!contactsData || contactsData.length === 0) {
+        return NextResponse.json({ error: 'No valid contacts found' }, { status: 400 })
+      }
+
+      // Remove existing campaign contacts first
+      await supabase
+        .from('campaign_contacts')
+        .delete()
+        .eq('campaign_id', campaignId)
+
+      // Prepare campaign contacts data
+      const campaignContacts = contactsData.map(contact => ({
+        campaign_id: campaignId,
+        contact_id: contact.id,
+        email: contact.email.toLowerCase(),
+        first_name: contact.first_name,
+        last_name: contact.last_name,
+        company: contact.company || null,
+        phone: contact.phone || null,
+        status: 'pending',
+        added_at: new Date().toISOString()
+      }))
+
+      // Insert campaign contacts
+      const { data: insertedContacts, error: insertError } = await supabase
+        .from('campaign_contacts')
+        .insert(campaignContacts)
+        .select()
+
+      if (insertError) {
+        console.error('Bulk contact insert error:', insertError)
+        return NextResponse.json({ 
+          error: 'Failed to add contacts to campaign',
+          details: insertError.message 
+        }, { status: 500 })
+      }
+
+      return NextResponse.json({ 
+        message: 'Contacts added successfully',
+        count: insertedContacts.length,
+        contacts: insertedContacts
+      })
+    }
+
+    // Handle single contact addition (existing logic)
     // Check if contact already exists in this campaign
     const { data: existingContact } = await supabase
       .from('campaign_contacts')
@@ -138,7 +197,7 @@ export async function POST(
       .single()
 
     if (addError) {
-      console.error('Contact add error:', addError)
+      console.error('Contact add error:', addError) 
       return NextResponse.json({ 
         error: 'Failed to add contact',
         details: addError.message 

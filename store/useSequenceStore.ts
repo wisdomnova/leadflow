@@ -7,9 +7,10 @@ interface SequenceStore {
   currentStep: number
   isLoading: boolean
   error: string | null
-   
+    
   // Actions
   addStep: () => void
+  addStepAtIndex: (step: SequenceStep, index: number) => void
   removeStep: (stepId: string) => void
   updateStep: (stepId: string, updates: Partial<SequenceStep>) => void
   reorderSteps: (startIndex: number, endIndex: number) => void
@@ -26,7 +27,7 @@ export const useSequenceStore = create<SequenceStore>((set, get) => ({
   steps: [],
   currentStep: 0,
   isLoading: false,
-  error: null,
+  error: null, 
 
   addStep: () => {
     const { steps } = get()
@@ -47,6 +48,32 @@ export const useSequenceStore = create<SequenceStore>((set, get) => ({
 
     set({ 
       steps: [...steps, newStep],
+      error: null 
+    })
+  },
+
+  addStepAtIndex: (newStep: SequenceStep, index: number) => {
+    const { steps } = get()
+    if (steps.length >= 5) {
+      set({ error: 'Maximum 5 steps allowed' })
+      return
+    }
+
+    // Create a copy of the steps array
+    const updatedSteps = [...steps]
+    
+    // Insert the new step at the specified index
+    updatedSteps.splice(index, 0, newStep)
+    
+    // Update step numbers and names for all steps
+    const reorderedSteps = updatedSteps.map((step, i) => ({
+      ...step,
+      stepNumber: i + 1,
+      name: step.name.includes('Step ') ? `Step ${i + 1}` : step.name
+    }))
+
+    set({ 
+      steps: reorderedSteps,
       error: null 
     })
   },
@@ -120,22 +147,40 @@ export const useSequenceStore = create<SequenceStore>((set, get) => ({
     set({ isLoading: true, error: null })
 
     try {
-      const response = await fetch(`/api/campaigns/${campaignId}/sequence`, {
-        method: 'POST',
+      console.log('Store: Saving sequence for campaign:', campaignId, 'Steps:', steps.length)
+
+      // Transform steps to match API format
+      const transformedSteps = steps.map((step, index) => ({
+        subject: step.subject || '',
+        content: step.content || '',
+        delayDays: step.delayUnit === 'days' ? (step.delayAmount || 0) : 0,
+        delayHours: step.delayUnit === 'hours' ? (step.delayAmount || 0) : 0,
+        orderIndex: index
+      }))
+
+      // Use PUT method to replace all steps at once
+      const response = await fetch(`/api/campaigns/${campaignId}/steps`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ steps })
+        body: JSON.stringify({ steps: transformedSteps })
       })
 
       if (!response.ok) {
-        throw new Error('Failed to save sequence')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save sequence')
       }
+
+      const savedSteps = await response.json()
+      console.log('Store: Saved steps:', savedSteps)
 
       set({ isLoading: false })
     } catch (error) {
+      console.error('Store: Error saving sequence:', error)
       set({ 
         isLoading: false, 
         error: error instanceof Error ? error.message : 'Failed to save sequence'
       })
+      throw error
     }
   },
 
@@ -143,18 +188,38 @@ export const useSequenceStore = create<SequenceStore>((set, get) => ({
     set({ isLoading: true, error: null })
 
     try {
-      const response = await fetch(`/api/campaigns/${campaignId}/sequence`)
+      console.log('Store: Loading sequence for campaign:', campaignId)
+      
+      // Use the steps endpoint
+      const response = await fetch(`/api/campaigns/${campaignId}/steps`)
       
       if (!response.ok) {
-        throw new Error('Failed to load sequence')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to load sequence')
       }
-
-      const { steps } = await response.json()
+      
+      const data = await response.json()
+      console.log('Store: Loaded sequence data:', data)
+      
+      // Transform the data from campaign_steps format to SequenceStep format
+      const transformedSteps: SequenceStep[] = data.map((step: any, index: number) => ({
+        id: step.id ? step.id.toString() : `step-${index}`,
+        stepNumber: index + 1,
+        name: `Step ${index + 1}`,
+        subject: step.subject || '',
+        content: step.content || '',
+        delayAmount: step.delay_days > 0 ? step.delay_days : (step.delay_hours || 0),
+        delayUnit: step.delay_days > 0 ? 'days' : 'hours'
+      }))
+      
+      console.log('Store: Transformed steps:', transformedSteps)
+      
       set({ 
-        steps: steps || [],
+        steps: transformedSteps,
         isLoading: false 
       })
     } catch (error) {
+      console.error('Store: Error loading sequence:', error)
       set({ 
         isLoading: false, 
         error: error instanceof Error ? error.message : 'Failed to load sequence'

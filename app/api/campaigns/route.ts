@@ -1,4 +1,3 @@
-// ./app/api/campaigns/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
@@ -25,10 +24,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Get campaigns for the organization
+    // Get campaigns for the organization with recipient counts
     const { data: campaigns, error: campaignError } = await supabase
       .from('campaigns')
-      .select('*')
+      .select(`
+        *,
+        campaign_contacts(
+          id,
+          status
+        )
+      `)
       .eq('organization_id', userData.organization_id)
       .order('created_at', { ascending: false })
 
@@ -37,7 +42,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch campaigns' }, { status: 500 })
     }
 
-    return NextResponse.json(campaigns || [])
+    // Process campaigns to add computed fields
+    const processedCampaigns = campaigns?.map(campaign => {
+      const contacts = campaign.campaign_contacts || []
+      
+      return {
+        ...campaign,
+        total_recipients: contacts.length,
+        sent: contacts.filter((c: { status: string }) => ['sent', 'delivered', 'opened', 'clicked'].includes(c.status)).length,
+        opened: contacts.filter((c: { status: string }) => ['opened', 'clicked'].includes(c.status)).length,
+        clicked: contacts.filter((c: { status: string }) => c.status === 'clicked').length,
+        campaign_contacts: undefined // Remove to clean up response
+      }
+    }) || []
+
+    return NextResponse.json(processedCampaigns)
 
   } catch (error) {
     console.error('Campaigns error:', error)
@@ -72,28 +91,45 @@ export async function POST(request: NextRequest) {
 
     console.log('User organization:', userData.organization_id)
 
-    // Prepare campaign data - handle both old and new structures
+    // Prepare campaign data with ALL required fields
     const campaignData = {
       organization_id: userData.organization_id,
       name: body.name || 'Untitled Campaign',
-      // Handle both old (subject/content) and new (description) structures
+      description: body.description || null,
       subject: body.subject || '',
       content: body.content || '',
-      // Add description field if provided (for new sequence campaigns)
-      ...(body.description !== undefined && { description: body.description }),
       status: body.status || 'draft',
       type: body.type || 'one-time',
-      // Add sequence fields if this is a sequence campaign
-      ...(body.type === 'sequence' && { 
-        is_sequence: true,
-        total_steps: 1 // Will be updated when sequence is saved
-      }),
+      
+      // IMPORTANT: Add the missing sender fields
+      from_name: body.from_name || null,
+      from_email: body.from_email || null,
+      
+      // Sequence-specific fields
+      is_sequence: body.type === 'sequence',
+      total_steps: body.total_steps || (body.type === 'sequence' ? 1 : 0),
+      
+      // Scheduling fields
       scheduled_at: body.scheduled_at || null,
       sent_at: null,
+      launched_at: null,
+      
+      // Stats fields (start at 0)
       total_recipients: 0,
       delivered: 0,
       opened: 0,
-      clicked: 0
+      clicked: 0,
+      bounced: 0,
+      unsubscribed: 0,
+      
+      // Settings
+      send_rate: body.send_rate || 50,
+      track_opens: body.track_opens !== false, // Default to true
+      track_clicks: body.track_clicks !== false, // Default to true
+      
+      // Timestamps
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     }
 
     console.log('Campaign data to insert:', campaignData)

@@ -2,13 +2,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Mail, Clock, Users, Target, ChevronRight, Star } from 'lucide-react'
+import { Mail, Clock, Users, Target, ChevronRight, Star, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface Template {
   id: string
   name: string
-  description: string
-  category: 'sales' | 'marketing' | 'onboarding' | 'nurture'
+  description: string 
+  category: 'sales' | 'marketing' | 'onboarding' | 'nurture' 
   emails: number
   duration: string
   subject_line: string
@@ -30,12 +31,12 @@ const templates: Template[] = [
     category: 'onboarding',
     emails: 3,
     duration: '7 days',
-    subject_line: 'Welcome to {{company_name}}! 🎉',
+    subject_line: 'Welcome to {{company_name}}!',
     preview: 'Thank you for joining us! We\'re excited to help you get started...',
     popular: true,
     steps: [
       {
-        subject: 'Welcome to {{company_name}}! 🎉',
+        subject: 'Welcome to {{company_name}}!',
         content: `Hi {{first_name}},
 
 Welcome to {{company_name}}! We're thrilled to have you on board.
@@ -54,7 +55,7 @@ Best regards,
         delay_hours: 0
       },
       {
-        subject: 'Your quick start guide is here 📖',
+        subject: 'Your quick start guide is here',
         content: `Hi {{first_name}},
 
 Hope you're settling in well! 
@@ -76,7 +77,7 @@ Best,
         delay_hours: 0
       },
       {
-        subject: 'How are things going? 🤔',
+        subject: 'How are things going?',
         content: `Hi {{first_name}},
 
 It's been a week since you joined us at {{company_name}}. How are things going so far?
@@ -93,7 +94,7 @@ Looking forward to hearing from you!
 Best,
 {{from_name}}
 
-P.S. If you're loving {{company_name}}, we'd appreciate a quick review or referral! 🙏`,
+P.S. If you're loving {{company_name}}, we'd appreciate a quick review or referral!`,
         delay_days: 7,
         delay_hours: 0
       }
@@ -188,11 +189,11 @@ Best of luck with everything!
     category: 'marketing',
     emails: 3,
     duration: '10 days',
-    subject_line: 'Something exciting is coming to {{company_name}} 🚀',
+    subject_line: 'Something exciting is coming to {{company_name}}',
     preview: 'We\'ve been working on something special and can\'t wait to share...',
     steps: [
       {
-        subject: 'Something exciting is coming to {{company_name}} 🚀',
+        subject: 'Something exciting is coming to {{company_name}}',
         content: `Hi {{first_name}},
 
 We've been working on something special and can't wait to share it with you.
@@ -212,7 +213,7 @@ Excited to share more soon,
         delay_hours: 0
       },
       {
-        subject: '🎉 {{product_name}} is here!',
+        subject: '{{product_name}} is here!',
         content: `Hi {{first_name}},
 
 The wait is over! {{product_name}} is officially live and ready for you to explore.
@@ -222,7 +223,7 @@ What makes {{product_name}} special:
 ✓ {{benefit_2}}
 ✓ {{benefit_3}}
 
-🎁 Early bird special: Use code LAUNCH20 for 20% off your first month (expires in 48 hours)
+Early bird special: Use code LAUNCH20 for 20% off your first month (expires in 48 hours)
 
 [Get Started with {{product_name}}]
 
@@ -263,11 +264,11 @@ Best,
     category: 'nurture',
     emails: 3,
     duration: '14 days',
-    subject_line: 'We miss you, {{first_name}} 💙',
+    subject_line: 'We miss you, {{first_name}}',
     preview: 'It\'s been a while since we\'ve seen you at {{company_name}}...',
     steps: [
       {
-        subject: 'We miss you, {{first_name}} 💙',
+        subject: 'We miss you, {{first_name}}',
         content: `Hi {{first_name}},
 
 It's been a while since we've seen you at {{company_name}}, and we wanted to reach out.
@@ -284,14 +285,14 @@ Warm regards,
         delay_hours: 0
       },
       {
-        subject: 'What you\'ve been missing ✨',
+        subject: 'What you\'ve been missing',
         content: `Hi {{first_name}},
 
 Since you've been away, we've made some exciting improvements to {{company_name}}:
 
-🆕 {{new_feature_1}}
-🆕 {{new_feature_2}}  
-🆕 {{new_feature_3}}
+• {{new_feature_1}}
+• {{new_feature_2}}  
+• {{new_feature_3}}
 
 We'd love to show you what's new! Plus, we're offering a special "welcome back" discount just for you.
 
@@ -321,7 +322,7 @@ Just reply and let me know. Your feedback helps us serve everyone better.
 Thanks for listening,
 {{from_name}}
 
-P.S. If you don't want to hear from us anymore, you can unsubscribe below. No hard feelings! 💙`,
+P.S. If you don't want to hear from us anymore, you can unsubscribe below. No hard feelings!`,
         delay_days: 14,
         delay_hours: 0
       }
@@ -364,9 +365,9 @@ Customer Success Team`,
 
 I wanted to share some tips to help you get even more value from {{company_name}}:
 
-💡 Pro tip #1: {{tip_1}}
-💡 Pro tip #2: {{tip_2}}
-💡 Pro tip #3: {{tip_3}}
+Pro tip #1: {{tip_1}}
+Pro tip #2: {{tip_2}}
+Pro tip #3: {{tip_3}}
 
 Also, did you know about our {{advanced_feature}}? It's helped customers like {{similar_company}} achieve {{impressive_result}}.
 
@@ -391,13 +392,15 @@ interface CampaignTemplatesProps {
 export default function CampaignTemplates({ onSelectTemplate, onClose }: CampaignTemplatesProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
+  const [categoriesCollapsed, setCategoriesCollapsed] = useState(false)
+  const [templatesCollapsed, setTemplatesCollapsed] = useState(false)
 
   const categories = [
-    { id: 'all', name: 'All Templates' },
-    { id: 'sales', name: 'Sales' },
-    { id: 'marketing', name: 'Marketing' },
-    { id: 'onboarding', name: 'Onboarding' },
-    { id: 'nurture', name: 'Customer Success' }
+    { id: 'all', name: 'All Templates', count: templates.length },
+    { id: 'sales', name: 'Sales', count: templates.filter(t => t.category === 'sales').length },
+    { id: 'marketing', name: 'Marketing', count: templates.filter(t => t.category === 'marketing').length },
+    { id: 'onboarding', name: 'Onboarding', count: templates.filter(t => t.category === 'onboarding').length },
+    { id: 'nurture', name: 'Customer Success', count: templates.filter(t => t.category === 'nurture').length }
   ]
 
   const filteredTemplates = selectedCategory === 'all' 
@@ -411,187 +414,321 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-4 mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white min-h-[90vh]">
-        <div className="flex h-full">
-          {/* Left Sidebar */}
-          <div className="w-1/3 border-r border-gray-200 pr-6">
-            <div className="mb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Choose a Template</h3>
-              <p className="text-sm text-gray-500">
-                Start with a proven email sequence that you can customize for your needs.
-              </p>
+    <AnimatePresence>
+      <motion.div 
+        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <motion.div 
+          className="bg-white rounded-2xl shadow-2xl w-full h-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col"
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Choose a Template</h2>
+              <p className="text-gray-600 mt-1">Start with a proven email sequence and customize it for your needs</p>
             </div>
-
-            {/* Categories */}
-            <div className="mb-4">
-              <div className="space-y-1">
-                {categories.map((category) => (
-                  <button
-                    key={category.id}
-                    onClick={() => setSelectedCategory(category.id)}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-                      selectedCategory === category.id
-                        ? 'bg-blue-100 text-blue-900 font-medium'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    {category.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Template List */}
-            <div className="space-y-3">
-              {filteredTemplates.map((template) => (
-                <div
-                  key={template.id}
-                  onClick={() => setSelectedTemplate(template)}
-                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                    selectedTemplate?.id === template.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium text-gray-900 flex items-center">
-                      {template.name}
-                      {template.popular && (
-                        <Star className="h-4 w-4 text-yellow-500 ml-2 fill-current" />
-                      )}
-                    </h4>
-                  </div>
-                  
-                  <p className="text-sm text-gray-600 mb-3">
-                    {template.description}
-                  </p>
-                  
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <div className="flex items-center space-x-3">
-                      <span className="flex items-center">
-                        <Mail className="h-3 w-3 mr-1" />
-                        {template.emails} emails
-                      </span>
-                      <span className="flex items-center">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {template.duration}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <button
+              onClick={onClose}
+              className="p-3 hover:bg-red-50 rounded-full transition-colors cursor-pointer bg-red-100 border border-red-200"
+            >
+              <X className="w-5 h-5 text-red-600" />
+            </button>
           </div>
 
-          {/* Right Content */}
-          <div className="flex-1 pl-6">
-            {selectedTemplate ? (
-              <div>
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 flex items-center">
-                        {selectedTemplate.name}
-                        {selectedTemplate.popular && (
-                          <Star className="h-5 w-5 text-yellow-500 ml-2 fill-current" />
-                        )}
-                      </h3>
-                      <p className="text-gray-600 mt-1">{selectedTemplate.description}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-500 mb-1">
-                        {selectedTemplate.emails} emails • {selectedTemplate.duration}
-                      </div>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        selectedTemplate.category === 'sales' ? 'bg-green-100 text-green-800' :
-                        selectedTemplate.category === 'marketing' ? 'bg-blue-100 text-blue-800' :
-                        selectedTemplate.category === 'onboarding' ? 'bg-purple-100 text-purple-800' :
-                        'bg-orange-100 text-orange-800'
-                      }`}>
-                        {selectedTemplate.category}
-                      </span>
-                    </div>
-                  </div>
+          {/* Content */}
+          <div className="flex flex-1 overflow-hidden">
+            {/* Left Sidebar */}
+            <div className="w-80 border-r border-gray-200 bg-gray-50 overflow-y-auto">
+              {/* Categories */}
+              <div className="p-6">
+                <button
+                  onClick={() => setCategoriesCollapsed(!categoriesCollapsed)}
+                  className="w-full flex items-center justify-between text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4 hover:text-blue-600 transition-colors cursor-pointer"
+                >
+                  <span>Categories</span>
+                  {categoriesCollapsed ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronUp className="w-4 h-4" />
+                  )}
+                </button>
+                
+                <AnimatePresence>
+                  {!categoriesCollapsed && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-1"
+                    >
+                      {categories.map((category) => (
+                        <button
+                          key={category.id}
+                          onClick={() => setSelectedCategory(category.id)}
+                          className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                            selectedCategory === category.id
+                              ? 'bg-blue-100 text-blue-900 shadow-sm'
+                              : 'text-gray-700 hover:bg-white hover:shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{category.name}</span>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              selectedCategory === category.id
+                                ? 'bg-blue-200 text-blue-800'
+                                : 'bg-gray-200 text-gray-600'
+                            }`}>
+                              {category.count}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
-                  <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                    <div className="text-sm font-medium text-gray-700 mb-2">First Email Preview:</div>
-                    <div className="text-sm text-gray-600 mb-2">
-                      <strong>Subject:</strong> {selectedTemplate.subject_line}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {selectedTemplate.preview}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Email Sequence */}
-                <div className="mb-8">
-                  <h4 className="text-lg font-medium text-gray-900 mb-4">Email Sequence</h4>
-                  <div className="space-y-4">
-                    {selectedTemplate.steps.map((step, index) => (
-                      <div key={index} className="flex">
-                        <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium mr-4">
-                          {index + 1}
-                        </div>
-                        <div className="flex-1">
-                          <div className="bg-white border border-gray-200 rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <h5 className="font-medium text-gray-900">{step.subject}</h5>
-                              <span className="text-xs text-gray-500">
-                                {step.delay_days === 0 && step.delay_hours === 0 
-                                  ? 'Immediately' 
-                                  : `After ${step.delay_days}d ${step.delay_hours}h`}
+              {/* Template List */}
+              <div className="px-6 pb-6">
+                <button
+                  onClick={() => setTemplatesCollapsed(!templatesCollapsed)}
+                  className="w-full flex items-center justify-between text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4 hover:text-blue-600 transition-colors cursor-pointer"
+                >
+                  <span>Templates ({filteredTemplates.length})</span>
+                  {templatesCollapsed ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronUp className="w-4 h-4" />
+                  )}
+                </button>
+                
+                <AnimatePresence>
+                  {!templatesCollapsed && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-3"
+                    >
+                      {filteredTemplates.map((template) => (
+                        <motion.div
+                          key={template.id}
+                          onClick={() => setSelectedTemplate(template)}
+                          className={`p-4 rounded-xl cursor-pointer transition-all ${
+                            selectedTemplate?.id === template.id
+                              ? 'bg-blue-50 border-2 border-blue-200 shadow-md'
+                              : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                          }`}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <h4 className="font-semibold text-gray-900 flex items-center text-sm">
+                              {template.name}
+                              {template.popular && (
+                                <div className="ml-2 px-1.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full flex items-center">
+                                  <Star className="h-3 w-3 mr-1 fill-current" />
+                                  Popular
+                                </div>
+                              )}
+                            </h4>
+                          </div>
+                          
+                          <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                            {template.description}
+                          </p>
+                          
+                          <div className="flex items-center justify-between text-xs text-gray-500">
+                            <div className="flex items-center space-x-3">
+                              <span className="flex items-center">
+                                <Mail className="h-3 w-3 mr-1" />
+                                {template.emails}
+                              </span>
+                              <span className="flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {template.duration}
                               </span>
                             </div>
-                            <div className="text-sm text-gray-600 whitespace-pre-line">
-                              {step.content.substring(0, 200)}...
-                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              template.category === 'sales' ? 'bg-green-100 text-green-700' :
+                              template.category === 'marketing' ? 'bg-blue-100 text-blue-700' :
+                              template.category === 'onboarding' ? 'bg-purple-100 text-purple-700' :
+                              'bg-orange-100 text-orange-700'
+                            }`}>
+                              {template.category}
+                            </span>
                           </div>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Right Content */}
+            <div className="flex-1 overflow-y-auto">
+              {selectedTemplate ? (
+                <div className="p-8">
+                  {/* Template Header */}
+                  <div className="mb-8">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-3xl font-bold text-gray-900 flex items-center mb-2">
+                          {selectedTemplate.name}
+                          {selectedTemplate.popular && (
+                            <div className="ml-3 px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-full flex items-center">
+                              <Star className="h-4 w-4 mr-1 fill-current" />
+                              Popular Choice
+                            </div>
+                          )}
+                        </h3>
+                        <p className="text-xl text-gray-600 mb-4">{selectedTemplate.description}</p>
+                        
+                        <div className="flex items-center space-x-6 text-sm text-gray-500">
+                          <span className="flex items-center font-medium">
+                            <Mail className="h-4 w-4 mr-2" />
+                            {selectedTemplate.emails} emails
+                          </span>
+                          <span className="flex items-center font-medium">
+                            <Clock className="h-4 w-4 mr-2" />
+                            {selectedTemplate.duration}
+                          </span>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            selectedTemplate.category === 'sales' ? 'bg-green-100 text-green-800' :
+                            selectedTemplate.category === 'marketing' ? 'bg-blue-100 text-blue-800' :
+                            selectedTemplate.category === 'onboarding' ? 'bg-purple-100 text-purple-800' :
+                            'bg-orange-100 text-orange-800'
+                          }`}>
+                            {selectedTemplate.category}
+                          </span>
                         </div>
                       </div>
-                    ))}
+                    </div>
+
+                    {/* First Email Preview */}
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-100">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3">First Email Preview</h4>
+                      <div className="bg-white rounded-xl p-4 border border-gray-200">
+                        <div className="text-sm text-gray-700 mb-2">
+                          <strong>Subject:</strong> <span className="text-blue-600">{selectedTemplate.subject_line}</span>
+                        </div>
+                        <div className="text-sm text-gray-600 leading-relaxed">
+                          {selectedTemplate.preview}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Email Sequence */}
+                  <div className="mb-8">
+                    <h4 className="text-2xl font-bold text-gray-900 mb-6">Complete Email Sequence</h4>
+                    <div className="space-y-6">
+                      {selectedTemplate.steps.map((step, index) => (
+                        <motion.div 
+                          key={index} 
+                          className="flex"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          <div className="flex-shrink-0 mr-6">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-2xl flex items-center justify-center text-lg font-bold shadow-lg">
+                              {index + 1}
+                            </div>
+                            {index < selectedTemplate.steps.length - 1 && (
+                              <div className="w-0.5 h-16 bg-gray-200 mx-auto mt-4"></div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                              <div className="flex items-center justify-between mb-4">
+                                <h5 className="text-lg font-semibold text-gray-900">{step.subject}</h5>
+                                <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                  {step.delay_days === 0 && step.delay_hours === 0 
+                                    ? 'Send immediately' 
+                                    : `Wait ${step.delay_days}d ${step.delay_hours}h`}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600 whitespace-pre-line bg-gray-50 rounded-xl p-4 leading-relaxed">
+                                {step.content.length > 300 
+                                  ? step.content.substring(0, 300) + '...' 
+                                  : step.content}
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Variables Notice */}
+                  <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl p-6 mb-8">
+                    <h5 className="font-bold text-yellow-800 mb-3 flex items-center">
+                      <span className="text-xl mr-2">⚙️</span>
+                      Smart Personalization
+                    </h5>
+                    <p className="text-sm text-yellow-700 mb-3">
+                      This template uses smart variables that automatically personalize each email:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {['{{first_name}}', '{{company_name}}', '{{from_name}}'].map((variable) => (
+                        <code key={variable} className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-mono">
+                          {variable}
+                        </code>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Sticky Action Bar */}
+                  <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 -mx-8 -mb-8">
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-gray-600">
+                        Ready to customize this template for your campaign?
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={onClose}
+                          className="px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 font-medium transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleUseTemplate}
+                          className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 font-medium flex items-center shadow-lg hover:shadow-xl transition-all cursor-pointer"
+                        >
+                          Use This Template
+                          <ChevronRight className="h-5 w-5 ml-2" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                {/* Variables Notice */}
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                  <h5 className="font-medium text-yellow-800 mb-2">📝 Personalization Variables</h5>
-                  <p className="text-sm text-yellow-700">
-                    This template uses variables like <code>{`{{first_name}}`}</code> and <code>{`{{company_name}}`}</code> 
-                    that will be automatically replaced with your contact's information.
-                  </p>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="w-24 h-24 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                      <Mail className="h-12 w-12 text-gray-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Select a Template</h3>
+                    <p className="text-lg text-gray-500 max-w-md">
+                      Choose a template from the sidebar to see the preview and complete email sequence.
+                    </p>
+                  </div>
                 </div>
-
-                {/* Action Buttons */}
-                <div className="flex justify-between">
-                  <button
-                    onClick={onClose}
-                    className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleUseTemplate}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
-                  >
-                    Use This Template
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Template</h3>
-                <p className="text-gray-500">
-                  Choose a template from the list to see the preview and email sequence.
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   )
 }

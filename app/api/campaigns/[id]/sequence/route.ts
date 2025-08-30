@@ -17,6 +17,8 @@ export async function GET(
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
     const { id: campaignId } = await params
 
+    console.log('API (sequence): Redirecting to steps API for campaign:', campaignId)
+
     // Get campaign to verify ownership
     const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
@@ -39,18 +41,32 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Get sequence steps
+    // Get steps from campaign_steps table (new approach)
     const { data: steps, error: stepsError } = await supabase
-      .from('sequences')
+      .from('campaign_steps')
       .select('*')
       .eq('campaign_id', campaignId)
-      .order('step_number')
+      .order('order_index')
 
     if (stepsError) {
+      console.error('Failed to fetch steps:', stepsError)
       return NextResponse.json({ error: 'Failed to fetch sequence' }, { status: 500 })
     }
 
-    return NextResponse.json({ steps: steps || [] })
+    // Transform campaign_steps format to legacy sequence format
+    const sequenceSteps = (steps || []).map((step: any, index: number) => ({
+      id: step.id,
+      step_number: index + 1,
+      name: `Step ${index + 1}`,
+      subject: step.subject || '',
+      content: step.content || '',
+      delay_amount: step.delay_days || 0,
+      delay_unit: step.delay_days > 0 ? 'days' : 'hours'
+    }))
+
+    console.log('API (sequence): Returning', sequenceSteps.length, 'steps as legacy format')
+
+    return NextResponse.json({ steps: sequenceSteps })
 
   } catch (error) {
     console.error('Get sequence error:', error)
@@ -72,6 +88,8 @@ export async function POST(
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
     const { steps } = await request.json()
     const { id: campaignId } = await params
+
+    console.log('API (sequence): Saving', steps?.length, 'steps to campaign_steps table')
 
     // Validate steps
     if (!Array.isArray(steps) || steps.length < 1 || steps.length > 5) {
@@ -100,39 +118,43 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Delete existing sequence steps
+    // Delete existing steps from campaign_steps table
     await supabase
-      .from('sequences')
+      .from('campaign_steps')
       .delete()
       .eq('campaign_id', campaignId)
 
-    // Insert new sequence steps
-    const sequenceData = steps.map((step: any, index: number) => ({
+    // Transform legacy sequence format to campaign_steps format
+    const stepsData = steps.map((step: any, index: number) => ({
       campaign_id: campaignId,
-      step_number: index + 1,
-      name: step.name || `Step ${index + 1}`,
+      type: 'email',
       subject: step.subject || '',
       content: step.content || '',
-      delay_amount: step.delayAmount || 0,
-      delay_unit: step.delayUnit || 'hours'
+      delay_days: step.delayUnit === 'days' ? (step.delayAmount || 0) : 0,
+      delay_hours: step.delayUnit === 'hours' ? (step.delayAmount || 0) : 0,
+      order_index: index
     }))
 
+    // Insert into campaign_steps table
     const { error: insertError } = await supabase
-      .from('sequences')
-      .insert(sequenceData)
+      .from('campaign_steps')
+      .insert(stepsData)
 
     if (insertError) {
+      console.error('Failed to save to campaign_steps:', insertError)
       return NextResponse.json({ error: 'Failed to save sequence' }, { status: 500 })
     }
 
     // Update campaign with sequence info
-    await supabase
+    await supabase 
       .from('campaigns')
       .update({
         is_sequence: true,
         total_steps: steps.length
       })
       .eq('id', campaignId)
+
+    console.log('API (sequence): Successfully saved', steps.length, 'steps')
 
     return NextResponse.json({ success: true })
 
