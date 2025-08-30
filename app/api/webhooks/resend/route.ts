@@ -16,20 +16,21 @@ function verifyWebhookSignature(payload: string, signature: string, timestamp: s
 
   try {
     // Svix signature format: "v1,base64signature"
-    const signatures = signature.split(',')
-    let signatureToVerify = ''
+    // Split on comma and look for v1 version
+    const parts = signature.split(',')
     
-    for (const sig of signatures) {
-      if (sig.startsWith('v1,')) {
-        signatureToVerify = sig.substring(3) // Remove "v1,"
-        break
-      }
-    }
-
-    if (!signatureToVerify) {
-      console.error('No v1 signature found in:', signature)
+    if (parts.length !== 2 || parts[0] !== 'v1') {
+      console.error('Invalid signature format. Expected "v1,signature", got:', signature)
       return false
     }
+
+    const signatureToVerify = parts[1] // The base64 signature part
+
+    console.log('Parsing signature:', {
+      fullSignature: signature,
+      version: parts[0],
+      signature: signatureToVerify.substring(0, 10) + '...'
+    })
 
     // Create the signed payload as Svix does: timestamp.payload
     const signedPayload = `${timestamp}.${payload}`
@@ -44,7 +45,8 @@ function verifyWebhookSignature(payload: string, signature: string, timestamp: s
       provided: signatureToVerify.substring(0, 10) + '...',
       expected: expectedSignature.substring(0, 10) + '...',
       timestamp,
-      payloadLength: payload.length
+      payloadLength: payload.length,
+      signedPayloadLength: signedPayload.length
     })
 
     // Compare signatures (both are base64)
