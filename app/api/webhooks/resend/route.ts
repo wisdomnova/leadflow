@@ -3,21 +3,54 @@ import { NextRequest, NextResponse } from 'next/server'
 import { EmailService } from '@/lib/email-service'
 import crypto from 'crypto'
 
-function verifyWebhookSignature(payload: string, signature: string): boolean {
+function verifyWebhookSignature(payload: string, signature: string, timestamp: string): boolean {
   if (!process.env.RESEND_WEBHOOK_SECRET) {
     console.warn('RESEND_WEBHOOK_SECRET not configured, skipping signature verification')
     return true // Allow in development
   }
 
+  if (!signature || !timestamp) {
+    console.warn('Missing signature or timestamp in webhook')
+    return false
+  }
+
   try {
+    // Svix signature format: "v1,base64signature"
+    const signatures = signature.split(',')
+    let signatureToVerify = ''
+    
+    for (const sig of signatures) {
+      if (sig.startsWith('v1,')) {
+        signatureToVerify = sig.substring(3) // Remove "v1,"
+        break
+      }
+    }
+
+    if (!signatureToVerify) {
+      console.error('No v1 signature found in:', signature)
+      return false
+    }
+
+    // Create the signed payload as Svix does: timestamp.payload
+    const signedPayload = `${timestamp}.${payload}`
+    
+    // Generate expected signature
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RESEND_WEBHOOK_SECRET)
-      .update(payload)
-      .digest('hex')
+      .update(signedPayload, 'utf8')
+      .digest('base64')
 
+    console.log('Svix signature verification:', {
+      provided: signatureToVerify.substring(0, 10) + '...',
+      expected: expectedSignature.substring(0, 10) + '...',
+      timestamp,
+      payloadLength: payload.length
+    })
+
+    // Compare signatures (both are base64)
     return crypto.timingSafeEqual(
-      Buffer.from(signature.replace('sha256=', '')),
-      Buffer.from(expectedSignature)
+      Buffer.from(signatureToVerify, 'base64'),
+      Buffer.from(expectedSignature, 'base64')
     )
   } catch (error) {
     console.error('Webhook signature verification failed:', error)
@@ -28,21 +61,27 @@ function verifyWebhookSignature(payload: string, signature: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.text()
-    const signature = request.headers.get('resend-signature') || 
-                     request.headers.get('x-resend-signature') || 
-                     request.headers.get('webhook-signature') || ''
+    
+    // Get Svix headers
+    const signature = request.headers.get('svix-signature') || ''
+    const timestamp = request.headers.get('svix-timestamp') || ''
+    const id = request.headers.get('svix-id') || ''
 
-    console.log('Webhook received:', {
+    console.log('Svix webhook received:', {
       payloadLength: payload.length,
-      signature: signature ? signature.substring(0, 20) + '...' : 'none',
-      headers: Object.fromEntries(request.headers.entries())
+      signature: signature ? signature.substring(0, 30) + '...' : 'none',
+      timestamp,
+      id,
+      userAgent: request.headers.get('user-agent')
     })
 
     // Verify webhook signature
-    if (!verifyWebhookSignature(payload, signature)) {
+    if (!verifyWebhookSignature(payload, signature, timestamp)) {
       console.error('Invalid webhook signature')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
+
+    console.log('✅ Webhook signature verified')
 
     const event = JSON.parse(payload)
     console.log('Resend webhook event:', {
@@ -143,7 +182,8 @@ export async function POST(request: NextRequest) {
       eventType: event.type,
       messageId: event.data?.id,
       campaignId,
-      contactId
+      contactId,
+      svixId: id
     })
 
   } catch (error) {
