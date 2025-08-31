@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Check, Upload, Zap, BarChart3, Users, Mail, Brain, Play, Star, Quote } from "lucide-react";
+import { Check, Upload, Zap, BarChart3, Users, Mail, Brain, Play, Star, Quote, Twitter, Linkedin, Github, Globe } from "lucide-react";
 import { useState } from "react";
 
 const fadeInUp = {
@@ -101,17 +101,15 @@ export default function Home() {
     return Math.round(discount)
   }
 
-  // Social proof companies
-  const companies = [
-    { name: 'Microsoft', logo: '/logos/microsoft.svg' },
-    { name: 'Slack', logo: '/logos/slack.svg' },
-    { name: 'Notion', logo: '/logos/notion.svg' },
-    { name: 'Stripe', logo: '/logos/stripe.svg' },
-    { name: 'Zoom', logo: '/logos/zoom.svg' },
-    { name: 'Shopify', logo: '/logos/shopify.svg' }
+  // Social media links
+  const socialLinks = [
+    { name: 'Twitter', icon: Twitter, url: 'https://twitter.com/leadflow', color: 'hover:text-blue-400' },
+    { name: 'LinkedIn', icon: Linkedin, url: 'https://linkedin.com/company/leadflow', color: 'hover:text-blue-600' },
+    { name: 'GitHub', icon: Github, url: 'https://github.com/leadflow', color: 'hover:text-gray-600' },
+    { name: 'Website', icon: Globe, url: 'https://leadflow.com', color: 'hover:text-green-500' }
   ];
 
-  // Testimonials
+  // Testimonials - Updated to 3
   const testimonials = [
     {
       id: 1,
@@ -129,6 +127,15 @@ export default function Home() {
       title: "Sales Director",
       company: "GrowthLabs",
       avatar: "/avatars/marcus.jpg",
+      rating: 5
+    },
+    {
+      id: 3,
+      content: "The analytics dashboard gives us insights we never had before. We can optimize our campaigns in real-time and see immediate improvements.",
+      author: "Emily Watson",
+      title: "Head of Business Development",
+      company: "ScaleUp Inc",
+      avatar: "/avatars/emily.jpg",
       rating: 5
     }
   ];
@@ -205,7 +212,7 @@ export default function Home() {
         {/* Floating Gradient Blur */}
         <div className="absolute inset-0 pointer-events-none">
           <div
-            className="absolute -right-80 top-1/2 -translate-y-1/2 w-[800px] h-[400px] opacity-60"
+            className="absolute -right-80 top-1/3 -translate-y-1/2 w-[1000px] h-[800px] opacity-70"
             style={{
               background: `
                 radial-gradient(ellipse 60% 80% at 30% 50%, rgba(31, 190, 57, 0.3) 0%, transparent 70%),
@@ -220,13 +227,13 @@ export default function Home() {
           />
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
+        <div className="px-6 lg:px-8 relative z-10">
           {/* Hero Content */}
-          <div className="grid lg:grid-cols-2 gap-16 items-center mb-24">
+          <div className="relative mb-24 pl-32">
             
             {/* Text Content - Left */}
             <motion.div 
-              className="space-y-8"
+              className="space-y-8 max-w-2xl lg:ml-12"
               initial="initial"
               animate="animate"
               variants={{
@@ -238,7 +245,7 @@ export default function Home() {
               }}
             >
               <motion.h1 
-                className="text-6xl lg:text-7xl font-black leading-tight"
+                className="text-4xl sm:text-5xl lg:text-7xl font-black leading-tight"
                 variants={fadeInLeft}
               >
                 <span className="text-gray-900">Scale Your Cold Email </span>
@@ -255,7 +262,7 @@ export default function Home() {
               </motion.h1>
               
               <motion.p 
-                className="text-[22px] text-gray-600 font-normal leading-relaxed max-w-2xl"
+                className="text-lg sm:text-xl lg:text-[22px] text-gray-600 font-normal leading-relaxed max-w-2xl"
                 variants={fadeInLeft}
               >
                 Launch campaigns in under 5 minutes and get +32% reply rates with AI-powered personalization. 
@@ -268,11 +275,11 @@ export default function Home() {
               >
                 <Link 
                   href="/auth/sign-up" 
-                  className="inline-flex items-center justify-center bg-blue-600 text-white px-12 py-5 rounded-2xl text-xl font-bold hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105"
+                  className="inline-flex items-center justify-center bg-blue-600 text-white px-8 sm:px-12 py-4 sm:py-5 rounded-2xl text-lg sm:text-xl font-bold hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105"
                 >
                   Start Free Trial
                 </Link>
-                <button className="inline-flex items-center justify-center bg-transparent border-2 border-gray-300 text-gray-700 px-12 py-5 rounded-2xl text-xl font-bold hover:bg-gray-50 transition-all transform hover:scale-105">
+                <button className="inline-flex items-center justify-center bg-transparent border-2 border-gray-300 text-gray-700 px-8 sm:px-12 py-4 sm:py-5 rounded-2xl text-lg sm:text-xl font-bold hover:bg-gray-50 transition-all transform hover:scale-105">
                   <Play className="w-5 h-5 mr-2" />
                   Watch Demo
                 </button>
@@ -280,7 +287,7 @@ export default function Home() {
 
               {/* Trial Benefits */}
               <motion.div 
-                className="flex items-center space-x-8 pt-2"
+                className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-8 pt-2"
                 variants={fadeInLeft}
               >
                 <div className="flex items-center space-x-2">
@@ -296,7 +303,7 @@ export default function Home() {
 
             {/* Dashboard Image - Right */}
             <motion.div 
-              className="relative w-full max-w-4xl mx-auto"
+              className="absolute right-0 top-0 w-[500px] sm:w-[600px] lg:w-[700px] max-w-none"
               variants={fadeInRight}
               initial="initial"
               animate="animate"
@@ -305,18 +312,19 @@ export default function Home() {
                 <Image
                   src="/dashboard.png"
                   alt="LeadFlow Dashboard"
-                  width={1200}
-                  height={800}
+                  width={2000}
+                  height={1200}
                   className="w-full h-auto"
                   priority
+                  quality={95}
                 />
               </div>
             </motion.div>
           </div>
 
-          {/* Social Proof - Company Logos */}
+          {/* Social Links */}
           <motion.div 
-            className="mb-20"
+            className="mb-20 max-w-7xl mx-auto"
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
@@ -326,23 +334,29 @@ export default function Home() {
               className="text-center text-gray-500 mb-8 text-sm font-medium"
               variants={staggerItem}
             >
-              Trusted by sales teams at
+              Connect with us
             </motion.p>
             <motion.div 
-              className="flex flex-wrap justify-center items-center gap-8 lg:gap-12 opacity-60"
+              className="flex justify-center items-center gap-8"
               variants={staggerItem}
             >
-              {companies.map((company, index) => (
-                <div key={index} className="h-8 w-20 bg-gray-300 rounded flex items-center justify-center">
-                  <span className="text-xs text-gray-600 font-medium">{company.name}</span>
-                </div>
+              {socialLinks.map((link, index) => (
+                <Link 
+                  key={index} 
+                  href={link.url}
+                  className={`p-3 rounded-full bg-gray-100 text-gray-600 transition-all hover:scale-110 ${link.color}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <link.icon className="w-6 h-6" />
+                </Link>
               ))}
             </motion.div>
           </motion.div>
 
-          {/* Testimonials */}
+          {/* Testimonials - Updated to 3 columns */}
           <motion.div 
-            className="grid md:grid-cols-2 gap-8 mb-32"
+            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 mb-32 max-w-7xl mx-auto"
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
@@ -351,23 +365,31 @@ export default function Home() {
             {testimonials.map((testimonial, index) => (
               <motion.div
                 key={testimonial.id}
-                className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm"
+                className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-3xl p-6 lg:p-8 shadow-lg hover:shadow-xl transition-all duration-300"
                 variants={staggerItem}
+                whileHover={{ y: -5, scale: 1.02 }}
               >
                 <div className="flex items-center mb-4">
                   {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                    <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
                   ))}
                 </div>
-                <Quote className="w-8 h-8 text-gray-300 mb-4" />
-                <p className="text-gray-700 mb-6 text-lg leading-relaxed">
+                <div className="mb-4">
+                  <Quote className="w-8 h-8 text-blue-500 opacity-30" />
+                </div>
+                <p className="text-gray-700 mb-6 text-base leading-relaxed font-medium">
                   "{testimonial.content}"
                 </p>
                 <div className="flex items-center">
-                  <div className="w-12 h-12 bg-gray-200 rounded-full mr-4"></div>
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mr-4 flex items-center justify-center">
+                    <span className="text-white font-bold text-lg">
+                      {testimonial.author.split(' ').map(n => n[0]).join('')}
+                    </span>
+                  </div>
                   <div>
-                    <div className="font-semibold text-gray-900">{testimonial.author}</div>
-                    <div className="text-sm text-gray-600">{testimonial.title}, {testimonial.company}</div>
+                    <div className="font-bold text-gray-900">{testimonial.author}</div>
+                    <div className="text-sm text-gray-600">{testimonial.title}</div>
+                    <div className="text-sm text-blue-600 font-medium">{testimonial.company}</div>
                   </div>
                 </div>
               </motion.div>
@@ -375,7 +397,7 @@ export default function Home() {
           </motion.div>
 
           {/* How It Works Content */}
-          <div className="mt-32">
+          <div className="mt-32 max-w-7xl mx-auto">
             {/* Section Label */}
             <motion.div 
               className="mb-20"
@@ -384,13 +406,13 @@ export default function Home() {
               viewport={{ once: true }}
               variants={staggerItem}
             >
-              <p className="text-[40px] text-gray-700 font-normal lowercase tracking-widest text-center">
+              <p className="text-2xl sm:text-3xl lg:text-[40px] text-gray-700 font-normal lowercase tracking-widest text-center">
                 how it works
               </p>
             </motion.div>
 
             <motion.div 
-              className="grid md:grid-cols-3 gap-12"
+              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12"
               initial="initial"
               whileInView="animate"
               viewport={{ once: true }}
@@ -407,7 +429,7 @@ export default function Home() {
                 <div className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-4 text-sm font-bold">
                   1
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Upload & Setup</h3>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Upload & Setup</h3>
                 <p className="text-gray-600 leading-relaxed">
                   Import your contact list and create email templates. 
                   Our AI helps you write compelling subject lines and personalized messages in under 5 minutes.
@@ -425,7 +447,7 @@ export default function Home() {
                 <div className="bg-green-600 text-white w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-4 text-sm font-bold">
                   2
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Automate & Send</h3>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Automate & Send</h3>
                 <p className="text-gray-600 leading-relaxed">
                   Set up email sequences and let LeadFlow automatically send personalized emails 
                   at optimal times for maximum open rates and +32% reply rates.
@@ -443,7 +465,7 @@ export default function Home() {
                 <div className="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-4 text-sm font-bold">
                   3
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Track & Optimize</h3>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Track & Optimize</h3>
                 <p className="text-gray-600 leading-relaxed">
                   Monitor reply rates, track conversions, and optimize your campaigns 
                   with detailed analytics and A/B testing to continuously improve results.
@@ -454,11 +476,26 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="bg-white py-40 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+      {/* Features Section - Redesigned */}
+      <section className="bg-white py-32 lg:py-40 relative overflow-hidden">
+        {/* Background Gradient */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[600px] opacity-40"
+            style={{
+              background: `
+                radial-gradient(ellipse 60% 80% at 30% 50%, rgba(31, 190, 57, 0.2) 0%, transparent 70%),
+                radial-gradient(ellipse 80% 60% at 70% 30%, rgba(24, 106, 229, 0.3) 0%, transparent 70%),
+                radial-gradient(ellipse 70% 70% at 50% 70%, rgba(147, 51, 234, 0.15) 0%, transparent 60%)
+              `,
+              filter: "blur(100px)",
+            }}
+          />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
           
-          {/* Header with Rounded Gradient Box */}
+          {/* Simple Clean Header */}
           <motion.div 
             className="text-center mb-20"
             initial="initial"
@@ -466,96 +503,56 @@ export default function Home() {
             viewport={{ once: true }}
             variants={staggerContainer}
           >
-            {/* Rounded Gradient Container */}
-            <div className="relative mx-auto w-full max-w-6xl">
-              <motion.div 
-                className="relative rounded-[3rem] p-20 lg:p-32 overflow-hidden min-h-[500px] flex items-center justify-center"
+            <motion.h2 
+              className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight"
+              variants={staggerItem}
+            >
+              <span className="text-gray-900">Everything You Need for </span>
+              <span 
+                className="block"
                 style={{
-                  background: `
-                    radial-gradient(ellipse 60% 40% at 20% 30%, rgba(31, 190, 57, 0.15) 0%, transparent 50%),
-                    radial-gradient(ellipse 50% 60% at 80% 20%, rgba(24, 106, 229, 0.2) 0%, transparent 50%),
-                    radial-gradient(ellipse 70% 50% at 50% 80%, rgba(147, 51, 234, 0.15) 0%, transparent 50%),
-                    radial-gradient(ellipse 80% 30% at 10% 70%, rgba(31, 190, 57, 0.1) 0%, transparent 60%),
-                    radial-gradient(ellipse 40% 70% at 90% 60%, rgba(24, 106, 229, 0.15) 0%, transparent 50%),
-                    linear-gradient(135deg, #000000 0%, #0f0f0f 25%, #000000 50%, #1a1a1a 75%, #000000 100%)
-                  `,
-                  filter: 'drop-shadow(0 25px 50px rgba(0, 0, 0, 0.3))'
-                }}
-                variants={staggerItem}
-                initial={{ scale: 0.8, opacity: 0 }}
-                whileInView={{ 
-                  scale: 1, 
-                  opacity: 1,
-                  boxShadow: [
-                    "0 25px 50px rgba(0, 0, 0, 0.3)",
-                    "0 35px 70px rgba(31, 190, 57, 0.2), 0 45px 90px rgba(24, 106, 229, 0.15)",
-                    "0 25px 50px rgba(0, 0, 0, 0.3)"
-                  ]
-                }}
-                viewport={{ once: true }}
-                transition={{ 
-                  duration: 1.2, 
-                  ease: "easeOut",
-                  boxShadow: {
-                    duration: 2,
-                    times: [0, 0.5, 1],
-                    ease: "easeInOut"
-                  }
-                }}
-                whileHover={{
-                  scale: 1.02,
-                  boxShadow: "0 35px 70px rgba(31, 190, 57, 0.15), 0 45px 90px rgba(24, 106, 229, 0.1)"
+                  background: 'linear-gradient(135deg, #1fbe39 0%, #186ae5 70%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
                 }}
               >
-                {/* Subtle animated overlay */}
-                <div 
-                  className="absolute inset-0 opacity-30"
-                  style={{
-                    background: `
-                      radial-gradient(circle at 30% 40%, rgba(31, 190, 57, 0.1) 0%, transparent 40%),
-                      radial-gradient(circle at 70% 60%, rgba(24, 106, 229, 0.1) 0%, transparent 40%),
-                      radial-gradient(circle at 50% 80%, rgba(147, 51, 234, 0.08) 0%, transparent 40%)
-                    `
-                  }}
-                />
+                Cold Email Success
+              </span>
+            </motion.h2>
+            
+            <motion.p 
+              className="text-lg sm:text-xl text-gray-600 leading-relaxed max-w-3xl mx-auto"
+              variants={staggerItem}
+            >
+              From lead management to AI-powered personalization, LeadFlow provides everything you need to run successful cold email campaigns at scale.
+            </motion.p>
 
-                {/* Content */}
-                <div className="relative z-10 text-center max-w-5xl mx-auto">
-                  <motion.h2 
-                    className="text-5xl lg:text-7xl font-bold text-white mb-8 leading-tight"
-                    variants={staggerItem}
-                    initial={{ y: 30, opacity: 0 }}
-                    whileInView={{ y: 0, opacity: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.3, duration: 0.8 }}
-                  >
-                    Everything You Need for 
-                    <span 
-                      className="block mt-2"
-                      style={{
-                        background: 'linear-gradient(135deg, #1fbe39 0%, #186ae5 70%)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text'
-                      }}
-                    >
-                      Cold Email Success
-                    </span>
-                  </motion.h2>
-                  
-                  <motion.p 
-                    className="text-xl text-gray-300 leading-relaxed max-w-3xl mx-auto"
-                    variants={staggerItem}
-                    initial={{ y: 20, opacity: 0 }}
-                    whileInView={{ y: 0, opacity: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.5, duration: 0.8 }}
-                  >
-                    From lead management to AI-powered personalization, LeadFlow provides everything you need to run successful cold email campaigns at scale.
-                  </motion.p>
-                </div>
-              </motion.div>
-            </div>
+            {/* Feature Grid */}
+            <motion.div 
+              className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 mt-16"
+              variants={staggerContainer}
+            >
+              {[
+                { icon: Users, title: "Contact Management", desc: "Import, organize, and segment up to 50,000 contacts" },
+                { icon: Mail, title: "Email Sequences", desc: "Automated multi-step campaigns with smart timing" },
+                { icon: Brain, title: "AI Personalization", desc: "Dynamic content that increases reply rates by 32%" },
+                { icon: BarChart3, title: "Advanced Analytics", desc: "Real-time tracking and optimization insights" }
+              ].map((feature, index) => (
+                <motion.div
+                  key={index}
+                  className="bg-white border border-gray-100 rounded-2xl p-6 text-center hover:shadow-lg transition-all duration-300"
+                  variants={staggerItem}
+                  whileHover={{ y: -5, scale: 1.02 }}
+                >
+                  <div className="bg-gradient-to-br from-blue-500 to-purple-600 w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <feature.icon className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-2">{feature.title}</h3>
+                  <p className="text-sm text-gray-600">{feature.desc}</p>
+                </motion.div>
+              ))}
+            </motion.div>
           </motion.div>
         </div>
       </section>
@@ -564,7 +561,7 @@ export default function Home() {
       <section id="features" className="bg-white py-32 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <motion.div 
-            className="grid lg:grid-cols-2 gap-20 items-center"
+            className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center"
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
@@ -576,7 +573,7 @@ export default function Home() {
               variants={staggerItem}
             >
               <div className="flex items-center space-x-4 mb-6">
-                <h2 className="text-5xl font-bold">
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold">
                   <span className="text-gray-900">Contact </span>
                   <span 
                     style={{
@@ -591,7 +588,7 @@ export default function Home() {
                 </h2>
               </div>
               
-              <p className="text-xl text-gray-600 leading-relaxed">
+              <p className="text-lg sm:text-xl text-gray-600 leading-relaxed">
                 Import and organize your contacts with CSV upload, automatic deduplication, and smart segmentation tools. 
                 Manage up to 50,000 contacts with advanced filtering.
               </p>
@@ -599,16 +596,17 @@ export default function Home() {
 
             {/* Contacts Screenshot */}
             <motion.div 
-              className="relative w-full max-w-4xl mx-auto"
+              className="relative w-full max-w-none mx-auto"
               variants={staggerItem}
             >
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
                 <Image
                   src="/contacts.png"
                   alt="LeadFlow Contacts Management"
-                  width={1200}
-                  height={800}
+                  width={2000}
+                  height={1200}
                   className="w-full h-auto"
+                  quality={95}
                 />
               </div>
             </motion.div>
@@ -620,7 +618,7 @@ export default function Home() {
       <section className="bg-gray-50 py-32 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <motion.div 
-            className="grid lg:grid-cols-2 gap-20 items-center"
+            className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center"
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
@@ -628,16 +626,17 @@ export default function Home() {
           >
             {/* Campaigns Screenshot */}
             <motion.div 
-              className="relative w-full max-w-4xl mx-auto order-2 lg:order-1"
+              className="relative w-full max-w-none mx-auto order-2 lg:order-1"
               variants={staggerItem}
             >
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
                 <Image
                   src="/campaigns.png"
                   alt="LeadFlow Campaigns"
-                  width={1200}
-                  height={800}
+                  width={2000}
+                  height={1200}
                   className="w-full h-auto"
+                  quality={95}
                 />
               </div>
             </motion.div>
@@ -648,7 +647,7 @@ export default function Home() {
               variants={staggerItem}
             >
               <div className="flex items-center space-x-4 mb-6">
-                <h2 className="text-5xl font-bold">
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold">
                   <span className="text-gray-900">Email </span>
                   <span 
                     style={{
@@ -663,7 +662,7 @@ export default function Home() {
                 </h2>
               </div>
               
-              <p className="text-xl text-gray-600 leading-relaxed">
+              <p className="text-lg sm:text-xl text-gray-600 leading-relaxed">
                 Create unlimited automated email sequences with smart follow-ups. 
                 Set precise timing, personalize at scale, and convert prospects into customers.
               </p>
@@ -676,7 +675,7 @@ export default function Home() {
       <section className="bg-white py-32 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <motion.div 
-            className="grid lg:grid-cols-2 gap-20 items-center"
+            className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center"
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
@@ -688,7 +687,7 @@ export default function Home() {
               variants={staggerItem}
             >
               <div className="flex items-center space-x-4 mb-6">
-                <h2 className="text-5xl font-bold">
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold">
                   <span className="text-gray-900">Advanced </span>
                   <span 
                     style={{
@@ -703,7 +702,7 @@ export default function Home() {
                 </h2>
               </div>
               
-              <p className="text-xl text-gray-600 leading-relaxed">
+              <p className="text-lg sm:text-xl text-gray-600 leading-relaxed">
                 Track every metric that matters. Monitor reply rates, open rates, click-through rates, and conversions 
                 with real-time analytics and detailed reporting.
               </p>
@@ -711,16 +710,17 @@ export default function Home() {
 
             {/* Analytics Screenshot */}
             <motion.div 
-              className="relative w-full max-w-4xl mx-auto"
+              className="relative w-full max-w-none mx-auto"
               variants={staggerItem}
             >
               <div className="relative rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
                 <Image
                   src="/analytics.png"
                   alt="LeadFlow Analytics Dashboard"
-                  width={1200}
-                  height={800}
+                  width={2000}
+                  height={1200}
                   className="w-full h-auto"
+                  quality={95}
                 />
               </div>
             </motion.div>
@@ -741,7 +741,7 @@ export default function Home() {
             variants={staggerContainer}
           >
             <motion.h2 
-              className="text-5xl lg:text-6xl font-bold mb-6"
+              className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6"
               variants={staggerItem}
             >
               <span className="text-gray-900">Simple, </span>
@@ -757,7 +757,7 @@ export default function Home() {
               </span>
             </motion.h2>
             <motion.p 
-              className="text-xl text-gray-600 max-w-3xl mx-auto"
+              className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto"
               variants={staggerItem}
             >
               Choose the perfect plan for your business. Start with our free trial and upgrade when you're ready to scale.
@@ -803,7 +803,7 @@ export default function Home() {
 
           {/* Pricing Cards */}
           <motion.div 
-            className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto"
+            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-7xl mx-auto"
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
@@ -812,7 +812,7 @@ export default function Home() {
             {plans.map((plan, index) => (
               <motion.div
                 key={plan.id}
-                className={`relative bg-white rounded-3xl shadow-xl border-2 p-8 ${
+                className={`relative bg-white rounded-3xl shadow-xl border-2 p-6 lg:p-8 ${
                   plan.popular 
                     ? 'border-blue-500 ring-4 ring-blue-100 scale-105' 
                     : 'border-gray-200'
@@ -830,14 +830,14 @@ export default function Home() {
                 )}
 
                 <div className="text-center mb-8">
-                  <h3 className="text-3xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+                  <h3 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{plan.name}</h3>
                   <p className="text-gray-600 mb-6">{plan.description}</p>
                   
                   <div className="mb-4">
-                    <span className="text-5xl font-bold text-gray-900">
+                    <span className="text-4xl lg:text-5xl font-bold text-gray-900">
                       €{billingCycle === 'monthly' ? plan.monthly : plan.yearly}
                     </span>
-                    <span className="text-gray-600 text-xl">
+                    <span className="text-gray-600 text-lg lg:text-xl">
                       /{billingCycle === 'monthly' ? 'month' : 'year'}
                     </span>
                   </div>
@@ -883,7 +883,7 @@ export default function Home() {
             <p className="text-gray-600 mb-4">
               All plans include a 14-day free trial. No credit card required.
             </p>
-            <div className="flex items-center justify-center space-x-6">
+            <div className="flex flex-wrap items-center justify-center gap-4 lg:gap-6">
               <div className="flex items-center space-x-2">
                 <Check className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-gray-600">Cancel anytime</span>
@@ -917,7 +917,7 @@ export default function Home() {
         />
 
         {/* CTA Content */}
-        <div className="relative z-10 py-32">
+        <div className="relative z-10 py-24 lg:py-32">
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
             <motion.div 
               className="text-center"
@@ -927,7 +927,7 @@ export default function Home() {
               variants={staggerContainer}
             >
               <motion.h2 
-                className="text-6xl lg:text-7xl font-bold mb-8 leading-tight"
+                className="text-4xl sm:text-5xl lg:text-7xl font-bold mb-8 leading-tight"
                 variants={staggerItem}
               >
                 <span className="text-white">Stop Sending Cold Emails </span>
@@ -944,7 +944,7 @@ export default function Home() {
               </motion.h2>
               
               <motion.p 
-                className="text-2xl text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed"
+                className="text-lg sm:text-xl lg:text-2xl text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed"
                 variants={staggerItem}
               >
                 Launch campaigns in under 5 minutes and achieve +32% reply rates with automated sequences.
@@ -956,31 +956,31 @@ export default function Home() {
               >
                 <Link 
                   href="/auth/sign-up" 
-                  className="inline-flex items-center bg-blue-600 text-white px-12 py-5 rounded-2xl text-xl font-bold hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105"
+                  className="inline-flex items-center bg-blue-600 text-white px-8 sm:px-12 py-4 sm:py-5 rounded-2xl text-lg sm:text-xl font-bold hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105"
                 >
                   Start Free Trial
                 </Link>
-                <button className="inline-flex items-center bg-transparent border-2 border-white text-white px-12 py-5 rounded-2xl text-xl font-bold hover:bg-white hover:text-black transition-all transform hover:scale-105">
+                <button className="inline-flex items-center bg-transparent border-2 border-white text-white px-8 sm:px-12 py-4 sm:py-5 rounded-2xl text-lg sm:text-xl font-bold hover:bg-white hover:text-black transition-all transform hover:scale-105">
                   <Play className="w-5 h-5 mr-2" />
                   Watch Demo
                 </button>
               </motion.div>
 
               <motion.div 
-                className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-12 pt-12"
+                className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-8 lg:space-x-12 pt-12"
                 variants={staggerItem}
               >
                 <div className="flex items-center space-x-3">
                   <Check className="w-6 h-6 text-green-400" />
-                  <span className="text-gray-300 text-lg font-medium">14 days free trial</span>
+                  <span className="text-gray-300 text-base lg:text-lg font-medium">14 days free trial</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Check className="w-6 h-6 text-green-400" />
-                  <span className="text-gray-300 text-lg font-medium">No credit card required</span>
+                  <span className="text-gray-300 text-base lg:text-lg font-medium">No credit card required</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Check className="w-6 h-6 text-green-400" />
-                  <span className="text-gray-300 text-lg font-medium">Setup in 5 minutes</span>
+                  <span className="text-gray-300 text-base lg:text-lg font-medium">Setup in 5 minutes</span>
                 </div>
               </motion.div>
             </motion.div>
@@ -1089,7 +1089,7 @@ export default function Home() {
                   © {new Date().getFullYear()} LeadFlow. All rights reserved.
                 </div>
 
-                <div className="flex flex-wrap items-center space-x-8">
+                <div className="flex flex-wrap items-center gap-4 lg:gap-8">
                   <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors text-sm">
                     Privacy Policy
                   </Link>
@@ -1099,13 +1099,6 @@ export default function Home() {
                   <Link href="/security" className="text-gray-400 hover:text-white transition-colors text-sm">
                     Security
                   </Link>
-                </div>
-
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2 bg-gray-800 px-3 py-1 rounded-full">
-                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                    <span className="text-gray-400 text-xs">System Operational</span>
-                  </div>
                 </div>
               </div>
             </motion.div>
