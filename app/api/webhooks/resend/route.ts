@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       case 'email.sent':
         await EmailService.logEmailEvent({
           campaignId,
-          contactId,
+          contactId, 
           stepNumber,
           type: 'sent',
           messageId: event.data?.email_id, // ✅ Fixed: use email_id instead of id

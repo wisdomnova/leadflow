@@ -18,7 +18,7 @@ export async function GET(
     const { id: campaignId } = await params
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '50')
-
+ 
     // Get user's organization
     const { data: userData, error: userError } = await supabase
       .from('users')

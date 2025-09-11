@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       success: true,  
       processedCount,
       retriedCount: retryCount,
-      cleanedCount: cleanupCount, 
+      cleanedCount: cleanupCount,  
       timestamp: new Date().toISOString()
     })
 

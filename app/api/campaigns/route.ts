@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         bounced: bouncedContacts.size, 
         complained: complainedContacts.size,
         unsubscribed: unsubscribedContacts.size,
-        // Clean up nested data
+        // Clean up nested data 
         campaign_contacts: undefined,
         email_events: undefined
       }

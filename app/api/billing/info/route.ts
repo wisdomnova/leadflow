@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
 
 export async function GET(request: NextRequest) {
-  try {
+  try { 
     const token = request.cookies.get('auth-token')?.value
 
     if (!token) {

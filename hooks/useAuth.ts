@@ -10,5 +10,5 @@ export const useAuth = () => {
     signIn,
     signOut,
     checkAuth
-  } 
-}
+  }  
+} 

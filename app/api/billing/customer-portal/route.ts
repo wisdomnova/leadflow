@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     // Get user
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('stripe_customer_id')
+      .select('stripe_customer_id') 
       .eq('id', decoded.userId)
       .single()
 

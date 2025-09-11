@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
       openRate,
       emailsDelivered: totalDelivered,
       emailsOpened: totalOpened
-    }
+    } 
 
     console.log('📊 Dashboard stats calculated:', stats)
 

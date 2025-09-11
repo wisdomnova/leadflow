@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Ubuntu } from "next/font/google";
+import { Raleway } from "next/font/google";
 import "./globals.css";
 
-const ubuntu = Ubuntu({
-  variable: "--font-ubuntu",
+const raleway = Raleway({
+  variable: "--font-raleway",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "700"], 
+  weight: ["300", "400", "500", "600", "700", "800"], 
 });
 
 export const metadata: Metadata = {
@@ -21,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${ubuntu.variable} antialiased font-sans`}
+        className={`${raleway.variable} antialiased font-sans`}
       >
         {children} 
       </body>

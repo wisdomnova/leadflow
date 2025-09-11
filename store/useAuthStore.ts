@@ -10,8 +10,8 @@ interface User {
   subscription_status: string
   plan_type: string
   organizations?: { 
-    id: string
-    name: string 
+    id: string 
+    name: string  
   } 
 }
 

@@ -1,10 +1,9 @@
-// ./app/(dashboard)/contacts/page.tsx - Enhanced UI with better consistency
-
+// ./app/(dashboard)/contacts/page.tsx
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useContactStore } from '@/store/useContactStore'
 import { 
   Users, 
@@ -23,9 +22,113 @@ import {
   X,
   Tag,
   UserX,
-  ArrowUpRight
+  ArrowUpRight,
+  ArrowLeft,
+  ChevronDown,
+  Check
 } from 'lucide-react'
 import clsx from 'clsx'
+
+// Theme colors - consistent with dashboard
+const THEME_COLORS = {
+  primary: '#0f66db',     // Main blue
+  success: '#25b43d',     // Green
+  secondary: '#6366f1',   // Indigo
+  accent: '#059669',      // Emerald
+  warning: '#dc2626'      // Red
+}
+
+// Status filter options
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All Status', icon: Filter },
+  { value: 'active', label: 'Active', icon: () => <div className="h-3 w-3 rounded-full" style={{ backgroundColor: THEME_COLORS.success }} /> },
+  { value: 'unsubscribed', label: 'Unsubscribed', icon: () => <div className="h-3 w-3 rounded-full" style={{ backgroundColor: THEME_COLORS.secondary }} /> },
+  { value: 'bounced', label: 'Bounced', icon: () => <div className="h-3 w-3 rounded-full" style={{ backgroundColor: THEME_COLORS.warning }} /> }
+]
+
+// Custom Select Component
+interface CustomSelectProps {
+  value: string
+  options: typeof STATUS_OPTIONS
+  onChange: (value: string) => void
+  className?: string
+}
+
+function CustomSelect({ value, options, onChange, className }: CustomSelectProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const selectedOption = options.find(option => option.value === value) || options[0]
+
+  return (
+    <div className={clsx("relative", className)}>
+      <button
+        type="button"
+        className="relative w-full px-4 py-3 text-left bg-white border border-gray-300 rounded-xl shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:border-transparent hover:bg-gray-50 transition-all duration-200"
+        style={{ 
+          '--tw-ring-color': THEME_COLORS.primary
+        } as any}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="flex items-center">
+          <selectedOption.icon className="h-4 w-4 mr-3 text-gray-400" />
+          <span className="block truncate text-gray-900 font-medium">{selectedOption.label}</span>
+        </span>
+        <span className="absolute inset-y-0 right-0 flex items-center pr-3">
+          <ChevronDown 
+            className={clsx(
+              "h-4 w-4 text-gray-400 transition-transform duration-200",
+              isOpen && "rotate-180"
+            )} 
+          />
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 z-10" 
+              onClick={() => setIsOpen(false)}
+            />
+            
+            {/* Dropdown */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="absolute right-0 z-20 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden"
+            >
+              <div className="py-2">
+                {options.map((option) => (
+                  <button
+                    key={option.value}
+                    className={clsx(
+                      "w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center justify-between transition-colors duration-150",
+                      value === option.value && "text-blue-600 font-medium"
+                    )}
+                    onClick={() => {
+                      onChange(option.value)
+                      setIsOpen(false)
+                    }}
+                  >
+                    <div className="flex items-center">
+                      <option.icon className="h-4 w-4 mr-3 text-gray-400" />
+                      <span className="text-gray-900">{option.label}</span>
+                    </div>
+                    {value === option.value && (
+                      <Check className="h-4 w-4" style={{ color: THEME_COLORS.primary }} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 // Debounce hook
 function useDebounce(value: string, delay: number) {
@@ -217,22 +320,47 @@ export default function ContactsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+        return (
+          <span 
+            className="inline-flex items-center px-2.5 py-0.5 rounded-xl text-xs font-medium text-white"
+            style={{ backgroundColor: THEME_COLORS.success }}
+          >
+            Active
+          </span>
+        )
       case 'unsubscribed':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Unsubscribed</span>
+        return (
+          <span 
+            className="inline-flex items-center px-2.5 py-0.5 rounded-xl text-xs font-medium text-white"
+            style={{ backgroundColor: THEME_COLORS.warning }}
+          >
+            Unsubscribed
+          </span>
+        )
       case 'bounced':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Bounced</span>
+        return (
+          <span 
+            className="inline-flex items-center px-2.5 py-0.5 rounded-xl text-xs font-medium text-white"
+            style={{ backgroundColor: THEME_COLORS.warning }}
+          >
+            Bounced
+          </span>
+        )
       default:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Unknown</span>
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-xl text-xs font-medium bg-gray-100 text-gray-800">
+            Unknown
+          </span>
+        )
     }
   }
 
   if (loading && allContacts.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-full mx-auto px-6 py-6">
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto" style={{ borderColor: THEME_COLORS.primary }}></div>
           </div>
         </div>
       </div>
@@ -241,7 +369,7 @@ export default function ContactsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-full mx-auto px-6 py-6">
         <div className="space-y-8">
           {/* Header */}
           <motion.div 
@@ -252,22 +380,23 @@ export default function ContactsPage() {
           >
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Contacts</h1>
-              <p className="mt-1 text-gray-600">
+              <p className="mt-1 text-lg text-gray-600">
                 Manage your contact database and import new leads
               </p>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
               <button 
                 onClick={() => handleExport(false)}
                 disabled={exporting || filteredContacts.length === 0}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center px-6 py-3 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 <Download className="h-4 w-4 mr-2" />
                 {exporting ? 'Exporting...' : 'Export All'}
               </button>
               <Link
                 href="/contacts/import"
-                className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all"
+                className="inline-flex items-center px-8 py-3 border border-transparent text-sm font-semibold rounded-xl text-white hover:shadow-lg transition-all duration-200"
+                style={{ backgroundColor: THEME_COLORS.primary }}
               >
                 <Upload className="h-4 w-4 mr-2" />
                 Import Contacts
@@ -278,40 +407,42 @@ export default function ContactsPage() {
           {/* Bulk Actions Bar */}
           {selectedContacts.length > 0 && (
             <motion.div 
-              className="bg-blue-50 border border-blue-200 rounded-2xl p-4"
+              className="border border-gray-200 rounded-2xl p-6 shadow-lg"
+              style={{ backgroundColor: `${THEME_COLORS.primary}10` }}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <div className="flex items-center text-sm text-blue-700">
-                    <span className="font-medium">{selectedContacts.length}</span>
-                    <span className="ml-1">
+                  <div className="flex items-center text-sm font-medium" style={{ color: THEME_COLORS.primary }}>
+                    <span className="font-bold text-lg">{selectedContacts.length}</span>
+                    <span className="ml-2">
                       {selectedContacts.length === 1 ? 'contact' : 'contacts'} selected
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
                     <button
                       onClick={() => handleExport(true)}
                       disabled={exporting}
-                      className="inline-flex items-center px-3 py-1.5 border border-blue-300 rounded-xl text-sm font-medium text-blue-700 bg-white hover:bg-blue-50 disabled:opacity-50 transition-colors"
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md disabled:opacity-50 transition-all duration-200"
                     >
-                      <Download className="h-4 w-4 mr-1" />
+                      <Download className="h-4 w-4 mr-2" />
                       {exporting ? 'Exporting...' : 'Export Selected'}
                     </button>
                     <button
                       onClick={() => setShowBulkDeleteModal(true)}
-                      className="inline-flex items-center px-3 py-1.5 border border-red-300 rounded-xl text-sm font-medium text-red-700 bg-white hover:bg-red-50 transition-colors"
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl text-sm font-medium text-white hover:shadow-md transition-all duration-200"
+                      style={{ backgroundColor: THEME_COLORS.warning }}
                     >
-                      <Trash2 className="h-4 w-4 mr-1" />
+                      <Trash2 className="h-4 w-4 mr-2" />
                       Delete Selected
                     </button>
                   </div>
                 </div>
                 <button
                   onClick={() => setSelectedContacts([])}
-                  className="text-blue-400 hover:text-blue-600 transition-colors"
+                  className="text-gray-500 hover:text-gray-700 p-2 hover:bg-white hover:bg-opacity-50 rounded-xl transition-all duration-200"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -326,29 +457,31 @@ export default function ContactsPage() {
                 title: searchQuery || statusFilter !== 'all' ? 'Filtered Contacts' : 'Total Contacts',
                 value: totalCount.toLocaleString(),
                 icon: Users,
-                color: 'text-blue-600',
-                bgColor: 'bg-blue-100'
+                color: THEME_COLORS.primary
               },
               {
                 title: 'Active',
                 value: filteredContacts.filter(c => c.status === 'active').length,
-                icon: () => <div className="h-3 w-3 bg-green-600 rounded-full" />,
-                color: 'text-green-600',
-                bgColor: 'bg-green-100'
+                icon: () => <div className="h-6 w-6 rounded-full flex items-center justify-center" style={{ backgroundColor: THEME_COLORS.success }}>
+                  <div className="h-3 w-3 bg-white rounded-full" />
+                </div>,
+                color: THEME_COLORS.success
               },
               {
                 title: 'Unsubscribed',
                 value: filteredContacts.filter(c => c.status === 'unsubscribed').length,
-                icon: () => <div className="h-3 w-3 bg-yellow-600 rounded-full" />,
-                color: 'text-yellow-600',
-                bgColor: 'bg-yellow-100'
+                icon: () => <div className="h-6 w-6 rounded-full flex items-center justify-center" style={{ backgroundColor: THEME_COLORS.secondary }}>
+                  <div className="h-3 w-3 bg-white rounded-full" />
+                </div>,
+                color: THEME_COLORS.secondary
               },
               {
                 title: 'Bounced',
                 value: filteredContacts.filter(c => c.status === 'bounced').length,
-                icon: () => <div className="h-3 w-3 bg-red-600 rounded-full" />,
-                color: 'text-red-600',
-                bgColor: 'bg-red-100'
+                icon: () => <div className="h-6 w-6 rounded-full flex items-center justify-center" style={{ backgroundColor: THEME_COLORS.warning }}>
+                  <div className="h-3 w-3 bg-white rounded-full" />
+                </div>,
+                color: THEME_COLORS.warning
               }
             ].map((stat, index) => {
               const Icon = stat.icon
@@ -356,32 +489,33 @@ export default function ContactsPage() {
               return (
                 <motion.div
                   key={stat.title}
-                  className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
+                  className="bg-white rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 p-6 group hover:scale-105"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
                 >
-                  <div className="flex items-center">
-                    <div className={`w-12 h-12 ${stat.bgColor} rounded-xl flex items-center justify-center`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div 
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-200"
+                      style={{ backgroundColor: stat.color }}
+                    >
                       {typeof Icon === 'function' && stat.title !== 'Total Contacts' && stat.title !== 'Filtered Contacts' ? (
                         <Icon />
                       ) : (
-                        <Icon className={`h-6 w-6 ${stat.color}`} />
+                        <Icon className="h-7 w-7 text-white" />
                       )}
                     </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                      <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
-                    </div>
                   </div>
+                  <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">{stat.title}</h3>
+                  <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
                 </motion.div>
               )
             })}
           </div>
 
-          {/* Filters */}
+          {/* Filters - Updated with consistent shadows */}
           <motion.div 
-            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6"
+            className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
@@ -392,25 +526,24 @@ export default function ContactsPage() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search contacts..."
+                    placeholder="Search contacts by name, email, company..."
                     value={searchQuery}
                     onChange={handleSearch}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:border-transparent text-gray-900 placeholder-gray-500 transition-all duration-200 shadow-sm"
+                    style={{ 
+                      '--tw-ring-color': THEME_COLORS.primary
+                    } as any}
                   />
                 </div>
               </div>
               
-              <div className="flex gap-2">
-                <select
+              <div className="flex gap-3">
+                <CustomSelect
                   value={statusFilter}
-                  onChange={(e) => handleStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="unsubscribed">Unsubscribed</option>
-                  <option value="bounced">Bounced</option>
-                </select>
+                  options={STATUS_OPTIONS}
+                  onChange={handleStatusFilter}
+                  className="w-48"
+                />
               </div>
             </div>
           </motion.div>
@@ -418,16 +551,19 @@ export default function ContactsPage() {
           {/* Empty State */}
           {filteredContacts.length === 0 && !loading ? (
             <motion.div 
-              className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center"
+              className="bg-white rounded-2xl border border-gray-200 shadow-lg p-12 text-center"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
-              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Users className="h-8 w-8 text-gray-400" />
+              <div 
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md"
+                style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
+              >
+                <Users className="h-8 w-8" style={{ color: THEME_COLORS.primary }} />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No contacts found</h3>
-              <p className="text-gray-500 mb-6">
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">No contacts found</h3>
+              <p className="text-gray-600 mb-6 text-lg">
                 {searchQuery || statusFilter !== 'all' 
                   ? 'Try adjusting your search or filters'
                   : 'Get started by importing your first contacts'
@@ -436,7 +572,8 @@ export default function ContactsPage() {
               {!searchQuery && statusFilter === 'all' && (
                 <Link
                   href="/contacts/import"
-                  className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all"
+                  className="inline-flex items-center px-8 py-3 border border-transparent text-sm font-semibold rounded-xl text-white hover:shadow-lg transition-all duration-200"
+                  style={{ backgroundColor: THEME_COLORS.primary }}
                 >
                   <Upload className="h-4 w-4 mr-2" />
                   Import Contacts
@@ -446,7 +583,7 @@ export default function ContactsPage() {
           ) : (
             /* Contact Table */
             <motion.div 
-              className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+              className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
@@ -455,27 +592,31 @@ export default function ContactsPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <input
                           type="checkbox"
                           checked={selectedContacts.length === paginatedContacts.length && paginatedContacts.length > 0}
                           onChange={handleSelectAll}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          className="h-4 w-4 focus:ring-2 border-gray-300 rounded transition-all"
+                          style={{ 
+                            accentColor: THEME_COLORS.primary,
+                            '--tw-ring-color': THEME_COLORS.primary
+                          } as any}
                         />
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Contact
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Company
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Added
                       </th>
-                      <th scope="col" className="relative px-6 py-3">
+                      <th scope="col" className="relative px-6 py-4">
                         <span className="sr-only">Actions</span>
                       </th>
                     </tr>
@@ -484,7 +625,7 @@ export default function ContactsPage() {
                     {paginatedContacts.map((contact, index) => (
                       <motion.tr 
                         key={contact.id} 
-                        className="hover:bg-gray-50 transition-colors"
+                        className="hover:bg-gray-50 transition-colors duration-200"
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
@@ -494,29 +635,36 @@ export default function ContactsPage() {
                             type="checkbox"
                             checked={selectedContacts.includes(contact.id)}
                             onChange={() => handleSelectContact(contact.id)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            className="h-4 w-4 focus:ring-2 border-gray-300 rounded transition-all"
+                            style={{ 
+                              accentColor: THEME_COLORS.primary,
+                              '--tw-ring-color': THEME_COLORS.primary
+                            } as any}
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                                <span className="text-sm font-medium text-blue-700">
+                            <div className="flex-shrink-0 h-12 w-12">
+                              <div 
+                                className="h-12 w-12 rounded-2xl flex items-center justify-center shadow-md"
+                                style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
+                              >
+                                <span className="text-lg font-bold" style={{ color: THEME_COLORS.primary }}>
                                   {contact.first_name?.charAt(0) || contact.email.charAt(0).toUpperCase()}
                                 </span>
                               </div>
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">
+                              <div className="text-sm font-semibold text-gray-900">
                                 {contact.first_name} {contact.last_name}
                               </div>
-                              <div className="text-sm text-gray-500 flex items-center">
-                                <Mail className="h-3 w-3 mr-1" />
+                              <div className="text-sm text-gray-600 flex items-center mt-1">
+                                <Mail className="h-3 w-3 mr-2 text-gray-400" />
                                 {contact.email}
                               </div>
                               {contact.phone && (
-                                <div className="text-sm text-gray-500 flex items-center mt-1">
-                                  <Phone className="h-3 w-3 mr-1" />
+                                <div className="text-sm text-gray-600 flex items-center mt-1">
+                                  <Phone className="h-3 w-3 mr-2 text-gray-400" />
                                   {contact.phone}
                                 </div>
                               )}
@@ -550,7 +698,13 @@ export default function ContactsPage() {
                               setContactToDelete(contact.id)
                               setShowDeleteModal(true)
                             }}
-                            className="text-red-600 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                            className="text-gray-500 hover:text-white p-2 rounded-xl hover:shadow-md transition-all duration-200"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = THEME_COLORS.warning
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                            }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -563,21 +717,23 @@ export default function ContactsPage() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
                   <div className="flex-1 flex justify-between sm:hidden">
                     <button
                       onClick={() => setCurrentPage(currentPage - 1)}
                       disabled={currentPage === 1}
-                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                     >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
                       Previous
                     </button>
                     <button
                       onClick={() => setCurrentPage(currentPage + 1)}
                       disabled={currentPage === totalPages}
-                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                     >
                       Next
+                      <ArrowUpRight className="h-4 w-4 ml-2" />
                     </button>
                   </div>
                   <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
@@ -595,9 +751,9 @@ export default function ContactsPage() {
                         <button
                           onClick={() => setCurrentPage(currentPage - 1)}
                           disabled={currentPage === 1}
-                          className="relative inline-flex items-center px-2 py-2 rounded-l-xl border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="relative inline-flex items-center px-4 py-2 rounded-l-xl border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                         >
-                          Previous
+                          <ArrowLeft className="h-4 w-4" />
                         </button>
                         {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                           let page = i + 1
@@ -614,11 +770,12 @@ export default function ContactsPage() {
                               key={page}
                               onClick={() => setCurrentPage(page)}
                               className={clsx(
-                                'relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors',
+                                'relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-all duration-200',
                                 page === currentPage
-                                  ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                  ? 'z-10 text-white border-transparent shadow-md'
                                   : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
                               )}
+                              style={page === currentPage ? { backgroundColor: THEME_COLORS.primary } : {}}
                             >
                               {page}
                             </button>
@@ -627,9 +784,9 @@ export default function ContactsPage() {
                         <button
                           onClick={() => setCurrentPage(currentPage + 1)}
                           disabled={currentPage === totalPages}
-                          className="relative inline-flex items-center px-2 py-2 rounded-r-xl border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="relative inline-flex items-center px-4 py-2 rounded-r-xl border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                         >
-                          Next
+                          <ArrowUpRight className="h-4 w-4" />
                         </button>
                       </nav>
                     </div>
@@ -639,68 +796,83 @@ export default function ContactsPage() {
             </motion.div>
           )}
 
-          {/* Modals */}
+          {/* Delete Modal */}
           {showDeleteModal && (
-            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-              <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-2xl bg-white">
-                <div className="mt-3 text-center">
-                  <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                    <Trash2 className="h-6 w-6 text-red-600" />
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+              <motion.div 
+                className="relative p-8 border w-96 shadow-xl rounded-2xl bg-white"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="text-center">
+                  <div 
+                    className="mx-auto flex items-center justify-center h-16 w-16 rounded-2xl mb-4 shadow-md"
+                    style={{ backgroundColor: `${THEME_COLORS.warning}20` }}
+                  >
+                    <Trash2 className="h-8 w-8" style={{ color: THEME_COLORS.warning }} />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mt-4">Delete Contact</h3>
-                  <div className="mt-2 px-7 py-3">
-                    <p className="text-sm text-gray-500">
-                      Are you sure you want to delete this contact? This action cannot be undone.
-                    </p>
-                  </div>
-                  <div className="flex gap-4 px-4 py-3">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Contact</h3>
+                  <p className="text-gray-600 mb-6">
+                    Are you sure you want to delete this contact? This action cannot be undone.
+                  </p>
+                  <div className="flex gap-4">
                     <button
                       onClick={() => setShowDeleteModal(false)}
-                      className="flex-1 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                      className="flex-1 px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 hover:shadow-md transition-all duration-200 font-medium"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={() => contactToDelete && handleDeleteContact(contactToDelete)}
-                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
+                      className="flex-1 px-6 py-3 text-white rounded-xl hover:shadow-lg transition-all duration-200 font-medium"
+                      style={{ backgroundColor: THEME_COLORS.warning }}
                     >
                       Delete
                     </button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
           )}
 
+          {/* Bulk Delete Modal */}
           {showBulkDeleteModal && (
-            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-              <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-2xl bg-white">
-                <div className="mt-3 text-center">
-                  <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                    <Trash2 className="h-6 w-6 text-red-600" />
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+              <motion.div 
+                className="relative p-8 border w-96 shadow-xl rounded-2xl bg-white"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="text-center">
+                  <div 
+                    className="mx-auto flex items-center justify-center h-16 w-16 rounded-2xl mb-4 shadow-md"
+                    style={{ backgroundColor: `${THEME_COLORS.warning}20` }}
+                  >
+                    <Trash2 className="h-8 w-8" style={{ color: THEME_COLORS.warning }} />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mt-4">Delete {selectedContacts.length} Contacts</h3>
-                  <div className="mt-2 px-7 py-3">
-                    <p className="text-sm text-gray-500">
-                      Are you sure you want to delete {selectedContacts.length} selected contacts? This action cannot be undone.
-                    </p>
-                  </div>
-                  <div className="flex gap-4 px-4 py-3">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Delete {selectedContacts.length} Contacts</h3>
+                  <p className="text-gray-600 mb-6">
+                    Are you sure you want to delete {selectedContacts.length} selected contacts? This action cannot be undone.
+                  </p>
+                  <div className="flex gap-4">
                     <button
                       onClick={() => setShowBulkDeleteModal(false)}
-                      className="flex-1 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                      className="flex-1 px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 hover:shadow-md transition-all duration-200 font-medium"
                     >
                       Cancel
                     </button>
-                    <button
+                    <button 
                       onClick={handleBulkDelete}
-                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
+                      className="flex-1 px-6 py-3 text-white rounded-xl hover:shadow-lg transition-all duration-200 font-medium"
+                      style={{ backgroundColor: THEME_COLORS.warning }}
                     >
                       Delete All
                     </button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
           )}
         </div>

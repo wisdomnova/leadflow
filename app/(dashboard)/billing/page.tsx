@@ -1,17 +1,33 @@
-// ./app/(dashboard)/billing/page.tsx - Removed gradients for cleaner design
-
+// ./app/(dashboard)/billing/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTrialStatus } from '@/hooks/useTrialStatus'
-import { motion } from 'framer-motion'
-import { 
+import { motion, AnimatePresence } from 'framer-motion'
+import {  
   CreditCard, 
   ExternalLink, 
-  AlertCircle
-} from 'lucide-react'
+  AlertCircle,
+  Calendar,
+  TrendingUp,
+  Users,
+  Mail,
+  Target,
+  Clock,
+  CheckCircle,
+  ArrowUpRight
+} from 'lucide-react' 
 import Link from 'next/link'
+
+// Theme colors - consistent with dashboard
+const THEME_COLORS = {
+  primary: '#0f66db',     // Main blue
+  success: '#25b43d',     // Green
+  secondary: '#6366f1',   // Indigo
+  accent: '#059669',      // Emerald
+  warning: '#dc2626'      // Red
+}
 
 interface BillingInfo {
   subscription: any
@@ -120,16 +136,19 @@ export default function BillingPage() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      trial: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Free Trial' },
-      active: { bg: 'bg-green-100', text: 'text-green-800', label: 'Active' },
-      cancelled: { bg: 'bg-red-100', text: 'text-red-800', label: 'Cancelled' },
-      past_due: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Past Due' }
+      trial: { bg: `${THEME_COLORS.primary}20`, text: THEME_COLORS.primary, label: 'Free Trial' },
+      active: { bg: `${THEME_COLORS.success}20`, text: THEME_COLORS.success, label: 'Active' },
+      cancelled: { bg: `${THEME_COLORS.warning}20`, text: THEME_COLORS.warning, label: 'Cancelled' },
+      past_due: { bg: '#fef3c7', text: '#d97706', label: 'Past Due' }
     }
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.trial
 
     return (
-      <span className={`inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-medium ${config.bg} ${config.text}`}>
+      <span 
+        className="inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-semibold shadow-sm"
+        style={{ backgroundColor: config.bg, color: config.text }}
+      >
         {config.label}
       </span>
     )
@@ -156,32 +175,38 @@ export default function BillingPage() {
   }
 
   const getUsageColor = (percentage: number) => {
-    if (percentage >= 90) return 'bg-red-500'
-    if (percentage >= 75) return 'bg-yellow-500'
-    return 'bg-blue-600'
+    if (percentage >= 90) return THEME_COLORS.warning
+    if (percentage >= 75) return '#d97706'
+    return THEME_COLORS.primary
   }
 
   const usageItems = [
     {
       label: 'Contacts',
       used: usageStats.contacts.used,
-      limit: usageStats.contacts.limit
+      limit: usageStats.contacts.limit,
+      icon: Users,
+      color: THEME_COLORS.primary
     },
     {
       label: 'Email Campaigns This Month',
       used: usageStats.campaigns.used,
-      limit: usageStats.campaigns.limit
+      limit: usageStats.campaigns.limit,
+      icon: Target,
+      color: THEME_COLORS.success
     },
     {
       label: 'Emails Sent This Month',
       used: usageStats.emails.used,
-      limit: usageStats.emails.limit
+      limit: usageStats.emails.limit,
+      icon: Mail,
+      color: THEME_COLORS.secondary
     }
   ]
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-6">
         
         {/* Header */}
         <motion.div 
@@ -190,10 +215,10 @@ export default function BillingPage() {
           animate="animate"
           variants={fadeInUp}
         >
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Billing & Subscription
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-lg text-gray-600">
             Manage your subscription and billing information
           </p>
         </motion.div>
@@ -206,37 +231,80 @@ export default function BillingPage() {
         >
           {/* Current Plan */}
           <motion.div 
-            className="bg-white rounded-3xl border border-gray-200 shadow-sm p-10"
+            className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8"
             variants={staggerItem}
           >
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">Current Plan</h2>
+              <div className="flex items-center">
+                <div 
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center mr-4 shadow-md"
+                  style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
+                >
+                  <CreditCard className="h-6 w-6" style={{ color: THEME_COLORS.primary }} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Current Plan</h2>
+                  <p className="text-gray-600">Your subscription details and status</p>
+                </div>
+              </div>
               {getStatusBadge(subscriptionStatus)}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-              <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
-                <p className="text-sm font-medium text-gray-600 mb-2">Plan</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                <div className="flex items-center mb-3">
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-sm"
+                    style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
+                  >
+                    <TrendingUp className="h-5 w-5" style={{ color: THEME_COLORS.primary }} />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-700">Plan</p>
+                </div>
                 <p className="text-2xl font-bold text-gray-900">{getPlanDisplayName(planType)}</p>
               </div>
               
               {isTrialActive ? (
-                <div className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
-                  <p className="text-sm font-medium text-blue-600 mb-2">Trial Days Remaining</p>
-                  <p className="text-2xl font-bold text-blue-900">{daysRemaining} days</p>
+                <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
+                  <div className="flex items-center mb-3">
+                    <div 
+                      className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-sm"
+                      style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
+                    >
+                      <Clock className="h-5 w-5" style={{ color: THEME_COLORS.primary }} />
+                    </div>
+                    <p className="text-sm font-semibold" style={{ color: THEME_COLORS.primary }}>Trial Days Remaining</p>
+                  </div>
+                  <p className="text-2xl font-bold" style={{ color: THEME_COLORS.primary }}>{daysRemaining} days</p>
                 </div>
               ) : (
-                <div className="bg-green-50 rounded-2xl p-6 border border-green-200">
-                  <p className="text-sm font-medium text-green-600 mb-2">Billing Cycle</p>
-                  <p className="text-2xl font-bold text-green-900">
+                <div className="bg-green-50 rounded-2xl p-6 border border-green-100">
+                  <div className="flex items-center mb-3">
+                    <div 
+                      className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-sm"
+                      style={{ backgroundColor: `${THEME_COLORS.success}20` }}
+                    >
+                      <Calendar className="h-5 w-5" style={{ color: THEME_COLORS.success }} />
+                    </div>
+                    <p className="text-sm font-semibold" style={{ color: THEME_COLORS.success }}>Billing Cycle</p>
+                  </div>
+                  <p className="text-2xl font-bold" style={{ color: THEME_COLORS.success }}>
                     {billingInfo.subscription?.billing_cycle ? billingInfo.subscription.billing_cycle.charAt(0).toUpperCase() + billingInfo.subscription.billing_cycle.slice(1) : 'Monthly'}
                   </p>
                 </div>
               )}
 
-              <div className="bg-purple-50 rounded-2xl p-6 border border-purple-200">
-                <p className="text-sm font-medium text-purple-600 mb-2">Status</p>
-                <p className="text-2xl font-bold text-purple-900">
+              <div className="bg-purple-50 rounded-2xl p-6 border border-purple-100">
+                <div className="flex items-center mb-3">
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-sm"
+                    style={{ backgroundColor: `${THEME_COLORS.secondary}20` }}
+                  >
+                    <CheckCircle className="h-5 w-5" style={{ color: THEME_COLORS.secondary }} />
+                  </div>
+                  <p className="text-sm font-semibold" style={{ color: THEME_COLORS.secondary }}>Status</p>
+                </div>
+                <p className="text-2xl font-bold" style={{ color: THEME_COLORS.secondary }}>
                   {subscriptionStatus === 'trial' ? 'Free Trial' : 'Active'}
                 </p>
               </div>
@@ -247,10 +315,12 @@ export default function BillingPage() {
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Link
                     href="/billing/upgrade"
-                    className="inline-flex items-center justify-center px-8 py-4 text-base font-bold rounded-2xl text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
+                    className="inline-flex items-center justify-center px-8 py-3 text-white rounded-xl font-semibold transition-all shadow-sm hover:shadow-md"
+                    style={{ backgroundColor: THEME_COLORS.primary }}
                   >
-                    <CreditCard className="h-5 w-5 mr-3" />
+                    <CreditCard className="h-5 w-5 mr-2" />
                     Upgrade Now
+                    <ArrowUpRight className="h-4 w-4 ml-2" />
                   </Link>
                 </motion.div>
               ) : (
@@ -258,7 +328,7 @@ export default function BillingPage() {
                   <motion.button
                     onClick={handleManageBilling}
                     disabled={isLoadingPortal}
-                    className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-2xl text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-gray-700 bg-white rounded-xl hover:bg-gray-50 hover:shadow-md transition-all disabled:opacity-50 font-medium"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -275,9 +345,11 @@ export default function BillingPage() {
                   <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                     <Link
                       href="/billing/upgrade"
-                      className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-2xl text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
+                      className="inline-flex items-center justify-center px-6 py-3 text-white rounded-xl font-medium transition-all shadow-sm hover:shadow-md"
+                      style={{ backgroundColor: THEME_COLORS.primary }}
                     >
                       Change Plan
+                      <ArrowUpRight className="h-4 w-4 ml-2" />
                     </Link>
                   </motion.div>
                 </>
@@ -287,33 +359,54 @@ export default function BillingPage() {
 
           {/* Usage Limits */}
           <motion.div 
-            className="bg-white rounded-3xl border border-gray-200 shadow-sm p-10"
+            className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8"
             variants={staggerItem}
           >
-            <h2 className="text-2xl font-bold text-gray-900 mb-8">Usage & Limits</h2>
+            <div className="flex items-center mb-8">
+              <div 
+                className="w-12 h-12 rounded-2xl flex items-center justify-center mr-4 shadow-md"
+                style={{ backgroundColor: `${THEME_COLORS.accent}20` }}
+              >
+                <TrendingUp className="h-6 w-6" style={{ color: THEME_COLORS.accent }} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Usage & Limits</h2>
+                <p className="text-gray-600">Track your current usage against plan limits</p>
+              </div>
+            </div>
 
             <div className="space-y-6">
               {usageItems.map((item, index) => {
                 const percentage = calculatePercentage(item.used, item.limit)
+                const Icon = item.icon
                 
                 return (
                   <motion.div
                     key={item.label} 
-                    className="bg-gray-50 rounded-2xl p-6 border border-gray-200"
+                    className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:shadow-md transition-all duration-200"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <span className="font-semibold text-gray-900 text-base">{item.label}</span>
-                      <span className="text-gray-600 font-medium text-base">
+                      <div className="flex items-center">
+                        <div 
+                          className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-sm"
+                          style={{ backgroundColor: `${item.color}20` }}
+                        >
+                          <Icon className="h-5 w-5" style={{ color: item.color }} />
+                        </div>
+                        <span className="font-semibold text-gray-900">{item.label}</span>
+                      </div>
+                      <span className="text-gray-600 font-medium">
                         {item.used.toLocaleString()} / {item.limit.toLocaleString()}
                       </span>
                     </div>
                     
                     <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                       <motion.div 
-                        className={`h-full rounded-full ${getUsageColor(percentage)}`}
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: getUsageColor(percentage) }}
                         initial={{ width: 0 }}
                         animate={{ width: `${percentage}%` }}
                         transition={{ duration: 1, ease: "easeOut", delay: index * 0.2 }}
@@ -321,15 +414,20 @@ export default function BillingPage() {
                     </div>
                     
                     <div className="flex justify-between mt-3 text-sm">
-                      <span className={`font-medium ${
-                        percentage >= 90 ? 'text-red-600' :
-                        percentage >= 75 ? 'text-yellow-600' :
-                        'text-gray-500'
-                      }`}>
+                      <span 
+                        className="font-medium"
+                        style={{ 
+                          color: percentage >= 90 ? THEME_COLORS.warning :
+                                 percentage >= 75 ? '#d97706' :
+                                 '#6b7280'
+                        }}
+                      >
                         {percentage.toFixed(1)}% used
                       </span>
                       {percentage >= 90 && (
-                        <span className="text-red-600 font-medium">Consider upgrading</span>
+                        <span className="font-medium" style={{ color: THEME_COLORS.warning }}>
+                          Consider upgrading
+                        </span>
                       )}
                     </div>
                   </motion.div>
@@ -340,45 +438,73 @@ export default function BillingPage() {
 
           {/* Billing History */}
           <motion.div 
-            className="bg-white rounded-3xl border border-gray-200 shadow-sm p-10"
+            className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8"
             variants={staggerItem}
           >
-            <h2 className="text-2xl font-bold text-gray-900 mb-8">Billing History</h2>
+            <div className="flex items-center mb-8">
+              <div 
+                className="w-12 h-12 rounded-2xl flex items-center justify-center mr-4 shadow-md"
+                style={{ backgroundColor: `${THEME_COLORS.secondary}20` }}
+              >
+                <Calendar className="h-6 w-6" style={{ color: THEME_COLORS.secondary }} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Billing History</h2>
+                <p className="text-gray-600">View your past invoices and payments</p>
+              </div>
+            </div>
 
             {subscriptionStatus === 'trial' ? (
               <div className="text-center py-12">
-                <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                  <AlertCircle className="h-10 w-10 text-gray-400" />
+                <div 
+                  className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-md"
+                  style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
+                >
+                  <AlertCircle className="h-10 w-10" style={{ color: THEME_COLORS.primary }} />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No billing history yet</h3>
-                <p className="text-gray-600 text-base">Your free trial is currently active.</p>
+                <p className="text-gray-600">Your free trial is currently active. Billing history will appear here once you subscribe.</p>
               </div>
             ) : (
               <div className="space-y-4">
                 {billingInfo.isLoading ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <div 
+                      className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto"
+                      style={{ borderColor: THEME_COLORS.primary }}
+                    ></div>
                   </div>
                 ) : billingInfo.subscription ? (
                   <motion.div 
-                    className="bg-gray-50 rounded-2xl p-6 border border-gray-200"
+                    className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:shadow-md transition-all duration-200"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-gray-900 text-lg">
-                          LeadFlow {getPlanDisplayName(planType)} - {billingInfo.subscription?.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'}
-                        </p>
-                        <p className="text-gray-600 text-base mt-1">
-                          Next billing: {billingInfo.nextBilling ? formatDate(billingInfo.nextBilling) : 'Processing...'}
-                        </p>
+                      <div className="flex items-center">
+                        <div 
+                          className="w-12 h-12 rounded-xl flex items-center justify-center mr-4 shadow-sm"
+                          style={{ backgroundColor: `${THEME_COLORS.success}20` }}
+                        >
+                          <CheckCircle className="h-6 w-6" style={{ color: THEME_COLORS.success }} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900 text-lg">
+                            LeadFlow {getPlanDisplayName(planType)} - {billingInfo.subscription?.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'}
+                          </p>
+                          <p className="text-gray-600 mt-1">
+                            Next billing: {billingInfo.nextBilling ? formatDate(billingInfo.nextBilling) : 'Processing...'}
+                          </p>
+                        </div>
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-bold text-gray-900">
                           ${getPlanPrice(planType, billingInfo.subscription?.billing_cycle || 'monthly')}.00
                         </p>
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        <span 
+                          className="inline-flex items-center px-3 py-1 rounded-xl text-sm font-semibold mt-2 shadow-sm"
+                          style={{ backgroundColor: `${THEME_COLORS.success}20`, color: THEME_COLORS.success }}
+                        >
                           Paid
                         </span>
                       </div>
@@ -386,11 +512,14 @@ export default function BillingPage() {
                   </motion.div>
                 ) : (
                   <div className="text-center py-12">
-                    <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                      <AlertCircle className="h-10 w-10 text-gray-400" />
+                    <div 
+                      className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-md"
+                      style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
+                    >
+                      <AlertCircle className="h-10 w-10" style={{ color: THEME_COLORS.primary }} />
                     </div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">No billing history</h3>
-                    <p className="text-gray-600 text-base">Billing history will appear here once you subscribe.</p>
+                    <p className="text-gray-600">Billing history will appear here once you subscribe.</p>
                   </div>
                 )}
               </div>

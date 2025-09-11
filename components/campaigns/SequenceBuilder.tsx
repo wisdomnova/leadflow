@@ -3,15 +3,24 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSequenceStore } from '@/store/useSequenceStore'
-import { Plus, Save, AlertCircle, CheckCircle, Clock, Mail, Edit2, Eye, Smartphone, Monitor, GripVertical, Trash2, X } from 'lucide-react'
+import { Plus, Save, AlertCircle, CheckCircle, Clock, Mail, Edit2, Eye, Smartphone, Monitor, GripVertical, Trash2, X, Play, Settings } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TemplateVariablePicker from './TemplateVariablePicker'
 
+// Theme colors - consistent with dashboard
+const THEME_COLORS = {
+  primary: '#0f66db',     // Main blue
+  success: '#25b43d',     // Green
+  secondary: '#6366f1',   // Indigo
+  accent: '#059669',      // Emerald
+  warning: '#dc2626'      // Red
+}
+
 interface SequenceBuilderProps { 
-  campaignId?: string
+  campaignId?: string 
   onSave?: () => void 
   templateApplied?: boolean
-  readOnly?: boolean // Add this line
+  readOnly?: boolean
 }
 
 interface EmailPreviewProps {
@@ -25,14 +34,14 @@ function EmailPreview({ step, onClose }: EmailPreviewProps) {
   return (
     <AnimatePresence>
       <motion.div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       >
         <motion.div 
-          className="bg-white rounded-2xl shadow-2xl w-full h-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col"
+          className="bg-white rounded-2xl shadow-xl w-full h-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col border border-gray-200"
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
@@ -46,35 +55,37 @@ function EmailPreview({ step, onClose }: EmailPreviewProps) {
             </div>
             <div className="flex items-center space-x-4">
               {/* View Mode Toggle */}
-              <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <div className="flex items-center bg-gray-100 rounded-xl p-1">
                 <button
                   onClick={() => setViewMode('desktop')}
-                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     viewMode === 'desktop' 
-                      ? 'bg-white text-gray-900 shadow-sm' 
+                      ? 'bg-white text-white shadow-md' 
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
+                  style={viewMode === 'desktop' ? { backgroundColor: THEME_COLORS.primary } : {}}
                 >
-                  <Monitor className="h-4 w-4 mr-1" />
+                  <Monitor className="h-4 w-4 mr-2" />
                   Desktop
                 </button>
                 <button
                   onClick={() => setViewMode('mobile')}
-                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     viewMode === 'mobile' 
-                      ? 'bg-white text-gray-900 shadow-sm' 
+                      ? 'bg-white text-white shadow-md' 
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
+                  style={viewMode === 'mobile' ? { backgroundColor: THEME_COLORS.primary } : {}}
                 >
-                  <Smartphone className="h-4 w-4 mr-1" />
+                  <Smartphone className="h-4 w-4 mr-2" />
                   Mobile
                 </button>
               </div>
               <button
                 onClick={onClose}
-                className="p-3 hover:bg-red-50 rounded-full transition-colors cursor-pointer bg-red-100 border border-red-200"
+                className="p-3 hover:bg-gray-100 rounded-xl transition-colors"
               >
-                <X className="w-5 h-5 text-red-600" />
+                <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
           </div>
@@ -82,11 +93,11 @@ function EmailPreview({ step, onClose }: EmailPreviewProps) {
           {/* Preview Content */}
           <div className="flex-1 overflow-y-auto p-8 bg-gray-50">
             <div className="flex justify-center">
-              <div className={`bg-white rounded-2xl shadow-xl border border-gray-200 transition-all duration-300 ${
+              <div className={`bg-white rounded-2xl shadow-lg border border-gray-200 transition-all duration-300 ${
                 viewMode === 'desktop' ? 'max-w-2xl w-full' : 'max-w-sm w-full'
               }`}>
                 {/* Email Header */}
-                <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-gray-50 to-gray-100">
+                <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-t-2xl">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-gray-600 font-medium">From: your-company@email.com</span>
                     <span className="text-sm text-gray-500">Now</span>
@@ -112,7 +123,7 @@ function EmailPreview({ step, onClose }: EmailPreviewProps) {
                 </div>
 
                 {/* Email Footer */}
-                <div className="border-t border-gray-100 p-4 bg-gray-50 text-center">
+                <div className="border-t border-gray-100 p-4 bg-gray-50 text-center rounded-b-2xl">
                   <p className="text-xs text-gray-500">
                     This is a preview of how your email will appear to recipients
                   </p>
@@ -129,7 +140,7 @@ function EmailPreview({ step, onClose }: EmailPreviewProps) {
               </div>
               <button
                 onClick={onClose}
-                className="px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 font-medium transition-colors cursor-pointer"
+                className="px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 hover:shadow-md font-medium transition-all duration-200"
               >
                 Close Preview
               </button>
@@ -145,7 +156,7 @@ export default function SequenceBuilder({
   campaignId, 
   onSave, 
   templateApplied, 
-  readOnly = false // Add this with default value
+  readOnly = false
 }: SequenceBuilderProps) {
   const {
     steps,
@@ -168,7 +179,6 @@ export default function SequenceBuilder({
   const [previewingStep, setPreviewingStep] = useState<any | null>(null)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
 
-  // Use useRef to store textarea refs without causing re-renders
   const textareaRefs = useRef<{ [key: string]: HTMLTextAreaElement | HTMLInputElement | null }>({})
   const [activeField, setActiveField] = useState<{ stepId: string, field: 'subject' | 'content' } | null>(null)
 
@@ -267,13 +277,10 @@ export default function SequenceBuilder({
       order_index: index
     }
 
-    // Use the store method if available, otherwise implement locally
     if (addStepAtIndex) {
       addStepAtIndex(newStep, index)
     } else {
-      // Fallback: Add to end and reorder
       addStep()
-      // You would need to implement reordering logic here
     }
   }
 
@@ -312,7 +319,6 @@ export default function SequenceBuilder({
         
         updateStep(stepId, { [field]: newValue })
         
-        // Reset cursor position after the inserted variable
         setTimeout(() => {
           if (element && 'selectionStart' in element) {
             element.selectionStart = element.selectionEnd = start + variable.length
@@ -320,7 +326,6 @@ export default function SequenceBuilder({
           }
         }, 0)
       } else {
-        // Fallback: append to end
         updateStep(stepId, { [field]: currentValue + variable })
       }
     }
@@ -337,12 +342,13 @@ export default function SequenceBuilder({
       <div className="space-y-6">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto mb-4" style={{ borderColor: THEME_COLORS.primary }}></div>
             <p className="text-gray-600 mb-4">Loading template steps...</p>
             {!readOnly && (
               <button
                 onClick={handleManualReload}
-                className="text-sm text-blue-600 hover:text-blue-700 underline"
+                className="text-sm hover:underline transition-colors"
+                style={{ color: THEME_COLORS.primary }}
               >
                 Click here if steps don't load
               </button>
@@ -358,14 +364,19 @@ export default function SequenceBuilder({
       {/* Read-only indicator */}
       {readOnly && (
         <motion.div 
-          className="bg-gray-50 border border-gray-200 rounded-2xl p-4"
+          className="bg-orange-50 border border-orange-200 rounded-2xl p-6 shadow-lg"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-gray-500 mr-3" />
+            <div 
+              className="w-10 h-10 rounded-xl flex items-center justify-center mr-4 shadow-md"
+              style={{ backgroundColor: THEME_COLORS.warning }}
+            >
+              <AlertCircle className="h-5 w-5 text-white" />
+            </div>
             <div>
-              <p className="text-gray-800 font-medium">Read-Only Mode</p>
+              <p className="text-gray-800 font-semibold text-lg">Read-Only Mode</p>
               <p className="text-gray-600 text-sm mt-1">
                 Email sequence cannot be modified while the campaign is active.
               </p>
@@ -377,27 +388,38 @@ export default function SequenceBuilder({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Email Sequence</h2>
-          <p className="text-gray-600 mt-1">
+          <h2 className="text-3xl font-bold text-gray-900">Email Sequence</h2>
+          <p className="text-gray-600 mt-1 text-lg">
             {readOnly ? 'View your automated email sequence' : 'Build your automated email sequence'}
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-4">
           {/* Save Status */}
           {saveSuccess && (
-            <div className="flex items-center text-sm text-green-600">
-              <CheckCircle className="h-4 w-4 mr-1" />
+            <motion.div 
+              className="flex items-center text-sm font-medium px-4 py-2 rounded-xl shadow-md"
+              style={{ 
+                color: THEME_COLORS.success,
+                backgroundColor: `${THEME_COLORS.success}20`
+              }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
               Saved successfully
-            </div>
+            </motion.div>
           )}
 
-          {/* Save Button - only show if not read-only */}
+          {/* Save Button */}
           {campaignId && !readOnly && (
             <button
               onClick={handleSave}
               disabled={isSaving || !isValidSequence}
-              className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="inline-flex items-center px-8 py-3 border border-transparent text-sm font-semibold rounded-xl shadow-sm text-white hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              style={{ 
+                backgroundColor: THEME_COLORS.primary
+              }}
             >
               <Save className="h-4 w-4 mr-2" />
               {isSaving ? 'Saving...' : 'Save Sequence'}
@@ -408,30 +430,40 @@ export default function SequenceBuilder({
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+        <motion.div 
+          className="bg-red-50 border border-red-200 rounded-2xl p-6 shadow-lg"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <div className="flex">
-            <AlertCircle className="h-5 w-5 text-red-400" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <div className="mt-2 text-sm text-red-700">{error}</div>
+            <div 
+              className="w-10 h-10 rounded-xl flex items-center justify-center mr-4 shadow-md"
+              style={{ backgroundColor: THEME_COLORS.warning }}
+            >
+              <AlertCircle className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Sequence</h3>
+              <div className="text-gray-700 mb-3">{error}</div>
               {campaignId && !readOnly && (
                 <button
                   onClick={handleManualReload}
-                  className="mt-2 text-sm text-blue-600 hover:text-blue-700 underline"
+                  className="text-sm font-medium hover:underline transition-colors"
+                  style={{ color: THEME_COLORS.primary }}
                 >
                   Try reloading
                 </button>
               )}
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Loading State */}
       {shouldShowLoading && (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Loading sequence...</span>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 mr-3" style={{ borderColor: THEME_COLORS.primary }}></div>
+          <span className="text-gray-600 text-lg">Loading sequence...</span>
         </div>
       )}
 
@@ -440,18 +472,18 @@ export default function SequenceBuilder({
         <div className="space-y-6">
           {steps.length > 0 ? (
             <>
-              {/* Simplified Step Cards */}
-              <div className="space-y-4">
+              {/* Step Cards */}
+              <div className="space-y-6">
                 {steps.map((step, index) => (
                   <div key={step.id}>
-                    {/* Add Step Button Between Steps - only show if not read-only */}
+                    {/* Add Step Button Between Steps */}
                     {index > 0 && canAddStep && !readOnly && (
-                      <div className="flex justify-center py-2">
+                      <div className="flex justify-center py-3">
                         <button
                           onClick={() => handleAddStepAtIndex(index)}
-                          className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full transition-colors"
+                          className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl border-2 border-dashed border-gray-300 text-gray-600 bg-white hover:bg-gray-50 hover:border-blue-600 hover:text-blue-600 transition-all duration-200"
                         >
-                          <Plus className="h-3 w-3 mr-1" />
+                          <Plus className="h-4 w-4 mr-2" />
                           Add step here
                         </button>
                       </div>
@@ -469,107 +501,125 @@ export default function SequenceBuilder({
                     >
                       {/* Timeline Connection */}
                       {index > 0 && (
-                        <div className="absolute -top-4 left-6 w-0.5 h-4 bg-gray-200"></div>
+                        <div 
+                          className="absolute -top-6 left-8 w-0.5 h-6 rounded-full"
+                          style={{ backgroundColor: THEME_COLORS.primary }}
+                        ></div>
                       )}
 
                       {/* Step Card */}
-                      <div className={`bg-white border border-gray-200 rounded-2xl p-6 transition-all ${
-                        !readOnly ? 'hover:border-gray-300 hover:shadow-lg' : ''
+                      <div className={`bg-white border border-gray-200 rounded-2xl shadow-lg transition-all duration-300 overflow-hidden ${
+                        !readOnly ? 'hover:border-gray-300 hover:shadow-xl group-hover:scale-[1.02]' : ''
                       }`}>
-                        <div className="flex items-start space-x-4">
-                          {/* Drag Handle - only show if not read-only */}
-                          {!readOnly && (
-                            <div className="flex-shrink-0 cursor-move">
-                              <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                            </div>
-                          )}
+                        <div className="p-6">
+                          <div className="flex items-start space-x-4">
+                            {/* Drag Handle */}
+                            {!readOnly && (
+                              <div className="flex-shrink-0 cursor-move pt-1">
+                                <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />
+                              </div>
+                            )}
 
-                          {/* Step Number */}
-                          <div className="flex-shrink-0">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-xl flex items-center justify-center text-lg font-bold shadow-lg">
-                              {index + 1}
+                            {/* Step Number */}
+                            <div className="flex-shrink-0">
+                              <div 
+                                className="w-16 h-16 text-white rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg"
+                                style={{ 
+                                  background: `linear-gradient(135deg, ${THEME_COLORS.primary} 0%, ${THEME_COLORS.secondary} 100%)`
+                                }}
+                              >
+                                {index + 1}
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Step Content */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center space-x-3">
-                                <h3 className="text-lg font-semibold text-gray-900">
-                                  {step.name || `Email ${index + 1}`}
-                                </h3>
+                            {/* Step Content */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center space-x-3">
+                                  <h3 className="text-xl font-bold text-gray-900">
+                                    {step.name || `Email ${index + 1}`}
+                                  </h3>
+                                  
+                                  {/* Wait Time Display */}
+                                  <div 
+                                    className="flex items-center text-sm font-medium text-white px-3 py-1.5 rounded-xl shadow-sm"
+                                    style={{ backgroundColor: THEME_COLORS.accent }}
+                                  >
+                                    <Clock className="h-4 w-4 mr-2" />
+                                    {step.delayAmount === 0 ? 'Send immediately' : `${step.delayAmount} ${step.delayUnit}`}
+                                  </div>
+                                </div>
                                 
-                                {/* Wait Time Display */}
-                                <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                                  <Clock className="h-4 w-4 mr-1" />
-                                  {step.delayAmount === 0 ? 'Send immediately' : `${step.delayAmount} ${step.delayUnit}`}
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => setPreviewingStep(step)}
+                                    className={`transition-all p-2 hover:bg-gray-100 rounded-xl ${
+                                      readOnly ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                    }`}
+                                    title="Preview email"
+                                  >
+                                    <Eye className="h-5 w-5 text-gray-500" />
+                                  </button>
+                                  {!readOnly && (
+                                    <button
+                                      onClick={() => setEditingStep(editingStep === step.id ? null : step.id)}
+                                      className="opacity-0 group-hover:opacity-100 transition-all p-2 hover:bg-gray-100 rounded-xl"
+                                      title="Edit step"
+                                    >
+                                      <Edit2 className="h-5 w-5 text-gray-500" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
-                              
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => setPreviewingStep(step)}
-                                  className={`transition-opacity p-2 hover:bg-gray-100 rounded-lg ${
-                                    readOnly ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                                  }`}
-                                  title="Preview email"
-                                >
-                                  <Eye className="h-4 w-4 text-gray-500" />
-                                </button>
-                                {!readOnly && (
-                                  <button
-                                    onClick={() => setEditingStep(editingStep === step.id ? null : step.id)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-gray-100 rounded-lg"
-                                    title="Edit step"
+
+                              {/* Subject Preview */}
+                              <div className="mb-4">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <Mail className="h-4 w-4 text-gray-400" />
+                                  <span className="text-sm font-semibold text-gray-700">Subject:</span>
+                                </div>
+                                <p className="text-gray-900 font-medium text-lg">
+                                  {step.subject || (
+                                    <span className="text-gray-500 italic">No subject set</span>
+                                  )}
+                                </p>
+                              </div>
+
+                              {/* Content Preview */}
+                              <div>
+                                <span className="text-sm font-semibold text-gray-700 mb-2 block">Content Preview:</span>
+                                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                                  <p className="text-gray-700 leading-relaxed line-clamp-3">
+                                    {step.content ? 
+                                      step.content.substring(0, 180) + (step.content.length > 180 ? '...' : '') : 
+                                      <span className="text-gray-500 italic">No content set</span>
+                                    }
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Edit Form */}
+                              <AnimatePresence>
+                                {editingStep === step.id && !readOnly && (
+                                  <motion.div
+                                    className="mt-6 pt-6 border-t border-gray-200"
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
                                   >
-                                    <Edit2 className="h-4 w-4 text-gray-500" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Subject Preview */}
-                            <div className="mb-3">
-                              <div className="flex items-center space-x-2 mb-1">
-                                <Mail className="h-4 w-4 text-gray-400" />
-                                <span className="text-sm font-medium text-gray-700">Subject:</span>
-                              </div>
-                              <p className="text-gray-900 font-medium">
-                                {step.subject || 'No subject set'}
-                              </p>
-                            </div>
-
-                            {/* Content Preview */}
-                            <div>
-                              <span className="text-sm font-medium text-gray-700 mb-1 block">Content Preview:</span>
-                              <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">
-                                {step.content ? 
-                                  step.content.substring(0, 120) + (step.content.length > 120 ? '...' : '') : 
-                                  'No content set'
-                                }
-                              </p>
-                            </div>
-
-                            {/* Edit Form - only show if not read-only */}
-                            <AnimatePresence>
-                              {editingStep === step.id && !readOnly && (
-                                <motion.div
-                                  className="mt-6 pt-6 border-t border-gray-200"
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: 'auto' }}
-                                  exit={{ opacity: 0, height: 0 }}
-                                >
-                                  <div className="space-y-4">
-                                    {/* Timing Controls - Simple Dropdown */}
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-6">
+                                      {/* Timing Controls */}
                                       <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
                                           Send Timing
                                         </label>
                                         <select
                                           value={getDelayValue(step)}
                                           onChange={(e) => handleDelayChange(step.id, e.target.value)}
-                                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                          className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 bg-white shadow-sm focus:ring-2 focus:border-transparent transition-all duration-200"
+                                          style={{ 
+                                            '--tw-ring-color': THEME_COLORS.primary
+                                          } as any}
                                         >
                                           <option value="immediate">Send immediately</option>
                                           <option value="1-hours">1 hour after</option>
@@ -586,89 +636,97 @@ export default function SequenceBuilder({
                                           <option value="30-days">1 month after</option>
                                         </select>
                                       </div>
-                                    </div>
 
-                                    {/* Subject */}
-                                    <div>
-                                      <div className="flex items-center justify-between mb-2">
-                                        <label className="block text-sm font-medium text-gray-700">
-                                          Subject Line
-                                        </label>
-                                        <TemplateVariablePicker
-                                          onInsert={handleVariableInsert}
+                                      {/* Subject */}
+                                      <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <label className="block text-sm font-semibold text-gray-700">
+                                            Subject Line
+                                          </label>
+                                          <TemplateVariablePicker
+                                            onInsert={handleVariableInsert}
+                                          />
+                                        </div>
+                                        <input
+                                          ref={(ref) => {
+                                            textareaRefs.current[`${step.id}-subject`] = ref
+                                          }}
+                                          type="text"
+                                          value={step.subject}
+                                          onChange={(e) => updateStep(step.id, { subject: e.target.value })}
+                                          onFocus={() => setActiveField({ stepId: step.id, field: 'subject' })}
+                                          placeholder="Enter email subject..."
+                                          className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm text-gray-900 focus:ring-2 focus:border-transparent transition-all duration-200"
+                                          style={{ 
+                                            '--tw-ring-color': THEME_COLORS.primary
+                                          } as any}
                                         />
                                       </div>
-                                      <input
-                                        ref={(ref) => {
-                                          textareaRefs.current[`${step.id}-subject`] = ref
-                                        }}
-                                        type="text"
-                                        value={step.subject}
-                                        onChange={(e) => updateStep(step.id, { subject: e.target.value })}
-                                        onFocus={() => setActiveField({ stepId: step.id, field: 'subject' })}
-                                        placeholder="Enter email subject..."
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                      />
-                                    </div>
 
-                                    {/* Content */}
-                                    <div>
-                                      <div className="flex items-center justify-between mb-2">
-                                        <label className="block text-sm font-medium text-gray-700">
-                                          Email Content
-                                        </label>
-                                        <TemplateVariablePicker
-                                          onInsert={handleVariableInsert}
+                                      {/* Content */}
+                                      <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <label className="block text-sm font-semibold text-gray-700">
+                                            Email Content
+                                          </label>
+                                          <TemplateVariablePicker
+                                            onInsert={handleVariableInsert}
+                                          />
+                                        </div>
+                                        <textarea
+                                          ref={(ref) => {
+                                            textareaRefs.current[`${step.id}-content`] = ref
+                                          }}
+                                          value={step.content}
+                                          onChange={(e) => updateStep(step.id, { content: e.target.value })}
+                                          onFocus={() => setActiveField({ stepId: step.id, field: 'content' })}
+                                          placeholder="Write your email content here..."
+                                          rows={8}
+                                          className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm text-gray-900 focus:ring-2 focus:border-transparent resize-vertical transition-all duration-200"
+                                          style={{ 
+                                            '--tw-ring-color': THEME_COLORS.primary
+                                          } as any}
                                         />
                                       </div>
-                                      <textarea
-                                        ref={(ref) => {
-                                          textareaRefs.current[`${step.id}-content`] = ref
-                                        }}
-                                        value={step.content}
-                                        onChange={(e) => updateStep(step.id, { content: e.target.value })}
-                                        onFocus={() => setActiveField({ stepId: step.id, field: 'content' })}
-                                        placeholder="Write your email content here..."
-                                        rows={8}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical"
-                                      />
-                                    </div>
 
-                                    {/* Actions */}
-                                    <div className="flex items-center justify-between pt-4">
-                                      <button
-                                        onClick={() => setEditingStep(null)}
-                                        className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-                                      >
-                                        Cancel
-                                      </button>
-                                      
-                                      <div className="flex items-center space-x-3">
-                                        {steps.length > 1 && (
-                                          <button
-                                            onClick={() => {
-                                              removeStep(step.id)
-                                              setEditingStep(null)
-                                            }}
-                                            className="inline-flex items-center px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                                          >
-                                            <Trash2 className="h-4 w-4 mr-1" />
-                                            Delete
-                                          </button>
-                                        )}
-                                        
+                                      {/* Actions */}
+                                      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                                         <button
                                           onClick={() => setEditingStep(null)}
-                                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                          className="px-6 py-3 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition-all duration-200 font-medium"
                                         >
-                                          Save Changes
+                                          Cancel
                                         </button>
+                                        
+                                        <div className="flex items-center space-x-3">
+                                          {steps.length > 1 && (
+                                            <button
+                                              onClick={() => {
+                                                removeStep(step.id)
+                                                setEditingStep(null)
+                                              }}
+                                              className="inline-flex items-center px-4 py-3 border border-transparent rounded-xl text-sm font-medium text-white hover:shadow-lg transition-all duration-200"
+                                              style={{ backgroundColor: THEME_COLORS.warning }}
+                                            >
+                                              <Trash2 className="h-4 w-4 mr-2" />
+                                              Delete
+                                            </button>
+                                          )}
+                                          
+                                          <button
+                                            onClick={() => setEditingStep(null)}
+                                            className="px-6 py-3 text-white rounded-xl hover:shadow-lg transition-all duration-200 font-medium"
+                                            style={{ backgroundColor: THEME_COLORS.primary }}
+                                          >
+                                            Save Changes
+                                          </button>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -676,19 +734,28 @@ export default function SequenceBuilder({
                   </div>
                 ))}
 
-                {/* Add Step Button at End - only show if not read-only */}
+                {/* Add Step Button at End */}
                 {canAddStep && !readOnly && (
                   <motion.div
-                    className="flex justify-center pt-4"
+                    className="flex justify-center pt-6"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: steps.length * 0.1 }}
                   >
                     <button
                       onClick={addStep}
-                      className="inline-flex items-center px-6 py-4 border-2 border-dashed border-gray-300 text-lg font-medium rounded-2xl text-gray-700 bg-white hover:bg-gray-50 hover:border-blue-400 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                      className="inline-flex items-center px-8 py-6 border-2 border-dashed border-gray-300 text-lg font-semibold rounded-2xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-lg transition-all duration-300"
+                      style={{}}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = THEME_COLORS.primary
+                        e.currentTarget.style.color = THEME_COLORS.primary
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#d1d5db'
+                        e.currentTarget.style.color = '#374151'
+                      }}
                     >
-                      <Plus className="h-5 w-5 mr-2" />
+                      <Plus className="h-6 w-6 mr-3" />
                       Add Email Step ({steps.length}/5)
                     </button>
                   </motion.div>
@@ -696,14 +763,22 @@ export default function SequenceBuilder({
               </div>
             </>
           ) : (
-            <div className="text-center py-12">
-              <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Mail className="h-10 w-10 text-gray-400" />
+            /* Empty State */
+            <motion.div 
+              className="bg-white rounded-2xl border border-gray-200 shadow-lg p-12 text-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div 
+                className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg"
+                style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
+              >
+                <Mail className="h-10 w-10" style={{ color: THEME_COLORS.primary }} />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">
                 {templateApplied ? 'No template steps found' : 'No email steps yet'}
               </h3>
-              <p className="text-gray-600 mb-6">
+              <p className="text-gray-600 mb-8 text-lg">
                 {templateApplied ? 'The template couldn\'t be loaded.' : 
                  readOnly ? 'This campaign has no email sequence steps.' : 'Get started by adding your first email step.'}
               </p>
@@ -711,20 +786,21 @@ export default function SequenceBuilder({
                 <div className="flex items-center justify-center space-x-4">
                   <button
                     onClick={handleManualReload}
-                    className="px-6 py-3 text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                    className="px-6 py-3 border border-gray-300 text-gray-700 bg-white rounded-xl hover:bg-gray-50 hover:shadow-md font-medium transition-all duration-200"
                   >
                     Reload Steps
                   </button>
-                  <span className="text-gray-400">or</span>
+                  <span className="text-gray-400 text-lg">or</span>
                   <button
                     onClick={addStep}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium transition-colors"
+                    className="px-8 py-3 text-white rounded-xl hover:shadow-lg font-semibold transition-all duration-200"
+                    style={{ backgroundColor: THEME_COLORS.primary }}
                   >
                     Add First Step
                   </button>
                 </div>
               )}
-            </div>
+            </motion.div>
           )}
         </div>
       )}
@@ -737,22 +813,31 @@ export default function SequenceBuilder({
         />
       )}
 
-      {/* Validation Messages - only show if not read-only */}
+      {/* Validation Messages */}
       {!isValidSequence && steps.length > 0 && !readOnly && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+        <motion.div 
+          className="bg-orange-50 border border-orange-200 rounded-2xl p-6 shadow-lg"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <div className="flex">
-            <AlertCircle className="h-5 w-5 text-yellow-400" />
-            <div className="ml-3"> 
-              <h3 className="text-sm font-medium text-yellow-800">
+            <div 
+              className="w-10 h-10 rounded-xl flex items-center justify-center mr-4 shadow-md"
+              style={{ backgroundColor: THEME_COLORS.warning }}
+            >
+              <AlertCircle className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Incomplete Steps
               </h3>
-              <div className="mt-2 text-sm text-yellow-700">
+              <div className="text-gray-700">
                 Please fill in the subject line and content for all email steps.
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
   )
-} 
+}

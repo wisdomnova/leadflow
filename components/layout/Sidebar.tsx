@@ -1,5 +1,4 @@
-// ./components/layout/Sidebar.tsx - Added Templates to navigation
-
+// ./components/layout/Sidebar.tsx
 'use client'
 
 import { useState } from 'react'
@@ -53,7 +52,7 @@ export function Sidebar() {
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <button
           type="button"
-          className="bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-lg border border-gray-200/50 text-gray-600 hover:text-gray-900 hover:bg-white transition-all duration-200"
+          className="bg-white p-3 rounded-xl shadow-lg text-gray-600 hover:text-gray-900 transition-colors duration-200"
           onClick={() => setMobileMenuOpen(true)}
         >
           <Menu className="h-5 w-5" />
@@ -67,28 +66,28 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <div className={clsx(
-        'fixed inset-y-0 left-0 z-50 w-64 bg-white/95 backdrop-blur-xl border-r border-gray-200/50 transform transition-transform duration-300 ease-in-out lg:translate-x-0',
+        'fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0',
         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       )}>
         <div className="flex h-full flex-col">
-          {/* Logo - Keep your original */}
-          <div className="flex h-16 shrink-0 items-center justify-between px-6 border-b border-gray-200/50">
+          {/* Logo */}
+          <div className="flex h-20 shrink-0 items-center justify-between px-6 border-b border-gray-200">
             <img
-              className="h-11 w-auto"
+              className="h-13 w-auto"
               src="/leadflow.png"
               alt="LeadFlow"
             />
             <button
               type="button"
-              className="lg:hidden text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-xl transition-colors"
+              className="lg:hidden text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-50 rounded-xl transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Navigation - Added Templates */}
-          <nav className="flex-1 px-4 py-6 space-y-2">
+          {/* Navigation - Clean and simple */}
+          <nav className="flex-1 px-4 py-8 space-y-2">
             {navigation.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
@@ -98,28 +97,30 @@ export function Sidebar() {
                   className={clsx(
                     'group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200',
                     isActive
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-200/50'
+                      ? 'bg-[#0f66db] text-white'
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                   )}
                 >
                   <item.icon
                     className={clsx(
-                      'mr-3 h-5 w-5 flex-shrink-0 transition-colors',
-                      isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'
+                      'mr-4 h-6 w-6 flex-shrink-0 transition-colors',
+                      isActive 
+                        ? 'text-white' 
+                        : 'text-gray-500 group-hover:text-gray-700'
                     )}
                   />
-                  {item.name}
+                  <span>{item.name}</span>
                 </Link>
               )
             })}
           </nav>
 
-          {/* User Profile - Simplified */}
-          <div className="border-t border-gray-200/50 p-4">
-            <div className="flex items-center mb-4 p-3 bg-gray-50 rounded-xl">
+          {/* User Profile - Clean design */}
+          <div className="border-t border-gray-200 p-6">
+            <div className="flex items-center mb-6 p-4 bg-gray-50 rounded-xl">
               <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border border-gray-200">
-                  <span className="text-sm font-medium text-blue-700">
+                <div className="h-10 w-10 rounded-xl bg-[#0f66db] flex items-center justify-center">
+                  <span className="text-sm font-semibold text-white">
                     {user?.first_name?.charAt(0) || 'U'}
                   </span>
                 </div>
@@ -136,7 +137,7 @@ export function Sidebar() {
             
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center justify-center px-4 py-3 text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-all duration-200 border border-red-200/50"
+              className="w-full flex items-center justify-center px-4 py-3 text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-colors duration-200"
             >
               <LogOut className="h-4 w-4 mr-2" />
               Sign out

@@ -7,8 +7,17 @@ import { useCampaignStore } from '@/store/useCampaignStore'
 import SequenceBuilder from '@/components/campaigns/SequenceBuilder'
 import CampaignTemplates from '@/components/campaigns/CampaignTemplates'
 import ContactSelector from '@/components/campaigns/ContactSelector'
-import { ArrowLeft, ArrowRight, Save, Mail, Settings, CheckCircle, Users, RotateCcw } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Save, Mail, Settings, CheckCircle, Users, RotateCcw, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
+
+// Theme colors - consistent with dashboard
+const THEME_COLORS = {
+  primary: '#0f66db',     // Main blue
+  success: '#25b43d',     // Green
+  secondary: '#6366f1',   // Indigo
+  accent: '#059669',      // Emerald
+  warning: '#dc2626'      // Red
+}
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -269,22 +278,19 @@ export default function CreateCampaignPage() {
       id: 1, 
       name: 'Campaign Setup', 
       description: 'Basic information',
-      icon: Settings,
-      color: 'blue'
+      icon: Settings
     },
     { 
       id: 2, 
       name: 'Email Sequence', 
       description: 'Create your emails',
-      icon: Mail,
-      color: 'purple'
+      icon: Mail
     },
     { 
       id: 3, 
       name: 'Review & Launch', 
       description: 'Select contacts and launch',
-      icon: Users,
-      color: 'green'
+      icon: Users
     }
   ]
 
@@ -296,20 +302,6 @@ export default function CreateCampaignPage() {
     return 'upcoming'
   }
 
-  const getStepColor = (stepId: number) => {
-    const status = getStepStatus(stepId)
-    if (status === 'completed') return 'bg-green-600 border-green-600'
-    if (status === 'current') return 'bg-blue-600 border-blue-600'
-    return 'bg-gray-100 border-gray-300'
-  }
-
-  const getStepTextColor = (stepId: number) => {
-    const status = getStepStatus(stepId)
-    if (status === 'completed') return 'text-white'
-    if (status === 'current') return 'text-white'
-    return 'text-gray-500'
-  }
-
   const canNavigateToStep = (stepId: number) => {
     if (stepId === 1) return true
     if (stepId === 2) return createdCampaignId !== null
@@ -318,12 +310,12 @@ export default function CreateCampaignPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/20">
-      <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-6xl mx-auto px-6 py-6">
         
         {/* Header */}
         <motion.div 
-          className="mb-12"
+          className="mb-8"
           initial="initial"
           animate="animate"
           variants={fadeInUp}
@@ -334,9 +326,9 @@ export default function CreateCampaignPage() {
                 clearSavedState()
                 router.back()
               }}
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors group"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
               Back to Campaigns
             </button>
             
@@ -364,7 +356,7 @@ export default function CreateCampaignPage() {
                     window.history.replaceState({}, '', url.toString())
                   }
                 }}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center px-6 py-3 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md transition-all duration-200"
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Start Fresh
@@ -372,167 +364,189 @@ export default function CreateCampaignPage() {
             )}
           </div>
           
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Create New Campaign
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-lg text-gray-600">
             Build and launch your email outreach campaign in three simple steps
           </p>
         </motion.div>
 
-        {/* Progress Steps */}
-        <motion.div 
-          className="mb-12"
-          initial="initial"
-          animate="animate"
-          variants={staggerContainer}
-        >
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
-            {steps.map((step, index) => (
-              <motion.div 
-                key={step.id} 
-                className="flex items-center"
-                variants={staggerItem}
-              >
+        {/* Progress Steps - matching import contacts exactly */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between max-w-2xl mx-auto">
+            {steps.map((stepItem, index) => (
+              <div key={stepItem.id} className="flex items-center">
                 <div className="flex items-center">
                   {/* Step Circle */}
-                  <button
-                    onClick={() => handleNavigateToStep(step.id)}
-                    disabled={!canNavigateToStep(step.id)}
-                    className={`relative flex items-center justify-center w-16 h-16 rounded-2xl border-2 transition-all duration-300 ${getStepColor(step.id)} ${
-                      canNavigateToStep(step.id) ? 'cursor-pointer hover:scale-105 hover:shadow-lg' : 'cursor-not-allowed'
-                    } ${currentStep === step.id ? 'shadow-xl shadow-blue-200' : ''}`}
+                  <div 
+                    className={`relative flex items-center justify-center w-12 h-12 rounded-2xl border-2 transition-all duration-300 ${
+                      getStepStatus(stepItem.id) === 'completed' 
+                        ? 'border-none shadow-md' 
+                        : getStepStatus(stepItem.id) === 'current' 
+                        ? 'border-none shadow-lg' 
+                        : 'bg-gray-100 border-gray-300'
+                    }`}
+                    style={{
+                      backgroundColor: getStepStatus(stepItem.id) === 'completed' 
+                        ? THEME_COLORS.success 
+                        : getStepStatus(stepItem.id) === 'current' 
+                        ? THEME_COLORS.primary 
+                        : undefined
+                    }}
                   >
-                    {getStepStatus(step.id) === 'completed' ? (
-                      <CheckCircle className="w-8 h-8 text-white" />
+                    {getStepStatus(stepItem.id) === 'completed' ? (
+                      <CheckCircle className="w-6 h-6 text-white" />
                     ) : (
-                      <step.icon className={`w-8 h-8 ${getStepTextColor(step.id)}`} />
+                      <stepItem.icon className={`w-6 h-6 ${
+                        getStepStatus(stepItem.id) === 'current' ? 'text-white' : 'text-gray-500'
+                      }`} />
                     )}
-                    
-                    {/* Pulse animation for current step */}
-                    {currentStep === step.id && (
-                      <div className="absolute inset-0 rounded-2xl bg-blue-600 animate-ping opacity-20"></div>
-                    )}
-                  </button>
+                  </div>
                   
                   {/* Step Info */}
-                  <div className="ml-4">
-                    <div className={`font-semibold transition-colors ${
-                      getStepStatus(step.id) === 'current' ? 'text-blue-600' :
-                      getStepStatus(step.id) === 'completed' ? 'text-green-600' :
+                  <div className="ml-3">
+                    <div className={`font-semibold text-sm transition-colors ${
+                      getStepStatus(stepItem.id) === 'current' ? 'text-gray-900' :
+                      getStepStatus(stepItem.id) === 'completed' ? 'text-gray-700' :
                       'text-gray-500'
                     }`}>
-                      {step.name}
+                      {stepItem.name}
                     </div>
-                    <div className="text-sm text-gray-500">{step.description}</div>
+                    <div className="text-xs text-gray-500">{stepItem.description}</div>
                   </div>
                 </div>
                 
                 {/* Connector Line */}
                 {index < steps.length - 1 && (
-                  <div className="flex-1 mx-8">
-                    <div className={`h-1 rounded-full transition-all duration-500 ${
-                      currentStep > step.id ? 'bg-green-400' : 'bg-gray-200'
-                    }`}></div>
+                  <div className="flex-1 mx-6">
+                    <div 
+                      className={`h-0.5 rounded-full transition-all duration-500 ${
+                        getStepStatus(stepItem.id) === 'completed' ? 'bg-gray-300' : 'bg-gray-200'
+                      }`}
+                      style={{
+                        backgroundColor: getStepStatus(stepItem.id) === 'completed' ? THEME_COLORS.success : undefined
+                      }}
+                    />
                   </div>
                 )}
-              </motion.div>
+              </div>
             ))}
           </div>
-        </motion.div>
+        </div>
 
         {/* Step Content */}
         <motion.div
           key={currentStep}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
           {currentStep === 1 && !showForm && (
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-              <div className="p-12">
-                {/* Template Selection or Start from Scratch */}
-                <div className="text-center">
-                  <motion.div
-                    initial="initial"
-                    animate="animate"
-                    variants={staggerContainer}
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              <div className="p-8">
+                {/* Header */}
+                <div className="mb-8">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    Choose Your Starting Point
+                  </h2>
+                  <p className="text-gray-600">
+                    Start with a proven template or build from scratch
+                  </p>
+                </div>
+
+                {/* Template Options */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Use Template Option */}
+                  <motion.button
+                    onClick={() => setShowTemplates(true)}
+                    className="relative border border-gray-300 rounded-2xl p-8 text-left hover:shadow-md transition-all duration-200 group hover:border-gray-400"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
                   >
-                    <motion.h2 
-                      className="text-3xl font-bold text-gray-900 mb-4"
-                      variants={staggerItem}
-                    >
-                      Choose Your Starting Point
-                    </motion.h2>
-                    <motion.p 
-                      className="text-xl text-gray-600 mb-12"
-                      variants={staggerItem}
-                    >
-                      Start with a proven template or build from scratch
-                    </motion.p>
+                    <div className="mb-6">
+                      <h3 className="text-xl font-bold text-gray-900 mb-3">Use a Template</h3>
+                      <p className="text-gray-600 leading-relaxed">
+                        Start with a proven email sequence that you can customize for your needs. 
+                        Choose from professionally crafted templates.
+                      </p>
+                    </div>
                     
-                    <motion.div 
-                      className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto"
-                      variants={staggerContainer}
-                    >
-                      <motion.button
-                        onClick={() => setShowTemplates(true)}
-                        className="group relative p-8 border-2 border-dashed border-blue-300 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all text-center"
-                        variants={staggerItem}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                    <div className="space-y-3">
+                      <div className="flex items-center text-sm text-gray-700">
+                        <CheckCircle className="h-4 w-4 mr-3" style={{ color: THEME_COLORS.success }} />
+                        <span>5 professional templates available</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-700">
+                        <CheckCircle className="h-4 w-4 mr-3" style={{ color: THEME_COLORS.success }} />
+                        <span>Pre-written email sequences</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-700">
+                        <CheckCircle className="h-4 w-4 mr-3" style={{ color: THEME_COLORS.success }} />
+                        <span>Fully customizable content</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <div 
+                        className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium text-white shadow-sm"
+                        style={{ backgroundColor: THEME_COLORS.primary }}
                       >
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="relative z-10">
-                          <div className="w-20 h-20 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-blue-200 transition-colors">
-                            <Mail className="h-10 w-10 text-blue-600 group-hover:scale-110 transition-transform" />
-                          </div>
-                          <h3 className="text-xl font-bold text-gray-900 mb-3">Use a Template</h3>
-                          <p className="text-gray-600 mb-4">
-                            Start with a proven email sequence that you can customize
-                          </p>
-                          <div className="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                            5 professional templates
-                          </div>
-                        </div>
-                      </motion.button>
-                      
-                      <motion.button
-                        onClick={handleStartFromScratch}
-                        className="group relative p-8 border-2 border-gray-300 rounded-2xl hover:border-gray-400 hover:bg-gray-50 transition-all text-center"
-                        variants={staggerItem}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="relative z-10">
-                          <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-gray-200 transition-colors">
-                            <Settings className="h-10 w-10 text-gray-600 group-hover:scale-110 transition-transform" />
-                          </div>
-                          <h3 className="text-xl font-bold text-gray-900 mb-3">Start from Scratch</h3>
-                          <p className="text-gray-600 mb-4">
-                            Create a completely custom campaign from the ground up
-                          </p>
-                          <div className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
-                            Full customization
-                          </div>
-                        </div>
-                      </motion.button>
-                    </motion.div>
-                  </motion.div>
+                        Browse Templates
+                      </div>
+                    </div>
+                  </motion.button>
+
+                  {/* Start from Scratch Option */}
+                  <motion.button
+                    onClick={handleStartFromScratch}
+                    className="relative border border-gray-300 rounded-2xl p-8 text-left hover:shadow-md transition-all duration-200 group hover:border-gray-400"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <div className="mb-6">
+                      <h3 className="text-xl font-bold text-gray-900 mb-3">Start from Scratch</h3>
+                      <p className="text-gray-600 leading-relaxed">
+                        Create a completely custom campaign from the ground up. 
+                        Perfect for unique messaging and specific use cases.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center text-sm text-gray-700">
+                        <CheckCircle className="h-4 w-4 mr-3" style={{ color: THEME_COLORS.accent }} />
+                        <span>Complete creative control</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-700">
+                        <CheckCircle className="h-4 w-4 mr-3" style={{ color: THEME_COLORS.accent }} />
+                        <span>Custom email sequences</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-700">
+                        <CheckCircle className="h-4 w-4 mr-3" style={{ color: THEME_COLORS.accent }} />
+                        <span>Tailored messaging strategy</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <div className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium shadow-sm">
+                        Start Building
+                      </div>
+                    </div>
+                  </motion.button>
                 </div>
               </div>
             </div>
           )}
 
           {currentStep === 1 && showForm && (
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="p-12">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h2 className="text-3xl font-bold text-gray-900 mb-2">Campaign Details</h2>
-                    <p className="text-gray-600">Set up the basic information for your campaign</p>
+                    <p className="text-gray-600 text-lg">Set up the basic information for your campaign</p>
                   </div>
                   <button
                     onClick={() => {
@@ -546,7 +560,7 @@ export default function CreateCampaignPage() {
                         from_email: ''
                       })
                     }}
-                    className="text-gray-500 hover:text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="text-gray-500 hover:text-gray-700 px-4 py-2 rounded-xl hover:bg-gray-100 transition-all duration-200 font-medium"
                   >
                     ← Back to options
                   </button>
@@ -555,21 +569,28 @@ export default function CreateCampaignPage() {
                 {/* Show selected template info */}
                 {selectedTemplate && (
                   <motion.div 
-                    className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-6"
+                    className="mb-8 border border-gray-200 rounded-2xl p-6 shadow-lg"
+                    style={{
+                      background: `linear-gradient(135deg, ${THEME_COLORS.primary}10 0%, ${THEME_COLORS.secondary}10 100%)`,
+                      borderColor: `${THEME_COLORS.primary}30`
+                    }}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mr-4">
-                          <Mail className="h-6 w-6 text-blue-600" />
+                        <div 
+                          className="w-12 h-12 rounded-xl flex items-center justify-center mr-4 shadow-md"
+                          style={{ backgroundColor: THEME_COLORS.primary }}
+                        >
+                          <Sparkles className="h-6 w-6 text-white" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-blue-900 text-lg">
+                          <h4 className="font-bold text-gray-900 text-lg">
                             Template: {selectedTemplate.name}
                           </h4>
-                          <p className="text-blue-700 mt-1">{selectedTemplate.description}</p>
-                          <div className="flex items-center space-x-6 mt-2 text-sm text-blue-600">
+                          <p className="text-gray-700 mt-1 leading-relaxed">{selectedTemplate.description}</p>
+                          <div className="flex items-center space-x-6 mt-2 text-sm text-gray-600">
                             <span className="font-medium">{selectedTemplate.emails} emails</span>
                             <span>•</span>
                             <span>{selectedTemplate.duration}</span>
@@ -587,7 +608,8 @@ export default function CreateCampaignPage() {
                             description: ''
                           }))
                         }}
-                        className="text-blue-600 hover:text-blue-800 px-4 py-2 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                        className="px-4 py-2 rounded-xl hover:bg-white hover:bg-opacity-50 transition-all duration-200 font-medium"
+                        style={{ color: THEME_COLORS.primary }}
                       >
                         Remove Template
                       </button>
@@ -605,7 +627,10 @@ export default function CreateCampaignPage() {
                         type="text"
                         value={campaignData.name}
                         onChange={(e) => setCampaignData((prev: any) => ({ ...prev, name: e.target.value }))}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm text-black focus:ring-2 focus:border-transparent transition-all duration-200"
+                        style={{ 
+                          '--tw-ring-color': THEME_COLORS.primary
+                        } as any}
                         placeholder="e.g., Welcome Series, Product Launch"
                         required
                       />
@@ -619,7 +644,10 @@ export default function CreateCampaignPage() {
                         value={campaignData.description}
                         onChange={(e) => setCampaignData((prev: any) => ({ ...prev, description: e.target.value }))}
                         rows={4}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm text-black focus:ring-2 focus:border-transparent transition-all duration-200"
+                        style={{ 
+                          '--tw-ring-color': THEME_COLORS.primary
+                        } as any}
                         placeholder="Describe the purpose of this campaign..."
                       />
                     </div>
@@ -630,7 +658,10 @@ export default function CreateCampaignPage() {
                         type="text"
                         value={campaignData.from_name}
                         onChange={(e) => setCampaignData((prev: any) => ({ ...prev, from_name: e.target.value }))}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-black focus:ring-2 focus:border-transparent transition-all duration-200"
+                        style={{ 
+                          '--tw-ring-color': THEME_COLORS.primary
+                        } as any}
                         placeholder="John Doe"
                         required
                       />
@@ -642,7 +673,10 @@ export default function CreateCampaignPage() {
                         type="email"
                         value={campaignData.from_email}
                         onChange={(e) => setCampaignData((prev: any) => ({ ...prev, from_email: e.target.value }))}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-black focus:ring-2 focus:border-transparent transition-all duration-200"
+                        style={{ 
+                          '--tw-ring-color': THEME_COLORS.primary
+                        } as any}
                         placeholder="john@company.com"
                         required
                       />
@@ -655,11 +689,15 @@ export default function CreateCampaignPage() {
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <motion.div 
-                        className={`relative p-6 border-2 rounded-2xl cursor-pointer transition-all ${
+                        className={`relative p-6 border-2 rounded-2xl cursor-pointer transition-all duration-200 ${
                           campaignData.type === 'sequence' 
-                            ? 'border-blue-500 bg-blue-50 shadow-lg' 
+                            ? 'shadow-lg border-2' 
                             : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                         }`}
+                        style={campaignData.type === 'sequence' ? {
+                          backgroundColor: `${THEME_COLORS.primary}10`,
+                          borderColor: THEME_COLORS.primary
+                        } : {}}
                         onClick={() => setCampaignData((prev: any) => ({ ...prev, type: 'sequence' }))}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
@@ -671,7 +709,11 @@ export default function CreateCampaignPage() {
                             value="sequence"
                             checked={campaignData.type === 'sequence'}
                             onChange={() => setCampaignData((prev: any) => ({ ...prev, type: 'sequence' }))}
-                            className="h-5 w-5 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            className="h-5 w-5 border-gray-300 focus:ring-2 transition-all"
+                            style={{ 
+                              color: THEME_COLORS.primary,
+                              '--tw-ring-color': THEME_COLORS.primary
+                            } as any}
                           />
                           <div className="ml-4">
                             <div className="font-semibold text-gray-900 text-lg">Email Sequence</div>
@@ -681,11 +723,15 @@ export default function CreateCampaignPage() {
                       </motion.div>
 
                       <motion.div 
-                        className={`relative p-6 border-2 rounded-2xl cursor-pointer transition-all ${
+                        className={`relative p-6 border-2 rounded-2xl cursor-pointer transition-all duration-200 ${
                           campaignData.type === 'single' 
-                            ? 'border-blue-500 bg-blue-50 shadow-lg' 
+                            ? 'shadow-lg border-2' 
                             : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                         }`}
+                        style={campaignData.type === 'single' ? {
+                          backgroundColor: `${THEME_COLORS.primary}10`,
+                          borderColor: THEME_COLORS.primary
+                        } : {}}
                         onClick={() => setCampaignData((prev: any) => ({ ...prev, type: 'single' }))}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
@@ -697,7 +743,11 @@ export default function CreateCampaignPage() {
                             value="single"
                             checked={campaignData.type === 'single'}
                             onChange={() => setCampaignData((prev: any) => ({ ...prev, type: 'single' }))}
-                            className="h-5 w-5 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            className="h-5 w-5 border-gray-300 focus:ring-2 transition-all"
+                            style={{ 
+                              color: THEME_COLORS.primary,
+                              '--tw-ring-color': THEME_COLORS.primary
+                            } as any}
                           />
                           <div className="ml-4">
                             <div className="font-semibold text-gray-900 text-lg">Single Email</div>
@@ -715,7 +765,10 @@ export default function CreateCampaignPage() {
                         clearSavedState()
                         router.back()
                       }}
-                      className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                      className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200"
+                      style={{ 
+                        '--tw-ring-color': THEME_COLORS.primary
+                      } as any}
                     >
                       <ArrowLeft className="h-5 w-5 mr-2" />
                       Cancel
@@ -724,7 +777,11 @@ export default function CreateCampaignPage() {
                     <button
                       type="submit"
                       disabled={isLoading || !isFormValid}
-                      className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-lg"
+                      className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm text-white hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                      style={{ 
+                        backgroundColor: THEME_COLORS.primary,
+                        '--tw-ring-color': THEME_COLORS.primary
+                      } as any}
                     >
                       {isLoading ? 'Creating...' : selectedTemplate ? 'Create with Template' : 'Continue to Sequence'}
                       <ArrowRight className="h-5 w-5 ml-2" />
@@ -736,21 +793,28 @@ export default function CreateCampaignPage() {
           )}
 
           {currentStep === 2 && createdCampaignId && (
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="p-12">
                 {selectedTemplate && (
                   <motion.div 
-                    className="mb-8 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-2xl p-6"
+                    className="mb-8 border border-gray-200 rounded-2xl p-6 shadow-lg"
+                    style={{
+                      background: `linear-gradient(135deg, ${THEME_COLORS.success}10 0%, ${THEME_COLORS.primary}10 100%)`,
+                      borderColor: `${THEME_COLORS.success}30`
+                    }}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
                     <div className="flex items-center">
-                      <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mr-4">
-                        <CheckCircle className="h-6 w-6 text-green-600" />
+                      <div 
+                        className="w-12 h-12 rounded-xl flex items-center justify-center mr-4 shadow-md"
+                        style={{ backgroundColor: THEME_COLORS.success }}
+                      >
+                        <CheckCircle className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-bold text-green-800 text-lg">Template Applied!</h3>
-                        <div className="text-green-700 mt-1">
+                        <h3 className="font-bold text-gray-900 text-lg">Template Applied!</h3>
+                        <div className="text-gray-700 mt-1 leading-relaxed">
                           Your email sequence has been pre-populated with the "{selectedTemplate.name}" template. 
                           You can customize any part of it below.
                         </div>
@@ -768,7 +832,10 @@ export default function CreateCampaignPage() {
                 <div className="flex justify-between pt-8 mt-8 border-t border-gray-100">
                   <button
                     onClick={() => setCurrentStep(1)}
-                    className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200"
+                    style={{ 
+                      '--tw-ring-color': THEME_COLORS.primary
+                    } as any}
                   >
                     <ArrowLeft className="h-5 w-5 mr-2" />
                     Back to Details
@@ -776,7 +843,11 @@ export default function CreateCampaignPage() {
 
                   <button
                     onClick={handleSequenceSave}
-                    className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all hover:shadow-lg"
+                    className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm text-white hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200"
+                    style={{ 
+                      backgroundColor: THEME_COLORS.primary,
+                      '--tw-ring-color': THEME_COLORS.primary
+                    } as any}
                   >
                     Continue to Review
                     <ArrowRight className="h-5 w-5 ml-2" />
@@ -787,7 +858,7 @@ export default function CreateCampaignPage() {
           )}
 
           {currentStep === 3 && (
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="p-12">
                 <ContactSelector
                   campaignId={createdCampaignId!}
@@ -877,7 +948,10 @@ export default function CreateCampaignPage() {
                 <div className="flex justify-between pt-8 mt-8 border-t border-gray-100">
                   <button
                     onClick={() => setCurrentStep(2)}
-                    className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200"
+                    style={{ 
+                      '--tw-ring-color': THEME_COLORS.primary
+                    } as any}
                   >
                     <ArrowLeft className="h-5 w-5 mr-2" />
                     Back to Sequence
@@ -948,7 +1022,11 @@ export default function CreateCampaignPage() {
                         alert(`❌ Failed to complete setup: ${error instanceof Error ? error.message : 'Unknown error'}`)
                       }
                     }}
-                    className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all hover:shadow-lg"
+                    className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm text-white hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200"
+                    style={{ 
+                      backgroundColor: THEME_COLORS.success,
+                      '--tw-ring-color': THEME_COLORS.success
+                    } as any}
                   >
                     <Save className="h-5 w-5 mr-2" />
                     Complete Campaign Setup

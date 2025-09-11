@@ -2,14 +2,23 @@
 'use client'
 
 import { useState } from 'react'
-import { Mail, Clock, Users, Target, ChevronRight, Star, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Mail, Clock, Users, Target, ChevronRight, Star, X, ChevronDown, ChevronUp, Settings, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+
+// Theme colors - consistent with dashboard
+const THEME_COLORS = {
+  primary: '#0f66db',     // Main blue
+  success: '#25b43d',     // Green
+  secondary: '#6366f1',   // Indigo
+  accent: '#059669',      // Emerald
+  warning: '#dc2626'      // Red
+}
 
 interface Template {
   id: string
   name: string
   description: string 
-  category: 'sales' | 'marketing' | 'onboarding' | 'nurture' 
+  category: 'sales' | 'marketing' | 'onboarding' | 'nurture'  
   emails: number
   duration: string
   subject_line: string
@@ -413,17 +422,32 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
     }
   }
 
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'sales':
+        return THEME_COLORS.success
+      case 'marketing':
+        return THEME_COLORS.primary
+      case 'onboarding':
+        return THEME_COLORS.secondary
+      case 'nurture':
+        return THEME_COLORS.accent
+      default:
+        return '#6b7280'
+    }
+  }
+
   return (
     <AnimatePresence>
       <motion.div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       >
         <motion.div 
-          className="bg-white rounded-2xl shadow-2xl w-full h-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col"
+          className="bg-white rounded-2xl shadow-xl w-full h-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col border border-gray-200"
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
@@ -432,14 +456,14 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Choose a Template</h2>
-              <p className="text-gray-600 mt-1">Start with a proven email sequence and customize it for your needs</p>
+              <h2 className="text-3xl font-bold text-gray-900">Choose a Template</h2>
+              <p className="text-gray-600 mt-1 text-lg">Start with a proven email sequence and customize it for your needs</p>
             </div>
             <button
               onClick={onClose}
-              className="p-3 hover:bg-red-50 rounded-full transition-colors cursor-pointer bg-red-100 border border-red-200"
+              className="p-3 hover:bg-gray-100 rounded-xl transition-colors"
             >
-              <X className="w-5 h-5 text-red-600" />
+              <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
 
@@ -451,7 +475,7 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
               <div className="p-6">
                 <button
                   onClick={() => setCategoriesCollapsed(!categoriesCollapsed)}
-                  className="w-full flex items-center justify-between text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4 hover:text-blue-600 transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4 hover:text-gray-700 transition-colors"
                 >
                   <span>Categories</span>
                   {categoriesCollapsed ? (
@@ -467,23 +491,24 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="space-y-1"
+                      className="space-y-2"
                     >
                       {categories.map((category) => (
                         <button
                           key={category.id}
                           onClick={() => setSelectedCategory(category.id)}
-                          className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                          className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
                             selectedCategory === category.id
-                              ? 'bg-blue-100 text-blue-900 shadow-sm'
+                              ? 'text-white shadow-md'
                               : 'text-gray-700 hover:bg-white hover:shadow-sm'
                           }`}
+                          style={selectedCategory === category.id ? { backgroundColor: THEME_COLORS.primary } : {}}
                         >
                           <div className="flex items-center justify-between">
                             <span>{category.name}</span>
-                            <span className={`text-xs px-2 py-1 rounded-full ${
+                            <span className={`text-xs px-2.5 py-1 rounded-xl font-semibold ${
                               selectedCategory === category.id
-                                ? 'bg-blue-200 text-blue-800'
+                                ? 'bg-white bg-opacity-20 text-white'
                                 : 'bg-gray-200 text-gray-600'
                             }`}>
                               {category.count}
@@ -500,7 +525,7 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
               <div className="px-6 pb-6">
                 <button
                   onClick={() => setTemplatesCollapsed(!templatesCollapsed)}
-                  className="w-full flex items-center justify-between text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4 hover:text-blue-600 transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4 hover:text-gray-700 transition-colors"
                 >
                   <span>Templates ({filteredTemplates.length})</span>
                   {templatesCollapsed ? (
@@ -522,47 +547,46 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                         <motion.div
                           key={template.id}
                           onClick={() => setSelectedTemplate(template)}
-                          className={`p-4 rounded-xl cursor-pointer transition-all ${
+                          className={`p-4 rounded-xl cursor-pointer transition-all duration-200 ${
                             selectedTemplate?.id === template.id
-                              ? 'bg-blue-50 border-2 border-blue-200 shadow-md'
+                              ? 'shadow-md border-2'
                               : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'
                           }`}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                          style={selectedTemplate?.id === template.id ? {
+                            borderColor: THEME_COLORS.primary
+                          } : {}}
                         >
                           <div className="flex items-start justify-between mb-2">
                             <h4 className="font-semibold text-gray-900 flex items-center text-sm">
                               {template.name}
                               {template.popular && (
-                                <div className="ml-2 px-1.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full flex items-center">
-                                  <Star className="h-3 w-3 mr-1 fill-current" />
+                                <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-lg text-xs font-semibold">
+                                  <Star className="h-3 w-3 mr-1 fill-current inline" />
                                   Popular
-                                </div>
+                                </span>
                               )}
                             </h4>
                           </div>
                           
-                          <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                          <p className="text-xs text-gray-600 mb-3 line-clamp-2 leading-relaxed">
                             {template.description}
                           </p>
                           
                           <div className="flex items-center justify-between text-xs text-gray-500">
                             <div className="flex items-center space-x-3">
-                              <span className="flex items-center">
+                              <span className="flex items-center font-medium">
                                 <Mail className="h-3 w-3 mr-1" />
                                 {template.emails}
                               </span>
-                              <span className="flex items-center">
+                              <span className="flex items-center font-medium">
                                 <Clock className="h-3 w-3 mr-1" />
                                 {template.duration}
                               </span>
                             </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              template.category === 'sales' ? 'bg-green-100 text-green-700' :
-                              template.category === 'marketing' ? 'bg-blue-100 text-blue-700' :
-                              template.category === 'onboarding' ? 'bg-purple-100 text-purple-700' :
-                              'bg-orange-100 text-orange-700'
-                            }`}>
+                            <span 
+                              className="px-2.5 py-1 bg-gray-100 rounded-lg text-xs font-semibold"
+                              style={{ color: getCategoryColor(template.category) }}
+                            >
                               {template.category}
                             </span>
                           </div>
@@ -585,13 +609,13 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                         <h3 className="text-3xl font-bold text-gray-900 flex items-center mb-2">
                           {selectedTemplate.name}
                           {selectedTemplate.popular && (
-                            <div className="ml-3 px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-full flex items-center">
-                              <Star className="h-4 w-4 mr-1 fill-current" />
+                            <span className="ml-3 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-xl text-sm font-semibold flex items-center">
+                              <Star className="h-4 w-4 mr-1.5 fill-current" />
                               Popular Choice
-                            </div>
+                            </span>
                           )}
                         </h3>
-                        <p className="text-xl text-gray-600 mb-4">{selectedTemplate.description}</p>
+                        <p className="text-xl text-gray-600 mb-4 leading-relaxed">{selectedTemplate.description}</p>
                         
                         <div className="flex items-center space-x-6 text-sm text-gray-500">
                           <span className="flex items-center font-medium">
@@ -602,12 +626,10 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                             <Clock className="h-4 w-4 mr-2" />
                             {selectedTemplate.duration}
                           </span>
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            selectedTemplate.category === 'sales' ? 'bg-green-100 text-green-800' :
-                            selectedTemplate.category === 'marketing' ? 'bg-blue-100 text-blue-800' :
-                            selectedTemplate.category === 'onboarding' ? 'bg-purple-100 text-purple-800' :
-                            'bg-orange-100 text-orange-800'
-                          }`}>
+                          <span 
+                            className="px-3 py-1.5 bg-gray-100 rounded-xl text-sm font-semibold"
+                            style={{ color: getCategoryColor(selectedTemplate.category) }}
+                          >
                             {selectedTemplate.category}
                           </span>
                         </div>
@@ -615,11 +637,14 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                     </div>
 
                     {/* First Email Preview */}
-                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-100">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-3">First Email Preview</h4>
+                    <div className="rounded-2xl p-6 border border-gray-200 bg-gray-50 shadow-sm">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <Mail className="h-5 w-5 mr-2 text-gray-600" />
+                        First Email Preview
+                      </h4>
                       <div className="bg-white rounded-xl p-4 border border-gray-200">
                         <div className="text-sm text-gray-700 mb-2">
-                          <strong>Subject:</strong> <span className="text-blue-600">{selectedTemplate.subject_line}</span>
+                          <strong>Subject:</strong> <span className="text-gray-900">{selectedTemplate.subject_line}</span>
                         </div>
                         <div className="text-sm text-gray-600 leading-relaxed">
                           {selectedTemplate.preview}
@@ -641,24 +666,27 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                           transition={{ delay: index * 0.1 }}
                         >
                           <div className="flex-shrink-0 mr-6">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-2xl flex items-center justify-center text-lg font-bold shadow-lg">
+                            <div 
+                              className="w-12 h-12 text-white rounded-2xl flex items-center justify-center text-lg font-bold shadow-sm"
+                              style={{ backgroundColor: THEME_COLORS.primary }}
+                            >
                               {index + 1}
                             </div>
                             {index < selectedTemplate.steps.length - 1 && (
-                              <div className="w-0.5 h-16 bg-gray-200 mx-auto mt-4"></div>
+                              <div className="w-0.5 h-16 bg-gray-300 mx-auto mt-4 rounded-full"></div>
                             )}
                           </div>
                           <div className="flex-1">
-                            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
                               <div className="flex items-center justify-between mb-4">
                                 <h5 className="text-lg font-semibold text-gray-900">{step.subject}</h5>
-                                <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                <span className="text-sm font-medium bg-gray-100 text-gray-700 px-3 py-1.5 rounded-xl">
                                   {step.delay_days === 0 && step.delay_hours === 0 
                                     ? 'Send immediately' 
                                     : `Wait ${step.delay_days}d ${step.delay_hours}h`}
                                 </span>
                               </div>
-                              <div className="text-sm text-gray-600 whitespace-pre-line bg-gray-50 rounded-xl p-4 leading-relaxed">
+                              <div className="text-sm text-gray-600 whitespace-pre-line bg-gray-50 rounded-xl p-4 leading-relaxed border border-gray-100">
                                 {step.content.length > 300 
                                   ? step.content.substring(0, 300) + '...' 
                                   : step.content}
@@ -671,17 +699,22 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                   </div>
 
                   {/* Variables Notice */}
-                  <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl p-6 mb-8">
-                    <h5 className="font-bold text-yellow-800 mb-3 flex items-center">
-                      <span className="text-xl mr-2">⚙️</span>
+                  <div className="rounded-2xl p-6 mb-8 border border-gray-200 bg-blue-50">
+                    <h5 className="font-bold text-gray-900 mb-3 flex items-center text-lg">
+                      <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center mr-3">
+                        <Settings className="h-5 w-5 text-blue-600" />
+                      </div>
                       Smart Personalization
                     </h5>
-                    <p className="text-sm text-yellow-700 mb-3">
-                      This template uses smart variables that automatically personalize each email:
+                    <p className="text-sm text-gray-700 mb-4 leading-relaxed">
+                      This template uses smart variables that automatically personalize each email based on your contact data:
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {['{{first_name}}', '{{company_name}}', '{{from_name}}'].map((variable) => (
-                        <code key={variable} className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-mono">
+                        <code 
+                          key={variable} 
+                          className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-xl text-xs font-mono font-semibold"
+                        >
                           {variable}
                         </code>
                       ))}
@@ -689,7 +722,7 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                   </div>
 
                   {/* Sticky Action Bar */}
-                  <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 -mx-8 -mb-8">
+                  <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 -mx-8 -mb-8 shadow-sm">
                     <div className="flex justify-between items-center">
                       <div className="text-sm text-gray-600">
                         Ready to customize this template for your campaign?
@@ -697,13 +730,14 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                       <div className="flex gap-3">
                         <button
                           onClick={onClose}
-                          className="px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 font-medium transition-colors cursor-pointer"
+                          className="px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 hover:shadow-sm font-medium transition-all duration-200"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={handleUseTemplate}
-                          className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 font-medium flex items-center shadow-lg hover:shadow-xl transition-all cursor-pointer"
+                          className="px-8 py-3 text-white rounded-xl font-medium flex items-center shadow-sm hover:shadow-md transition-all duration-200"
+                          style={{ backgroundColor: THEME_COLORS.primary }}
                         >
                           Use This Template
                           <ChevronRight className="h-5 w-5 ml-2" />
@@ -719,7 +753,7 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                       <Mail className="h-12 w-12 text-gray-400" />
                     </div>
                     <h3 className="text-2xl font-bold text-gray-900 mb-2">Select a Template</h3>
-                    <p className="text-lg text-gray-500 max-w-md">
+                    <p className="text-lg text-gray-500 max-w-md leading-relaxed">
                       Choose a template from the sidebar to see the preview and complete email sequence.
                     </p>
                   </div>

@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       .from('users')
       .select('*, organizations(*)')
       .eq('id', decoded.userId)
-      .single()
+      .single() 
 
     if (userError || !user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })

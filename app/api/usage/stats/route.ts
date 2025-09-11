@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     // Get user plan to determine limits
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('plan_type, organization_id, subscription_status')
+      .select('plan_type, organization_id, subscription_status') 
       .eq('id', decoded.userId)
       .single()
 

@@ -16,7 +16,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     checkAuth() 
-  }, [checkAuth])
+  }, [checkAuth]) 
  
   if (loading) { 
     return (
@@ -32,8 +32,8 @@ export default function DashboardLayout({
       <div className="lg:pl-64"> 
         <Header />
         <TrialBanner />
-        <main className="py-6">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <main>
+          <div className="mx-auto max-w-full px-6 py-2">
             {children}
           </div>
         </main>
@@ -43,4 +43,4 @@ export default function DashboardLayout({
       <TrialExpiredModal />
     </div>
   )
-} 
+}

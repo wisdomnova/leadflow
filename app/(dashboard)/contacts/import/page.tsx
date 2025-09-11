@@ -1,5 +1,4 @@
-// ./app/(dashboard)/contacts/import/page.tsx - Updated to match create campaign design
-
+// ./app/(dashboard)/contacts/import/page.tsx
 'use client'
 
 import { useState, useRef } from 'react'
@@ -17,28 +16,19 @@ import {
   Users,
   AlertTriangle,
   File,
-  Settings
+  Eye,
+  Shield,
+  Zap
 } from 'lucide-react'
 import Link from 'next/link'
 
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 } 
-}
-
-const staggerContainer = {
-  animate: {
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-}
-
-const staggerItem = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 }
+// Theme colors - consistent with dashboard
+const THEME_COLORS = {
+  primary: '#0f66db',     // Main blue
+  success: '#25b43d',     // Green
+  secondary: '#6366f1',   // Indigo
+  accent: '#059669',      // Emerald
+  warning: '#dc2626'      // Red
 }
 
 export default function ImportContactsPage() {
@@ -118,22 +108,19 @@ export default function ImportContactsPage() {
       id: 1, 
       name: 'Upload File', 
       description: 'Select your CSV file',
-      icon: Upload,
-      color: 'blue'
+      icon: Upload
     },
     { 
       id: 2, 
       name: 'Preview & Import', 
       description: 'Verify and import',
-      icon: FileText,
-      color: 'purple'
+      icon: Eye
     },
     { 
       id: 3, 
       name: 'Complete', 
       description: 'Import finished',
-      icon: CheckCircle,
-      color: 'green'
+      icon: CheckCircle
     }
   ]
 
@@ -144,241 +131,208 @@ export default function ImportContactsPage() {
     return 'upcoming'
   }
 
-  const getStepColor = (stepId: number) => {
-    const status = getStepStatus(stepId)
-    if (status === 'completed') return 'bg-green-600 border-green-600'
-    if (status === 'current') return 'bg-blue-600 border-blue-600'
-    return 'bg-gray-100 border-gray-300'
-  }
-
-  const getStepTextColor = (stepId: number) => {
-    const status = getStepStatus(stepId)
-    if (status === 'completed') return 'text-white'
-    if (status === 'current') return 'text-white'
-    return 'text-gray-500'
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/20">
-      <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-6xl mx-auto px-6 py-6">
         
         {/* Header */}
-        <motion.div 
-          className="mb-12"
-          initial="initial"
-          animate="animate"
-          variants={fadeInUp}
-        >
+        <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <Link
               href="/contacts"
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors group"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
               Back to Contacts
             </Link>
           </div>
           
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Import Contacts
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-lg text-gray-600">
             Upload a CSV file to import your contacts into LeadFlow
           </p>
-        </motion.div>
+        </div>
 
         {/* Progress Steps */}
-        <motion.div 
-          className="mb-12"
-          initial="initial"
-          animate="animate"
-          variants={staggerContainer}
-        >
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
+        <div className="mb-8">
+          <div className="flex items-center justify-between max-w-2xl mx-auto">
             {steps.map((stepItem, index) => (
-              <motion.div 
-                key={stepItem.id} 
-                className="flex items-center"
-                variants={staggerItem}
-              >
+              <div key={stepItem.id} className="flex items-center">
                 <div className="flex items-center">
                   {/* Step Circle */}
-                  <div className={`relative flex items-center justify-center w-16 h-16 rounded-2xl border-2 transition-all duration-300 ${getStepColor(stepItem.id)} ${
-                    getStepStatus(stepItem.id) === 'current' ? 'shadow-xl shadow-blue-200' : ''
-                  }`}>
+                  <div 
+                    className={`relative flex items-center justify-center w-12 h-12 rounded-2xl border-2 transition-all duration-300 ${
+                      getStepStatus(stepItem.id) === 'completed' 
+                        ? 'border-none shadow-md' 
+                        : getStepStatus(stepItem.id) === 'current' 
+                        ? 'border-none shadow-lg' 
+                        : 'bg-gray-100 border-gray-300'
+                    }`}
+                    style={{
+                      backgroundColor: getStepStatus(stepItem.id) === 'completed' 
+                        ? THEME_COLORS.success 
+                        : getStepStatus(stepItem.id) === 'current' 
+                        ? THEME_COLORS.primary 
+                        : undefined
+                    }}
+                  >
                     {getStepStatus(stepItem.id) === 'completed' ? (
-                      <CheckCircle className="w-8 h-8 text-white" />
+                      <CheckCircle className="w-6 h-6 text-white" />
                     ) : (
-                      <stepItem.icon className={`w-8 h-8 ${getStepTextColor(stepItem.id)}`} />
-                    )}
-                    
-                    {/* Pulse animation for current step */}
-                    {getStepStatus(stepItem.id) === 'current' && (
-                      <div className="absolute inset-0 rounded-2xl bg-blue-600 animate-ping opacity-20"></div>
+                      <stepItem.icon className={`w-6 h-6 ${
+                        getStepStatus(stepItem.id) === 'current' ? 'text-white' : 'text-gray-500'
+                      }`} />
                     )}
                   </div>
                   
                   {/* Step Info */}
-                  <div className="ml-4">
-                    <div className={`font-semibold transition-colors ${
-                      getStepStatus(stepItem.id) === 'current' ? 'text-blue-600' :
-                      getStepStatus(stepItem.id) === 'completed' ? 'text-green-600' :
+                  <div className="ml-3">
+                    <div className={`font-semibold text-sm transition-colors ${
+                      getStepStatus(stepItem.id) === 'current' ? 'text-gray-900' :
+                      getStepStatus(stepItem.id) === 'completed' ? 'text-gray-700' :
                       'text-gray-500'
                     }`}>
                       {stepItem.name}
                     </div>
-                    <div className="text-sm text-gray-500">{stepItem.description}</div>
+                    <div className="text-xs text-gray-500">{stepItem.description}</div>
                   </div>
                 </div>
                 
                 {/* Connector Line */}
                 {index < steps.length - 1 && (
-                  <div className="flex-1 mx-8">
-                    <div className={`h-1 rounded-full transition-all duration-500 ${
-                      getStepStatus(stepItem.id) === 'completed' ? 'bg-green-400' : 'bg-gray-200'
-                    }`}></div>
+                  <div className="flex-1 mx-6">
+                    <div 
+                      className={`h-0.5 rounded-full transition-all duration-500 ${
+                        getStepStatus(stepItem.id) === 'completed' ? 'bg-gray-300' : 'bg-gray-200'
+                      }`}
+                      style={{
+                        backgroundColor: getStepStatus(stepItem.id) === 'completed' ? THEME_COLORS.success : undefined
+                      }}
+                    />
                   </div>
                 )}
-              </motion.div>
+              </div>
             ))}
           </div>
-        </motion.div>
+        </div>
 
         {/* Step Content */}
         <motion.div
           key={step}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
           {step === 'upload' && (
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-              <div className="p-12">
-                <motion.div
-                  initial="initial"
-                  animate="animate"
-                  variants={staggerContainer}
-                >
-                  <motion.h2 
-                    className="text-3xl font-bold text-gray-900 mb-4"
-                    variants={staggerItem}
-                  >
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              <div className="p-8">
+                <div className="mb-8">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
                     Upload Your CSV File
-                  </motion.h2>
-                  <motion.p 
-                    className="text-xl text-gray-600 mb-8"
-                    variants={staggerItem}
-                  >
+                  </h2>
+                  <p className="text-gray-600">
                     Select a CSV file containing your contact information
-                  </motion.p>
+                  </p>
+                </div>
 
-                  {/* Instructions */}
-                  <motion.div 
-                    className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-8 mb-8"
-                    variants={staggerItem}
-                  >
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                          <FileText className="h-6 w-6 text-blue-600" />
-                        </div>
-                      </div>
-                      <div className="ml-6">
-                        <h3 className="text-lg font-bold text-blue-900 mb-3">
-                          CSV File Requirements
-                        </h3>
-                        <div className="text-blue-800 space-y-2">
-                          <div className="flex items-center">
-                            <CheckCircle className="h-4 w-4 text-blue-600 mr-2" />
-                            <span>File must be in CSV format (.csv)</span>
-                          </div>
-                          <div className="flex items-center">
-                            <CheckCircle className="h-4 w-4 text-blue-600 mr-2" />
-                            <span>Required column: <code className="bg-blue-100 px-2 py-1 rounded-md font-mono text-sm">email</code></span>
-                          </div>
-                          <div className="flex items-center">
-                            <CheckCircle className="h-4 w-4 text-blue-600 mr-2" />
-                            <span>Optional columns: <code className="bg-blue-100 px-2 py-1 rounded-md font-mono text-sm">first_name</code>, <code className="bg-blue-100 px-2 py-1 rounded-md font-mono text-sm">last_name</code>, <code className="bg-blue-100 px-2 py-1 rounded-md font-mono text-sm">company</code>, <code className="bg-blue-100 px-2 py-1 rounded-md font-mono text-sm">job_title</code>, <code className="bg-blue-100 px-2 py-1 rounded-md font-mono text-sm">phone</code>, <code className="bg-blue-100 px-2 py-1 rounded-md font-mono text-sm">tags</code></span>
-                          </div>
-                          <div className="flex items-center">
-                            <CheckCircle className="h-4 w-4 text-blue-600 mr-2" />
-                            <span>Maximum file size: 10MB</span>
-                          </div>
-                          <div className="flex items-center">
-                            <CheckCircle className="h-4 w-4 text-blue-600 mr-2" />
-                            <span>Duplicate emails will be automatically skipped</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {/* Download Template */}
-                  <motion.div 
-                    className="text-center mb-8"
-                    variants={staggerItem}
-                  >
-                    <button
-                      onClick={downloadTemplate}
-                      className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm hover:shadow-md"
+                {/* Instructions */}
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-6">
+                  <div className="flex">
+                    <div 
+                      className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
+                      style={{ backgroundColor: THEME_COLORS.secondary }}
                     >
-                      <Download className="h-5 w-5 mr-2" />
-                      Download CSV Template
-                    </button>
-                    <p className="mt-2 text-sm text-gray-500">
-                      Use this template to format your contact data correctly
-                    </p>
-                  </motion.div>
+                      <FileText className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="ml-4">
+                      <h3 className="text-lg font-bold text-gray-900 mb-3">
+                        CSV File Requirements
+                      </h3>
+                      <div className="text-gray-700 space-y-2 text-sm">
+                        <div className="flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.success }} />
+                          <span>File must be in CSV format (.csv)</span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.success }} />
+                          <span>Required column: <code className="bg-gray-200 px-2 py-1 rounded text-xs font-mono">email</code></span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.success }} />
+                          <span>Optional: <code className="bg-gray-200 px-1 rounded text-xs font-mono">first_name</code>, <code className="bg-gray-200 px-1 rounded text-xs font-mono">last_name</code>, <code className="bg-gray-200 px-1 rounded text-xs font-mono">company</code>, etc.</span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.success }} />
+                          <span>Maximum file size: 10MB</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-                  {/* File Upload */}
-                  <motion.div
-                    className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 ${
-                      dragActive 
-                        ? 'border-blue-400 bg-blue-50 scale-105' 
-                        : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
-                    }`}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                    variants={staggerItem}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                {/* Download Template */}
+                <div className="text-center mb-6">
+                  <button
+                    onClick={downloadTemplate}
+                    className="inline-flex items-center px-6 py-3 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md transition-all duration-200"
                   >
-                    <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                      <Upload className="h-10 w-10 text-blue-600" />
-                    </div>
-                    <div>
-                      <label htmlFor="file-upload" className="cursor-pointer">
-                        <span className="text-xl font-semibold text-gray-900 block mb-2">
-                          Drop your CSV file here, or{' '}
-                          <span className="text-blue-600 hover:text-blue-700 underline">browse</span>
-                        </span>
-                        <input
-                          ref={fileInputRef}
-                          id="file-upload"
-                          name="file-upload"
-                          type="file"
-                          accept=".csv"
-                          className="sr-only"
-                          onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                        />
-                      </label>
-                      <p className="text-gray-500">CSV files up to 10MB</p>
-                    </div>
-                  </motion.div>
-                </motion.div>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download CSV Template
+                  </button>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Use this template to format your contact data correctly
+                  </p>
+                </div>
+
+                {/* File Upload */}
+                <div
+                  className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 ${
+                    dragActive 
+                      ? 'border-blue-400 bg-blue-50' 
+                      : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+                  }`}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                >
+                  <div 
+                    className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md"
+                    style={{ backgroundColor: THEME_COLORS.primary }}
+                  >
+                    <Upload className="h-8 w-8 text-white" />
+                  </div>
+                  <div>
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      <span className="text-lg font-semibold text-gray-900 block mb-2">
+                        Drop your CSV file here, or{' '}
+                        <span className="hover:underline" style={{ color: THEME_COLORS.primary }}>browse</span>
+                      </span>
+                      <input
+                        ref={fileInputRef}
+                        id="file-upload"
+                        name="file-upload"
+                        type="file"
+                        accept=".csv"
+                        className="sr-only"
+                        onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                      />
+                    </label>
+                    <p className="text-gray-500">CSV files up to 10MB</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           {step === 'preview' && file && (
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-              <div className="p-12">
-                <div className="flex items-center justify-between mb-8">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">File Preview</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">File Preview</h2>
                     <p className="text-gray-600">Review your file before importing</p>
                   </div>
                   <button
@@ -386,46 +340,52 @@ export default function ImportContactsPage() {
                       setFile(null)
                       setStep('upload')
                     }}
-                    className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-xl transition-colors"
                   >
                     <X className="h-5 w-5" />
                   </button>
                 </div>
                 
                 {/* File Info */}
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-6 mb-8">
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-6">
                   <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                      <File className="h-6 w-6 text-blue-600" />
+                    <div 
+                      className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm"
+                      style={{ backgroundColor: THEME_COLORS.accent }}
+                    >
+                      <File className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 text-lg">{file.name}</h3>
-                      <p className="text-gray-600">{(file.size / 1024).toFixed(1)} KB</p>
+                      <h3 className="font-semibold text-gray-900">{file.name}</h3>
+                      <p className="text-gray-600 text-sm">{(file.size / 1024).toFixed(1)} KB</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Warning */}
-                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl p-6 mb-8">
+                <div className="bg-orange-50 border border-orange-200 rounded-2xl p-6 mb-6">
                   <div className="flex">
-                    <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center mr-4">
-                      <AlertTriangle className="h-6 w-6 text-yellow-600" />
+                    <div 
+                      className="w-10 h-10 rounded-xl flex items-center justify-center mr-4 shadow-sm"
+                      style={{ backgroundColor: THEME_COLORS.warning }}
+                    >
+                      <AlertTriangle className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-yellow-900 mb-3">
+                      <h3 className="text-lg font-bold text-gray-900 mb-3">
                         Before You Import
                       </h3>
-                      <div className="text-yellow-800 space-y-2">
+                      <div className="text-gray-700 space-y-2 text-sm">
                         <div className="flex items-center">
-                          <AlertCircle className="h-4 w-4 text-yellow-600 mr-2" />
+                          <AlertCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.warning }} />
                           <span>Contacts with duplicate emails will be skipped</span>
                         </div>
                         <div className="flex items-center">
-                          <AlertCircle className="h-4 w-4 text-yellow-600 mr-2" />
+                          <AlertCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.warning }} />
                           <span>Invalid email addresses will be rejected</span>
                         </div>
                         <div className="flex items-center">
-                          <AlertCircle className="h-4 w-4 text-yellow-600 mr-2" />
+                          <AlertCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.warning }} />
                           <span>This action cannot be undone</span>
                         </div>
                       </div>
@@ -434,27 +394,28 @@ export default function ImportContactsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-between pt-8 border-t border-gray-100">
+                <div className="flex justify-between pt-6 border-t border-gray-200">
                   <button
                     onClick={() => setStep('upload')}
-                    className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                    className="inline-flex items-center px-6 py-3 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                   >
-                    <ArrowLeft className="h-5 w-5 mr-2" />
+                    <ArrowLeft className="h-4 w-4 mr-2" />
                     Choose Different File
                   </button>
                   <button
                     onClick={handleImport}
                     disabled={importing}
-                    className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-lg"
+                    className="inline-flex items-center px-8 py-3 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: THEME_COLORS.primary }}
                   >
                     {importing ? (
                       <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Importing...
                       </div>
                     ) : (
                       <>
-                        <Upload className="h-5 w-5 mr-2" />
+                        <Upload className="h-4 w-4 mr-2" />
                         Import Contacts
                       </>
                     )}
@@ -465,25 +426,31 @@ export default function ImportContactsPage() {
           )}
 
           {step === 'result' && importResult && (
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-              <div className="p-12">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              <div className="p-8">
                 <div className="text-center mb-8">
-                  <div className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-md">
                     {importResult.success > 0 ? (
-                      <div className="w-20 h-20 bg-green-100 rounded-2xl flex items-center justify-center">
-                        <CheckCircle className="h-12 w-12 text-green-600" />
+                      <div 
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                        style={{ backgroundColor: THEME_COLORS.success }}
+                      >
+                        <CheckCircle className="h-10 w-10 text-white" />
                       </div>
                     ) : (
-                      <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center">
-                        <AlertCircle className="h-12 w-12 text-red-600" />
+                      <div 
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                        style={{ backgroundColor: THEME_COLORS.warning }}
+                      >
+                        <AlertCircle className="h-10 w-10 text-white" />
                       </div>
                     )}
                   </div>
 
-                  <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
                     Import {importResult.success > 0 ? 'Completed' : 'Failed'}
                   </h2>
-                  <p className="text-xl text-gray-600">
+                  <p className="text-gray-600">
                     {importResult.success > 0 
                       ? `Successfully imported ${importResult.success} contacts`
                       : 'No contacts were imported'
@@ -494,52 +461,58 @@ export default function ImportContactsPage() {
                 {/* Results Summary */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <motion.div 
-                    className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-2xl p-8 text-center"
+                    className="border border-gray-200 rounded-2xl p-6 text-center bg-gray-50"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
                   >
-                    <div className="text-4xl font-bold text-green-600 mb-2">{importResult.success}</div>
-                    <div className="text-green-800 font-medium">Successfully Imported</div>
+                    <div className="text-3xl font-bold mb-2" style={{ color: THEME_COLORS.success }}>
+                      {importResult.success}
+                    </div>
+                    <div className="text-gray-700 font-medium">Successfully Imported</div>
                   </motion.div>
                   
                   <motion.div 
-                    className="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-8 text-center"
+                    className="border border-gray-200 rounded-2xl p-6 text-center bg-gray-50"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                   >
-                    <div className="text-4xl font-bold text-yellow-600 mb-2">{importResult.duplicates}</div>
-                    <div className="text-yellow-800 font-medium">Duplicates Skipped</div>
+                    <div className="text-3xl font-bold mb-2" style={{ color: THEME_COLORS.secondary }}>
+                      {importResult.duplicates}
+                    </div>
+                    <div className="text-gray-700 font-medium">Duplicates Skipped</div>
                   </motion.div>
                   
                   <motion.div 
-                    className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-2xl p-8 text-center"
+                    className="border border-gray-200 rounded-2xl p-6 text-center bg-gray-50"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
                   >
-                    <div className="text-4xl font-bold text-red-600 mb-2">{importResult.errors}</div>
-                    <div className="text-red-800 font-medium">Errors</div>
+                    <div className="text-3xl font-bold mb-2" style={{ color: THEME_COLORS.warning }}>
+                      {importResult.errors}
+                    </div>
+                    <div className="text-gray-700 font-medium">Errors</div>
                   </motion.div>
                 </div>
 
                 {/* Error Details */}
                 {importResult.details && importResult.details.length > 0 && (
                   <motion.div 
-                    className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-2xl p-6 mb-8"
+                    className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-8"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
                   >
-                    <h4 className="text-lg font-bold text-red-900 mb-4 flex items-center">
-                      <AlertCircle className="h-5 w-5 mr-2" />
+                    <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                      <AlertCircle className="h-5 w-5 mr-2" style={{ color: THEME_COLORS.warning }} />
                       Import Errors
                     </h4>
-                    <ul className="text-red-800 space-y-2">
+                    <ul className="text-gray-700 space-y-2 text-sm">
                       {importResult.details.map((error: string, index: number) => (
                         <li key={index} className="flex items-start">
-                          <span className="text-red-600 mr-2">•</span>
+                          <span className="mr-2" style={{ color: THEME_COLORS.warning }}>•</span>
                           <span>{error}</span>
                         </li>
                       ))}
@@ -548,23 +521,24 @@ export default function ImportContactsPage() {
                 )}
 
                 {/* Actions */}
-                <div className="flex justify-center space-x-4 pt-8 border-t border-gray-100">
+                <div className="flex justify-center space-x-4 pt-6 border-t border-gray-200">
                   <button
                     onClick={() => {
                       setFile(null)
                       setImportResult(null)
                       setStep('upload')
                     }}
-                    className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                    className="inline-flex items-center px-6 py-3 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                   >
-                    <Upload className="h-5 w-5 mr-2" />
+                    <Upload className="h-4 w-4 mr-2" />
                     Import More Contacts
                   </button>
-                  <Link
+                  <Link 
                     href="/contacts"
-                    className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700 transition-all hover:shadow-lg"
+                    className="inline-flex items-center px-8 py-3 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white transition-all hover:shadow-lg"
+                    style={{ backgroundColor: THEME_COLORS.primary }}
                   >
-                    <Users className="h-5 w-5 mr-2" />
+                    <Users className="h-4 w-4 mr-2" />
                     View All Contacts
                   </Link>
                 </div>

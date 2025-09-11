@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
           message,
           timestamp: new Date(event.created_at).toLocaleString()
         })
-      })
+      }) 
     }
 
     // If no email events, show empty state

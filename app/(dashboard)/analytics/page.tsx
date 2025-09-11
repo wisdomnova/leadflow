@@ -1,640 +1,865 @@
+// ./app/(dashboard)/analytics/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useAuthStore } from '@/store/useAuthStore'
 import { 
   BarChart3, 
   TrendingUp, 
-  TrendingDown, 
+  TrendingDown,
+  Users, 
   Mail, 
   Eye, 
   MousePointer, 
-  Users, 
+  Reply,
   Calendar,
-  Filter,
   Download,
+  Filter,
   RefreshCw,
   Target,
+  Send,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
   Zap,
-  Activity
+  ArrowUpRight,
+  ArrowDownRight,
+  Activity,
+  Globe,
+  Smartphone,
+  Monitor,
+  Tablet,
+  Shield,
+  ChevronDown
 } from 'lucide-react'
-import { Line, Bar, Doughnut } from 'react-chartjs-2'
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
-  Legend,
-  ArcElement,
-} from 'chart.js'
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
+  ComposedChart,
+  FunnelChart,
+  Funnel,
+  LabelList
+} from 'recharts'
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement
-)
+// Theme colors - consistent with dashboard
+const THEME_COLORS = {
+  primary: '#0f66db',
+  success: '#25b43d',
+  secondary: '#6366f1',
+  accent: '#059669',
+  warning: '#dc2626',
+  gray: '#6b7280'
+}
 
-interface AnalyticsData {
-  overview: {
-    totalEmails: number
-    openRate: number
-    clickRate: number
-    replyRate: number
-    bounceRate: number
-  }
-  trends: {
-    dates: string[]
-    emails: number[]
-    opens: number[]
-    clicks: number[]
-    replies: number[]
-  }
-  campaigns: {
-    name: string
-    emails: number
-    openRate: number
-    clickRate: number
-    replyRate: number
-    status: 'active' | 'paused' | 'completed'
-  }[]
-  topPerformers: {
-    subject: string
-    openRate: number
-    clickRate: number
-    replyRate: number
-  }[]
-  campaignStatusBreakdown: {
-    active: number
-    paused: number
-    completed: number
-    draft: number
-  }
-  timeAnalysis: {
-    hours: string[]
-    openRates: number[]
-    clickRates: number[]
-  }
+interface GlobalMetrics {
+  totalSent: number
+  totalDelivered: number
+  totalOpened: number
+  totalClicked: number
+  totalBounced: number
+  deliveryRate: number
+  openRate: number
+  clickRate: number
+  bounceRate: number
+}
+
+interface CampaignPerformance {
+  id: string
+  name: string
+  sent: number
+  delivered: number
+  opened: number
+  clicked: number
+  deliveryRate: number
+  openRate: number
+  clickRate: number
+}
+
+interface TimeSeriesData {
+  date: string
+  sent: number
+  delivered: number
+  opened: number
+  clicked: number
+  bounced: number
 }
 
 export default function AnalyticsPage() {
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { user } = useAuthStore()
   const [timeRange, setTimeRange] = useState('7d')
+  const [timeRangeOpen, setTimeRangeOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  
+  // Data states
+  const [globalMetrics, setGlobalMetrics] = useState<GlobalMetrics>({
+    totalSent: 0,
+    totalDelivered: 0,
+    totalOpened: 0,
+    totalClicked: 0,
+    totalBounced: 0,
+    deliveryRate: 0,
+    openRate: 0,
+    clickRate: 0,
+    bounceRate: 0
+  })
+  
+  const [previousMetrics, setPreviousMetrics] = useState<GlobalMetrics>({
+    totalSent: 0,
+    totalDelivered: 0,
+    totalOpened: 0,
+    totalClicked: 0,
+    totalBounced: 0,
+    deliveryRate: 0,
+    openRate: 0,
+    clickRate: 0,
+    bounceRate: 0
+  })
+  
+  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData[]>([])
+  const [campaignPerformance, setCampaignPerformance] = useState<CampaignPerformance[]>([])
+  const [engagementFunnel, setEngagementFunnel] = useState<any[]>([])
 
-  useEffect(() => {
-    fetchAnalytics()
-  }, [timeRange])
-
-  const fetchAnalytics = async () => {
+  // Fetch all analytics data
+  const fetchAnalyticsData = async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true)
+    else setLoading(true)
+    
     try {
-      const response = await fetch(`/api/analytics?range=${timeRange}`)
-      if (response.ok) {
-        const data = await response.json()
-        setAnalyticsData(data)
-      } else {
-        // Fallback to mock data if API doesn't exist
-        setAnalyticsData(getMockData())
+      const [
+        globalResponse,
+        previousResponse,
+        timeSeriesResponse,
+        campaignResponse
+      ] = await Promise.all([
+        fetch(`/api/analytics/global-metrics?timeRange=${timeRange}`),
+        fetch(`/api/analytics/global-metrics?timeRange=${timeRange}&previous=true`),
+        fetch(`/api/analytics/time-series?timeRange=${timeRange}`),
+        fetch(`/api/analytics/campaign-performance?timeRange=${timeRange}`)
+      ])
+
+      if (globalResponse.ok) {
+        const data = await globalResponse.json()
+        setGlobalMetrics(data)
       }
+
+      if (previousResponse.ok) {
+        const data = await previousResponse.json()
+        setPreviousMetrics(data)
+      }
+
+      if (timeSeriesResponse.ok) {
+        const data = await timeSeriesResponse.json()
+        setTimeSeriesData(data)
+      }
+
+      if (campaignResponse.ok) {
+        const data = await campaignResponse.json()
+        setCampaignPerformance(data)
+        
+        // Create engagement funnel from campaign data
+        if (data.length > 0) {
+          const totals = data.reduce((acc: any, campaign: CampaignPerformance) => ({
+            sent: acc.sent + campaign.sent,
+            delivered: acc.delivered + campaign.delivered,
+            opened: acc.opened + campaign.opened,
+            clicked: acc.clicked + campaign.clicked
+          }), { sent: 0, delivered: 0, opened: 0, clicked: 0 })
+
+          setEngagementFunnel([
+            { name: 'Emails Sent', value: totals.sent, fill: THEME_COLORS.gray },
+            { name: 'Delivered', value: totals.delivered, fill: THEME_COLORS.primary },
+            { name: 'Opened', value: totals.opened, fill: THEME_COLORS.secondary },
+            { name: 'Clicked', value: totals.clicked, fill: THEME_COLORS.success }
+          ])
+        }
+      }
+
     } catch (error) {
-      console.error('Failed to fetch analytics:', error)
-      // Fallback to mock data on error
-      setAnalyticsData(getMockData())
+      console.error('Analytics fetch error:', error)
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
   }
 
-  const getMockData = (): AnalyticsData => {
-    return {
-      overview: {
-        totalEmails: 12847,
-        openRate: 34.2,
-        clickRate: 8.7,
-        replyRate: 12.4,
-        bounceRate: 2.1
-      },
-      trends: {
-        dates: timeRange === '7d' 
-          ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-          : timeRange === '30d'
-          ? Array.from({ length: 30 }, (_, i) => `Day ${i + 1}`)
-          : timeRange === '90d'
-          ? Array.from({ length: 90 }, (_, i) => `Day ${i + 1}`)
-          : Array.from({ length: 12 }, (_, i) => `Month ${i + 1}`),
-        emails: timeRange === '7d'
-          ? [450, 380, 520, 610, 480, 320, 280]
-          : Array.from({ length: timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 12 }, 
-              () => Math.floor(Math.random() * 600) + 200),
-        opens: timeRange === '7d'
-          ? [156, 125, 180, 210, 165, 110, 95]
-          : Array.from({ length: timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 12 }, 
-              () => Math.floor(Math.random() * 200) + 50),
-        clicks: timeRange === '7d'
-          ? [42, 35, 48, 55, 41, 28, 24]
-          : Array.from({ length: timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 12 }, 
-              () => Math.floor(Math.random() * 60) + 10),
-        replies: timeRange === '7d'
-          ? [58, 46, 67, 78, 62, 41, 35]
-          : Array.from({ length: timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 12 }, 
-              () => Math.floor(Math.random() * 80) + 20)
-      },
-      campaigns: [
-        {
-          name: 'Q4 Enterprise Outreach',
-          emails: 3420,
-          openRate: 42.3,
-          clickRate: 12.1,
-          replyRate: 18.7,
-          status: 'active' as const
-        },
-        {
-          name: 'SaaS Startup Follow-up',
-          emails: 2180,
-          openRate: 38.9,
-          clickRate: 9.4,
-          replyRate: 15.2,
-          status: 'active' as const
-        },
-        {
-          name: 'Product Launch Campaign',
-          emails: 4850,
-          openRate: 29.1,
-          clickRate: 6.8,
-          replyRate: 8.9,
-          status: 'completed' as const
-        },
-        {
-          name: 'Holiday Special Offer',
-          emails: 1960,
-          openRate: 35.6,
-          clickRate: 8.3,
-          replyRate: 11.4,
-          status: 'paused' as const
-        },
-        {
-          name: 'Lead Nurturing Sequence',
-          emails: 437,
-          openRate: 44.1,
-          clickRate: 13.7,
-          replyRate: 22.1,
-          status: 'active' as const
-        }
-      ],
-      topPerformers: [
-        {
-          subject: 'Quick question about [Company] growth plans',
-          openRate: 58.3,
-          clickRate: 18.7,
-          replyRate: 28.4
-        },
-        {
-          subject: 'Noticed you downloaded our whitepaper',
-          openRate: 52.1,
-          clickRate: 15.2,
-          replyRate: 24.8
-        },
-        {
-          subject: 'How [Company] increased revenue by 40%',
-          openRate: 49.7,
-          clickRate: 14.3,
-          replyRate: 19.2
-        },
-        {
-          subject: '5 minutes to discuss your Q1 goals?',
-          openRate: 46.8,
-          clickRate: 12.9,
-          replyRate: 21.7
-        }
-      ],
-      campaignStatusBreakdown: {
-        active: 8,
-        paused: 3,
-        completed: 12,
-        draft: 4
-      },
-      timeAnalysis: {
-        hours: ['6 AM', '8 AM', '10 AM', '12 PM', '2 PM', '4 PM', '6 PM', '8 PM'],
-        openRates: [18.2, 28.4, 42.1, 35.7, 38.9, 31.2, 22.6, 15.8],
-        clickRates: [4.1, 7.2, 12.3, 9.8, 11.4, 8.7, 6.2, 3.9]
-      }
-    }
+  useEffect(() => {
+    fetchAnalyticsData()
+  }, [timeRange])
+
+  // Calculate percentage changes
+  const calculateChange = (current: number, previous: number) => {
+    if (previous === 0) return { value: 0, isPositive: true }
+    const change = ((current - previous) / previous) * 100
+    return { value: Math.abs(change), isPositive: change >= 0 }
   }
 
-  const handleRefresh = () => {
-    setRefreshing(true)
-    fetchAnalytics()
-  }
-
-  const exportData = async () => {
-    try {
-      const response = await fetch(`/api/analytics/export?range=${timeRange}`)
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.style.display = 'none'
-        a.href = url
-        a.download = `analytics-${timeRange}.csv`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-      }
-    } catch (error) {
-      console.error('Failed to export data:', error)
-      // Create a simple CSV with mock data
-      const csvContent = `Date,Emails Sent,Opens,Clicks,Replies,Open Rate,Click Rate,Reply Rate
-2024-01-01,450,156,42,58,34.7%,9.3%,12.9%
-2024-01-02,380,125,35,46,32.9%,9.2%,12.1%
-2024-01-03,520,180,48,67,34.6%,9.2%,12.9%
-2024-01-04,610,210,55,78,34.4%,9.0%,12.8%
-2024-01-05,480,165,41,62,34.4%,8.5%,12.9%
-2024-01-06,320,110,28,41,34.4%,8.8%,12.8%
-2024-01-07,280,95,24,35,33.9%,8.6%,12.5%`
-      
-      const blob = new Blob([csvContent], { type: 'text/csv' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.style.display = 'none'
-      a.href = url
-      a.download = `analytics-${timeRange}.csv`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-    }
-  }
-
-  // Chart configurations
-  const lineChartData = analyticsData ? {
-    labels: analyticsData.trends.dates,
-    datasets: [
-      {
-        label: 'Emails Sent',
-        data: analyticsData.trends.emails,
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.4,
-      },
-      {
-        label: 'Opens',
-        data: analyticsData.trends.opens,
-        borderColor: 'rgb(16, 185, 129)',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        tension: 0.4,
-      },
-      {
-        label: 'Clicks',
-        data: analyticsData.trends.clicks,
-        borderColor: 'rgb(245, 158, 11)',
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-        tension: 0.4,
-      },
-      {
-        label: 'Replies',
-        data: analyticsData.trends.replies,
-        borderColor: 'rgb(139, 92, 246)',
-        backgroundColor: 'rgba(139, 92, 246, 0.1)',
-        tension: 0.4,
-      },
-    ],
-  } : null
-
-  const campaignStatusData = analyticsData ? {
-    labels: ['Active', 'Completed', 'Paused', 'Draft'],
-    datasets: [
-      {
-        data: [
-          analyticsData.campaignStatusBreakdown.active,
-          analyticsData.campaignStatusBreakdown.completed,
-          analyticsData.campaignStatusBreakdown.paused,
-          analyticsData.campaignStatusBreakdown.draft,
-        ],
-        backgroundColor: [
-          'rgb(16, 185, 129)',   // Green for Active
-          'rgb(59, 130, 246)',   // Blue for Completed
-          'rgb(245, 158, 11)',   // Yellow for Paused
-          'rgb(156, 163, 175)',  // Gray for Draft
-        ],
-        borderWidth: 0,
-      },
-    ],
-  } : null
-
-  const timeAnalysisData = analyticsData ? {
-    labels: analyticsData.timeAnalysis.hours,
-    datasets: [
-      {
-        label: 'Open Rate %',
-        data: analyticsData.timeAnalysis.openRates,
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-      },
-      {
-        label: 'Click Rate %',
-        data: analyticsData.timeAnalysis.clickRates,
-        backgroundColor: 'rgba(16, 185, 129, 0.8)',
-      },
-    ],
-  } : null
-
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-      },
-    },
-  }
-
-  const doughnutOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom' as const,
-        labels: {
-          padding: 20,
-          usePointStyle: true,
-        },
-      },
-    },
-  }
-
-  // Stats calculations - removed percentage formatting
-  const stats = [
+  const metricCards = [
     {
-      label: 'Total Emails',
-      value: analyticsData?.overview.totalEmails || 0,
-      icon: Mail,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
-      trend: '+12.5%',
-      trendUp: true
+      title: 'Total Emails Sent',
+      value: globalMetrics.totalSent.toLocaleString(),
+      change: calculateChange(globalMetrics.totalSent, previousMetrics.totalSent),
+      icon: Send,
+      color: THEME_COLORS.primary
     },
     {
-      label: 'Total Opens',
-      value: analyticsData ? Math.round((analyticsData.overview.totalEmails * analyticsData.overview.openRate) / 100) : 0,
+      title: 'Delivery Rate',
+      value: `${globalMetrics.deliveryRate}%`,
+      change: calculateChange(globalMetrics.deliveryRate, previousMetrics.deliveryRate),
+      icon: CheckCircle,
+      color: THEME_COLORS.success
+    },
+    {
+      title: 'Open Rate',
+      value: `${globalMetrics.openRate}%`,
+      change: calculateChange(globalMetrics.openRate, previousMetrics.openRate),
       icon: Eye,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
-      trend: '+2.5%',
-      trendUp: true
+      color: THEME_COLORS.secondary
     },
     {
-      label: 'Total Clicks',
-      value: analyticsData ? Math.round((analyticsData.overview.totalEmails * analyticsData.overview.clickRate) / 100) : 0,
+      title: 'Click Rate',
+      value: `${globalMetrics.clickRate}%`,
+      change: calculateChange(globalMetrics.clickRate, previousMetrics.clickRate),
       icon: MousePointer,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
-      trend: '+1.2%',
-      trendUp: true
+      color: THEME_COLORS.accent
     },
     {
-      label: 'Total Replies',
-      value: analyticsData ? Math.round((analyticsData.overview.totalEmails * analyticsData.overview.replyRate) / 100) : 0,
-      icon: Users,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
-      trend: '+3.1%',
-      trendUp: true
+      title: 'Bounce Rate',
+      value: `${globalMetrics.bounceRate}%`,
+      change: calculateChange(globalMetrics.bounceRate, previousMetrics.bounceRate),
+      icon: AlertTriangle,
+      color: THEME_COLORS.warning,
+      invertChange: true // Lower bounce rate is better
     }
   ]
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
+  const timeRangeOptions = [
+    { value: '7d', label: '7 Days' },
+    { value: '14d', label: '14 Days' },
+    { value: '30d', label: '30 Days' },
+    { value: '90d', label: '90 Days' }
+  ]
+
+  const selectedTimeRangeLabel = timeRangeOptions.find(option => option.value === timeRange)?.label || '7 Days'
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header - same style as campaigns */}
+      <div className="max-w-full mx-auto px-6 py-6">
+        
+        {/* Header */}
         <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
-              <p className="mt-1 text-gray-600">
-                Track your campaign performance and optimize your outreach
+              <h1 className="text-3xl font-bold text-gray-900">
+                Analytics
+              </h1>
+              <p className="text-lg text-gray-600 mt-1">
+                Deep insights into your email campaign performance
               </p>
             </div>
             
-            <div className="flex items-center space-x-4 mt-4 sm:mt-0">
-              {/* Time Range Filter */}
-              <select
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-                className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white min-w-[140px] transition-colors"
-              >
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
-                <option value="1y">Last year</option>
-              </select>
+            <div className="flex items-center space-x-4">
+              {/* Custom Time Range Selector */}
+              <div className="relative">
+                <button
+                  onClick={() => setTimeRangeOpen(!timeRangeOpen)}
+                  className="inline-flex items-center justify-between px-4 py-3 border border-gray-300 rounded-xl bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-32 transition-all duration-200"
+                >
+                  <span>{selectedTimeRangeLabel}</span>
+                  <ChevronDown className={`h-4 w-4 ml-2 transition-transform duration-200 ${timeRangeOpen ? 'rotate-180' : ''}`} />
+                </button>
 
+                {timeRangeOpen && (
+                  <motion.div
+                    className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-gray-200 z-50"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                  >
+                    <div className="py-2">
+                      {timeRangeOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            setTimeRange(option.value)
+                            setTimeRangeOpen(false)
+                          }}
+                          className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors ${
+                            timeRange === option.value 
+                              ? 'text-blue-600 bg-blue-50 font-medium' 
+                              : 'text-gray-700'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+              
               {/* Refresh Button */}
               <button
-                onClick={handleRefresh}
+                onClick={() => fetchAnalyticsData(true)}
                 disabled={refreshing}
-                className="inline-flex items-center px-4 py-3 border border-gray-300 text-gray-700 bg-white rounded-xl hover:bg-gray-50 disabled:opacity-50 font-medium transition-colors"
+                className="inline-flex items-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-all duration-200"
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                Refresh
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? 'Refreshing...' : 'Refresh'}
               </button>
-
+              
               {/* Export Button */}
-              <button
-                onClick={exportData}
-                className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all"
+              <button className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-semibold rounded-xl text-white hover:shadow-lg transition-all duration-200"
+                style={{ backgroundColor: THEME_COLORS.primary }}
               >
-                <Download className="w-4 h-4 mr-2" />
-                Export
+                <Download className="h-4 w-4 mr-2" />
+                Export Report
               </button>
             </div>
           </div>
 
-          {/* Stats Cards - updated to show totals instead of percentages */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {stats.map((stat, index) => {
-              const Icon = stat.icon
-              const displayValue = stat.value.toLocaleString()
+          {/* Key Metrics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+            {metricCards.map((metric, index) => {
+              const Icon = metric.icon
+              const isPositiveChange = metric.invertChange ? !metric.change.isPositive : metric.change.isPositive
 
               return (
                 <motion.div
-                  key={stat.label}
-                  className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
+                  key={metric.title}
+                  className="bg-white rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 p-6 group hover:scale-105"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
                 >
-                  <div className="flex items-center">
-                    <div className={`w-12 h-12 ${stat.bgColor} rounded-xl flex items-center justify-center`}>
-                      <Icon className={`h-6 w-6 ${stat.color}`} />
+                  <div className="flex items-center justify-between mb-4">
+                    <div 
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-200"
+                      style={{ backgroundColor: metric.color }}
+                    >
+                      <Icon className="h-6 w-6 text-white" />
                     </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-                      <p className="text-2xl font-bold text-gray-900">{displayValue}</p>
-                      {stat.trend && (
-                        <div className="flex items-center mt-1">
-                          {stat.trendUp ? (
-                            <TrendingUp className="w-3 h-3 text-green-500 mr-1" />
-                          ) : (
-                            <TrendingDown className="w-3 h-3 text-red-500 mr-1" />
-                          )}
-                          <span className={`text-xs font-medium ${stat.trendUp ? 'text-green-600' : 'text-red-600'}`}>
-                            {stat.trend} from last period
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    
+                    {metric.change.value > 0 && (
+                      <div className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-xs font-medium ${
+                        isPositiveChange 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {isPositiveChange ? (
+                          <TrendingUp className="h-3 w-3" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3" />
+                        )}
+                        <span>{metric.change.value.toFixed(1)}%</span>
+                      </div>
+                    )}
                   </div>
+                  
+                  <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">
+                    {metric.title}
+                  </h3>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {loading ? '...' : metric.value}
+                  </p>
                 </motion.div>
               )
             })}
           </div>
         </div>
 
-        {analyticsData && (
-          <>
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {/* Performance Trends */}
-              <motion.div
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+          
+          {/* Left Column - Main Charts */}
+          <div className="xl:col-span-3 space-y-8">
+            
+            {/* Time Series Performance Chart */}
+            <motion.div 
+              className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">Email Performance Trends</h3>
+                  <p className="text-gray-600 mt-1">Delivery, opens, and clicks over time</p>
+                </div>
+                <div 
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-md"
+                  style={{ backgroundColor: THEME_COLORS.primary }}
+                >
+                  <TrendingUp className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              
+              <div className="h-96">
+                {timeSeriesData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={timeSeriesData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="date" stroke="#6b7280" fontSize={12} />
+                      <YAxis stroke="#6b7280" fontSize={12} />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '16px',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Area type="monotone" dataKey="delivered" stackId="1" stroke={THEME_COLORS.primary} fill={`${THEME_COLORS.primary}20`} name="Delivered" />
+                      <Line type="monotone" dataKey="opened" stroke={THEME_COLORS.secondary} strokeWidth={3} dot={{ fill: THEME_COLORS.secondary, r: 4 }} name="Opened" />
+                      <Line type="monotone" dataKey="clicked" stroke={THEME_COLORS.success} strokeWidth={3} dot={{ fill: THEME_COLORS.success, r: 4 }} name="Clicked" />
+                      <Line type="monotone" dataKey="bounced" stroke={THEME_COLORS.warning} strokeWidth={2} dot={{ fill: THEME_COLORS.warning, r: 3 }} name="Bounced" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto mb-4" style={{ borderColor: THEME_COLORS.primary }}></div>
+                      <p className="text-gray-500">Loading performance trends...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Campaign Performance & Engagement Funnel */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              
+              {/* Campaign Performance Table */}
+              <motion.div 
+                className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Campaign Leaderboard</h3>
+                    <p className="text-gray-600 mt-1">Top performing campaigns</p>
+                  </div>
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: THEME_COLORS.success }}
+                  >
+                    <Target className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+                
+                <div className="space-y-4 max-h-80 overflow-y-auto">
+                  {campaignPerformance.length > 0 ? (
+                    campaignPerformance.slice(0, 8).map((campaign, index) => (
+                      <motion.div
+                        key={campaign.id}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.5 + index * 0.05 }}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div 
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
+                            style={{ backgroundColor: index < 3 ? THEME_COLORS.success : THEME_COLORS.gray }}
+                          >
+                            {index + 1}
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900 text-sm truncate max-w-32">
+                              {campaign.name}
+                            </h4>
+                            <p className="text-xs text-gray-500">
+                              {campaign.sent.toLocaleString()} sent
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="text-right">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-bold" style={{ color: THEME_COLORS.secondary }}>
+                              {campaign.openRate}%
+                            </span>
+                            <span className="text-xs text-gray-500">open</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-bold" style={{ color: THEME_COLORS.success }}>
+                              {campaign.clickRate}%
+                            </span>
+                            <span className="text-xs text-gray-500">click</span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <BarChart3 className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <p className="text-gray-500">No campaign data available</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+
+              {/* Engagement Funnel */}
+              <motion.div 
+                className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
-                className="bg-white rounded-2xl border border-gray-200 p-6"
               >
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Trends</h3>
-                {lineChartData && (
-                  <Line data={lineChartData} options={chartOptions} />
-                )}
-              </motion.div>
-
-              {/* Campaign Status Breakdown */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="bg-white rounded-2xl border border-gray-200 p-6"
-              >
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Campaign Status</h3>
-                {campaignStatusData && (
-                  <div className="h-64 flex items-center justify-center">
-                    <Doughnut data={campaignStatusData} options={doughnutOptions} />
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Engagement Funnel</h3>
+                    <p className="text-gray-600 mt-1">User journey breakdown</p>
                   </div>
-                )}
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: THEME_COLORS.secondary }}
+                  >
+                    <Activity className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  {engagementFunnel.map((stage, index) => {
+                    const percentage = engagementFunnel.length > 0 ? 
+                      (stage.value / engagementFunnel[0].value) * 100 : 0
+                    
+                    return (
+                      <motion.div
+                        key={stage.name}
+                        className="relative"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.6 + index * 0.1 }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-700">{stage.name}</span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-bold text-gray-900">
+                              {stage.value.toLocaleString()}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({percentage.toFixed(1)}%)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <motion.div
+                            className="h-3 rounded-full"
+                            style={{ backgroundColor: stage.fill }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${percentage}%` }}
+                            transition={{ delay: 0.8 + index * 0.1, duration: 0.8 }}
+                          />
+                        </div>
+                      </motion.div>
+                    )
+                  })}
+                </div>
               </motion.div>
             </div>
 
-            {/* Time Analysis */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-              className="bg-white rounded-2xl border border-gray-200 p-6 mb-8"
+            {/* Detailed Performance Metrics */}
+            <motion.div 
+              className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.6 }}
             >
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Best Times to Send</h3>
-              {timeAnalysisData && (
-                <Bar data={timeAnalysisData} options={chartOptions} />
-              )}
-            </motion.div>
-
-            {/* Tables Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Campaign Performance */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 }}
-                className="bg-white rounded-2xl border border-gray-200 p-6"
-              >
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Campaign Performance</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Campaign</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Emails</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Open Rate</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Reply Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {analyticsData.campaigns.map((campaign, index) => (
-                        <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center">
-                              <div className="font-medium text-gray-900">{campaign.name}</div>
-                              <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
-                                campaign.status === 'active' ? 'bg-green-100 text-green-800' :
-                                campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {campaign.status}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-gray-600">{campaign.emails.toLocaleString()}</td>
-                          <td className="py-3 px-4 text-gray-600">{campaign.openRate}%</td>
-                          <td className="py-3 px-4 text-gray-600">{campaign.replyRate}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </motion.div>
-
-              {/* Top Performing Subjects */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.9 }}
-                className="bg-white rounded-2xl border border-gray-200 p-6"
-              >
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Performing Subject Lines</h3>
-                <div className="space-y-4">
-                  {analyticsData.topPerformers.map((performer, index) => (
-                    <div key={index} className="border border-gray-200 rounded-xl p-4">
-                      <div className="font-medium text-gray-900 mb-2">{performer.subject}</div>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-600">Open: </span>
-                          <span className="font-medium text-green-600">{performer.openRate}%</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Click: </span>
-                          <span className="font-medium text-blue-600">{performer.clickRate}%</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Reply: </span>
-                          <span className="font-medium text-purple-600">{performer.replyRate}%</span>
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">Performance Breakdown</h3>
+                <p className="text-gray-600 mt-1">Detailed metrics comparison</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                  {
+                    title: 'Delivery Success',
+                    current: globalMetrics.totalDelivered,
+                    total: globalMetrics.totalSent,
+                    rate: globalMetrics.deliveryRate,
+                    color: THEME_COLORS.primary,
+                    icon: CheckCircle
+                  },
+                  {
+                    title: 'Email Opens',
+                    current: globalMetrics.totalOpened,
+                    total: globalMetrics.totalDelivered,
+                    rate: globalMetrics.openRate,
+                    color: THEME_COLORS.secondary,
+                    icon: Eye
+                  },
+                  {
+                    title: 'Link Clicks',
+                    current: globalMetrics.totalClicked,
+                    total: globalMetrics.totalOpened,
+                    rate: globalMetrics.clickRate,
+                    color: THEME_COLORS.success,
+                    icon: MousePointer
+                  },
+                  {
+                    title: 'Bounces',
+                    current: globalMetrics.totalBounced,
+                    total: globalMetrics.totalSent,
+                    rate: globalMetrics.bounceRate,
+                    color: THEME_COLORS.warning,
+                    icon: AlertTriangle
+                  }
+                ].map((metric, index) => {
+                  const Icon = metric.icon
+                  
+                  return (
+                    <motion.div
+                      key={metric.title}
+                      className="bg-gray-50 rounded-xl p-6"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.7 + index * 0.1 }}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-semibold text-gray-900">{metric.title}</h4>
+                        <div 
+                          className="w-8 h-8 rounded-lg flex items-center justify-center"
+                          style={{ backgroundColor: metric.color }}
+                        >
+                          <Icon className="h-4 w-4 text-white" />
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </div>
-          </>
-        )}
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl font-bold text-gray-900">
+                            {metric.current.toLocaleString()}
+                          </span>
+                          <span className="text-sm font-medium" style={{ color: metric.color }}>
+                            {metric.rate}%
+                          </span>
+                        </div>
+                        
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full transition-all duration-1000"
+                            style={{ 
+                              backgroundColor: metric.color,
+                              width: `${metric.rate}%`
+                            }}
+                          />
+                        </div>
+                        
+                        <p className="text-xs text-gray-500">
+                          of {metric.total.toLocaleString()} total
+                        </p>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Right Sidebar - Insights & Recommendations */}
+          <div className="xl:col-span-1 space-y-8">
+            
+            {/* Performance Insights */}
+            <motion.div 
+              className="bg-white rounded-2xl border border-gray-200 shadow-lg"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Performance Insights</h3>
+                <p className="text-gray-600">AI-powered recommendations</p>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                {[
+                  {
+                    type: globalMetrics.openRate > 25 ? 'success' : globalMetrics.openRate > 15 ? 'warning' : 'error',
+                    title: 'Open Rate Analysis',
+                    message: globalMetrics.openRate > 25 
+                      ? `Excellent ${globalMetrics.openRate}% open rate! Your subject lines are performing well.`
+                      : globalMetrics.openRate > 15 
+                      ? `Good ${globalMetrics.openRate}% open rate. Consider A/B testing subject lines.`
+                      : `${globalMetrics.openRate}% open rate needs improvement. Focus on subject line optimization.`,
+                    icon: Eye
+                  },
+                  {
+                    type: globalMetrics.clickRate > 3 ? 'success' : globalMetrics.clickRate > 1 ? 'warning' : 'error',
+                    title: 'Click Rate Performance',
+                    message: globalMetrics.clickRate > 3
+                      ? `Strong ${globalMetrics.clickRate}% click rate indicates engaging content.`
+                      : globalMetrics.clickRate > 1
+                      ? `Average ${globalMetrics.clickRate}% click rate. Optimize your CTAs.`
+                      : `Low ${globalMetrics.clickRate}% click rate. Review content relevance.`,
+                    icon: MousePointer
+                  },
+                  {
+                    type: globalMetrics.bounceRate < 2 ? 'success' : globalMetrics.bounceRate < 5 ? 'warning' : 'error',
+                    title: 'List Health',
+                    message: globalMetrics.bounceRate < 2
+                      ? `Excellent list health with ${globalMetrics.bounceRate}% bounce rate.`
+                      : globalMetrics.bounceRate < 5
+                      ? `Good list health. Regular cleaning recommended.`
+                      : `High ${globalMetrics.bounceRate}% bounce rate. Clean your list urgently.`,
+                    icon: Shield
+                  }
+                ].map((insight, index) => {
+                  const Icon = insight.icon
+                  const bgColor = insight.type === 'success' ? 'bg-green-50' : 
+                                 insight.type === 'warning' ? 'bg-yellow-50' : 'bg-red-50'
+                  const iconColor = insight.type === 'success' ? THEME_COLORS.success : 
+                                   insight.type === 'warning' ? '#f59e0b' : THEME_COLORS.warning
+
+                  return (
+                    <motion.div
+                      key={insight.title}
+                      className={`p-4 rounded-xl ${bgColor}`}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.6 + index * 0.1 }}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div 
+                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: iconColor }}
+                        >
+                          <Icon className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900 text-sm mb-1">
+                            {insight.title}
+                          </h4>
+                          <p className="text-xs text-gray-600 leading-relaxed">
+                            {insight.message}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </motion.div>
+
+            {/* Time Period Comparison */}
+            <motion.div 
+              className="bg-white rounded-2xl border border-gray-200 shadow-lg"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Period Comparison</h3>
+                <p className="text-gray-600">vs previous {timeRange.replace('d', ' days')}</p>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                {[
+                  { label: 'Emails Sent', current: globalMetrics.totalSent, previous: previousMetrics.totalSent },
+                  { label: 'Open Rate', current: globalMetrics.openRate, previous: previousMetrics.openRate, suffix: '%' },
+                  { label: 'Click Rate', current: globalMetrics.clickRate, previous: previousMetrics.clickRate, suffix: '%' },
+                  { label: 'Bounce Rate', current: globalMetrics.bounceRate, previous: previousMetrics.bounceRate, suffix: '%', invert: true }
+                ].map((comparison, index) => {
+                  const change = calculateChange(comparison.current, comparison.previous)
+                  const isImprovement = comparison.invert ? !change.isPositive : change.isPositive
+
+                  return (
+                    <motion.div
+                      key={comparison.label}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.7 + index * 0.1 }}
+                    >
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">{comparison.label}</span>
+                        <p className="text-lg font-bold text-gray-900">
+                          {comparison.current.toLocaleString()}{comparison.suffix || ''}
+                        </p>
+                      </div>
+                      
+                      {change.value > 0 && (
+                        <div className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-xs font-medium ${
+                          isImprovement ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {isImprovement ? (
+                            <ArrowUpRight className="h-3 w-3" />
+                          ) : (
+                            <ArrowDownRight className="h-3 w-3" />
+                          )}
+                          <span>{change.value.toFixed(1)}%</span>
+                        </div>
+                      )}
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </motion.div>
+
+            {/* Quick Actions */}
+            <motion.div 
+              className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 shadow-lg"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <div className="p-6 border-b border-blue-200">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Quick Actions</h3>
+                <p className="text-gray-600">Optimize your campaigns</p>
+              </div>
+              
+              <div className="p-6 space-y-3">
+                {[
+                  { label: 'A/B Test Subject Lines', href: '/campaigns/create', icon: Target },
+                  { label: 'Segment Your Audience', href: '/contacts', icon: Users },
+                  { label: 'Clean Email List', href: '/contacts/manage', icon: Shield },
+                  { label: 'Create New Campaign', href: '/campaigns/create', icon: Mail }
+                ].map((action, index) => {
+                  const Icon = action.icon
+                  
+                  return (
+                    <motion.a
+                      key={action.label}
+                      href={action.href}
+                      className="flex items-center space-x-3 p-3 bg-white rounded-xl hover:shadow-md transition-all duration-200 group"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.8 + index * 0.1 }}
+                    >
+                      <div 
+                        className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform"
+                        style={{ backgroundColor: THEME_COLORS.primary }}
+                      >
+                        <Icon className="h-4 w-4 text-white" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">
+                        {action.label}
+                      </span>
+                      <ArrowUpRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 ml-auto" />
+                    </motion.a>
+                  )
+                })}
+              </div>
+            </motion.div>
+          </div>
+        </div>
       </div>
     </div>
   )
