@@ -20,7 +20,7 @@ const fadeInUp = {
   initial: { opacity: 0, y: 30 },
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.8 }
-};
+}; 
 
 const fadeInLeft = {
   initial: { opacity: 0, x: -50 },
@@ -1324,7 +1324,7 @@ export default function Home() {
           >
             <p className="text-gray-600 mb-4">Still have questions?</p>
             <Link 
-              href="/support"
+              href="/support/help"
               className="inline-flex items-center text-lg font-semibold hover:underline"
               style={{ color: THEME_COLORS.primary }}
             >
@@ -1427,7 +1427,7 @@ export default function Home() {
             
             <div className="py-16">
               <motion.div 
-                className="grid lg:grid-cols-4 md:grid-cols-2 gap-12"
+                className="grid lg:grid-cols-5 md:grid-cols-2 gap-12"
                 initial="initial"
                 whileInView="animate"
                 viewport={{ once: true }}
@@ -1489,16 +1489,16 @@ export default function Home() {
                         Pricing
                       </Link>
                     </li>
-                    <li>
+                    {/* <li>
                       <Link href="/templates" className="text-gray-400 hover:text-white transition-colors">
                         Templates
                       </Link>
-                    </li>
-                    <li>
+                    </li> */}
+                    {/* <li>
                       <Link href="/integrations" className="text-gray-400 hover:text-white transition-colors">
                         Integrations
                       </Link>
-                    </li>
+                    </li> */}
                   </ul>
                 </motion.div>
 
@@ -1506,23 +1506,49 @@ export default function Home() {
                   <h3 className="text-white font-bold text-lg mb-6">Support</h3>
                   <ul className="space-y-4">
                     <li>
-                      <Link href="/help" className="text-gray-400 hover:text-white transition-colors">
+                      <Link href="/support/help" className="text-gray-400 hover:text-white transition-colors">
                         Help Center
                       </Link>
                     </li>
-                    <li>
-                      <Link href="/docs" className="text-gray-400 hover:text-white transition-colors">
+                    {/* <li>
+                      <Link href="/support/docs" className="text-gray-400 hover:text-white transition-colors">
                         Documentation
+                      </Link>
+                    </li> */}
+                    <li>
+                      <Link href="/support/contact" className="text-gray-400 hover:text-white transition-colors">
+                        Contact Support
+                      </Link>
+                    </li>
+                    {/* <li>
+                      <Link href="/api" className="text-gray-400 hover:text-white transition-colors">
+                        API Reference
+                      </Link>
+                    </li> */}
+                  </ul>
+                </motion.div>
+
+                <motion.div variants={staggerItem}>
+                  <h3 className="text-white font-bold text-lg mb-6">Legal</h3>
+                  <ul className="space-y-4">
+                    <li>
+                      <Link href="/legal/privacy" className="text-gray-400 hover:text-white transition-colors">
+                        Privacy Policy
                       </Link>
                     </li>
                     <li>
-                      <Link href="/security" className="text-gray-400 hover:text-white transition-colors">
+                      <Link href="/legal/terms" className="text-gray-400 hover:text-white transition-colors">
+                        Terms of Service
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/legal/security" className="text-gray-400 hover:text-white transition-colors">
                         Security
                       </Link>
                     </li>
                     <li>
-                      <Link href="/contact" className="text-gray-400 hover:text-white transition-colors">
-                        Contact Support
+                      <Link href="/legal/gdpr" className="text-gray-400 hover:text-white transition-colors">
+                        GDPR Compliance
                       </Link>
                     </li>
                   </ul>
@@ -1544,16 +1570,16 @@ export default function Home() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4 lg:gap-8">
-                  <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors text-sm">
+                  <Link href="/legal/privacy" className="text-gray-400 hover:text-white transition-colors text-sm">
                     Privacy Policy
                   </Link>
-                  <Link href="/terms" className="text-gray-400 hover:text-white transition-colors text-sm">
+                  <Link href="/legal/terms" className="text-gray-400 hover:text-white transition-colors text-sm">
                     Terms of Service
                   </Link>
-                  <Link href="/security" className="text-gray-400 hover:text-white transition-colors text-sm">
+                  <Link href="/legal/security" className="text-gray-400 hover:text-white transition-colors text-sm">
                     Security
                   </Link>
-                  <Link href="/gdpr" className="text-gray-400 hover:text-white transition-colors text-sm">
+                  <Link href="/legal/gdpr" className="text-gray-400 hover:text-white transition-colors text-sm">
                     GDPR Compliance
                   </Link>
                 </div>
