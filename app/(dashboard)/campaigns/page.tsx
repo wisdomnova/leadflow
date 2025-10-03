@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion' 
 import { useCampaignStore } from '@/store/useCampaignStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import { 
@@ -13,7 +13,7 @@ import {
   Plus, 
   Play, 
   Pause, 
-  Copy, 
+  Copy,  
   Trash2, 
   Calendar, 
   Users,

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('🔄 Processing email queue...')
+    console.log('🔄 Processing email queue...') 
     
     // *** REDUCED BATCH SIZE: Process 5 emails at a time with delays ***
     const processedCount = await EmailProcessor.processPendingJobs(5) // <-- Reduced from 20 to 5

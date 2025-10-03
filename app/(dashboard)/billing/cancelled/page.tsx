@@ -1,6 +1,6 @@
-// ./app/(dashboard)/billing/cancelled/page.tsx
 'use client'
 
+import { Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { 
   XCircle, 
@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
-// Theme colors - consistent with dashboard
+// Theme colors - consistent with dashboard 
 const THEME_COLORS = {
   primary: '#0f66db',     // Main blue
   success: '#25b43d',     // Green
@@ -39,7 +39,20 @@ const staggerItem = {
   animate: { opacity: 1, y: 0 }
 }
 
-export default function PaymentCancelledPage() {
+// 🎯 Loading Component
+function LoadingSpinner() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+        <p className="text-sm text-gray-600">Loading...</p>
+      </div>
+    </div>
+  )
+}
+
+// 🎯 Main Content Component
+function PaymentCancelledContent() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <motion.div 
@@ -198,3 +211,15 @@ export default function PaymentCancelledPage() {
     </div>
   )
 }
+
+// 🎯 Main Page Component with Suspense
+export default function PaymentCancelledPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <PaymentCancelledContent />
+    </Suspense>
+  )
+}
+
+// 🎯 Force dynamic rendering to prevent SSR issues
+export const dynamic = 'force-dynamic'

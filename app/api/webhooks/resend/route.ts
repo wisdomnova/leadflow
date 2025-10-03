@@ -1,12 +1,13 @@
-// ./app/api/webhooks/resend/route.ts - Update to use Svix library
-
+// app/api/webhooks/resend/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { EmailService } from '@/lib/email-service'
+import { ReplyDetectionService } from '@/lib/reply-detection'
 import { Webhook } from 'svix'
+import { supabase } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
-    const payload = await request.text()
+    const payload = await request.text() 
     
     // Get Svix headers
     const svixId = request.headers.get('svix-id') || ''
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       tags: event.data?.tags
     })
     
-    // *** FIXED: Extract tags correctly (tags is an object, not an array) ***
+    // Extract tags correctly (tags is an object, not an array)
     const tags = event.data?.tags || {}
     const campaignId = tags.campaign_id
     const contactId = tags.contact_id
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
           contactId, 
           stepNumber,
           type: 'sent',
-          messageId: event.data?.email_id, // ✅ Fixed: use email_id instead of id
+          messageId: event.data?.email_id,
           metadata: {
             to: event.data?.to,
             subject: event.data?.subject,
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
           contactId,
           stepNumber,
           type: 'delivery',
-          messageId: event.data?.email_id, // ✅ Fixed: use email_id instead of id
+          messageId: event.data?.email_id,
           metadata: {
             to: event.data?.to,
             subject: event.data?.subject,
@@ -168,6 +169,38 @@ export async function POST(request: NextRequest) {
           }
         })
         console.log('✅ Logged email click event')
+        break
+
+      // *** NEW: Handle incoming replies ***
+      case 'email.received':
+        try {
+          // Get organization ID from campaign
+          const { data: campaign } = await supabase
+            .from('campaigns')
+            .select('organization_id')
+            .eq('id', campaignId)
+            .single()
+
+          if (campaign) {
+            // Process incoming email as potential reply
+            await ReplyDetectionService.processIncomingEmail({
+              message_id: event.data?.id,
+              subject: event.data?.subject || 'No subject',
+              content: event.data?.text || event.data?.html || 'No content',
+              html_content: event.data?.html,
+              from_email: event.data?.from?.email || event.data?.from,
+              from_name: event.data?.from?.name,
+              to_email: event.data?.to?.email || event.data?.to,
+              to_name: event.data?.to?.name,
+              headers: event.data?.headers,
+              received_at: event.created_at
+            }, campaign.organization_id)
+            
+            console.log('✅ Processed incoming email as potential reply')
+          }
+        } catch (error) {
+          console.error('Failed to process incoming email:', error)
+        }
         break
 
       default:

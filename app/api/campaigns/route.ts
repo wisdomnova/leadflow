@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       .from('users')
       .select('organization_id')
       .eq('id', decoded.userId)
-      .single() 
+      .single()  
 
     if (userError || !userData) {
       console.error('User fetch error:', userError)

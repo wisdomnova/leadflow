@@ -9,7 +9,7 @@ interface Campaign {
   organization_id: string 
   name: string
   subject: string
-  content: string
+  content: string 
   status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused'
   type: 'one-time' | 'recurring' | 'sequence' | 'single'  // Added sequence and single
   scheduled_at: string | null

@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    } 
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { supabase } from '@/lib/supabase'
+import { AffiliateManager } from '@/lib/affiliate/affiliate-manager'
 import Stripe from 'stripe'
 
 export async function POST(request: NextRequest) { 
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    switch (event.type) { 
+    switch (event.type) {  
       case 'checkout.session.completed':
         const session = event.data.object as Stripe.Checkout.Session
         await handleCheckoutCompleted(session)
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const { userId, organizationId, planType, billingCycle } = session.metadata!
+  const { userId, organizationId, planType, billingCycle, referralCode } = session.metadata!
 
   // Update user subscription status
   await supabase
@@ -87,6 +88,21 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       current_period_start: new Date().toISOString(),
       current_period_end: new Date(Date.now() + (billingCycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString()
     }])
+
+  // 🎯 NEW: Track affiliate conversion if referred
+  if (referralCode) {
+    try {
+      await AffiliateManager.trackSubscription(
+        userId,
+        session.subscription as string,
+        session.amount_total! / 100, // Convert from cents
+        session.currency?.toUpperCase() || 'USD'
+      )
+      console.log(`Tracked affiliate conversion for referral: ${referralCode}`)
+    } catch (error) {
+      console.error('Failed to track affiliate conversion:', error)
+    }
+  }
 }
 
 async function handlePaymentSucceeded(invoice: any) {
@@ -97,6 +113,22 @@ async function handlePaymentSucceeded(invoice: any) {
     .from('users')
     .update({ subscription_status: 'active' })
     .eq('stripe_subscription_id', invoice.subscription)
+
+  // 🎯 NEW: Process recurring affiliate commission for monthly/yearly renewals
+  if (invoice.billing_reason === 'subscription_cycle') {
+    try {
+      await AffiliateManager.processRecurringCommission(
+        invoice.subscription,
+        invoice.amount_paid / 100, // Convert from cents
+        invoice.payment_intent,
+        new Date(invoice.period_start * 1000).toISOString().split('T')[0],
+        new Date(invoice.period_end * 1000).toISOString().split('T')[0]
+      )
+      console.log(`Processed recurring affiliate commission for subscription: ${invoice.subscription}`)
+    } catch (error) {
+      console.error('Failed to process recurring affiliate commission:', error)
+    }
+  }
 }
 
 async function handleSubscriptionUpdated(subscription: any) {

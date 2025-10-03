@@ -20,7 +20,7 @@ export const PLAN_LIMITS = {
     contacts: 100,
     campaigns: 3,
     emails_per_month: 500
-  },
+  }, 
   starter: {
     contacts: 1000,
     campaigns: 10,

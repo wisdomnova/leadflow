@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -11,7 +12,7 @@ const staggerContainer = {
     transition: {
       staggerChildren: 0.1
     }
-  }
+  } 
 }
 
 const staggerItem = {
@@ -20,7 +21,20 @@ const staggerItem = {
   transition: { duration: 0.5 }
 }
 
-export default function ForgotPasswordPage() {
+// 🎯 Loading Component
+function ForgotPasswordLoading() {
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-sm text-gray-600">Loading...</p>
+      </div>
+    </div>
+  )
+}
+
+// 🎯 Main Content Component
+function ForgotPasswordContent() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -341,3 +355,17 @@ export default function ForgotPasswordPage() {
     </div>
   )
 }
+
+// 🎯 Main Page Component with Suspense
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={<ForgotPasswordLoading />}>
+      <ForgotPasswordContent />
+    </Suspense>
+  )
+}
+
+// 🎯 Force dynamic rendering to prevent SSR issues
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const revalidate = 0

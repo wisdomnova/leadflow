@@ -11,7 +11,7 @@ export default function TrialBanner() {
 
   if (dismissed || !isTrialActive || subscriptionStatus === 'active') {
     return null
-  }
+  } 
 
   const urgencyColor = daysRemaining <= 3 ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'
   const textColor = daysRemaining <= 3 ? 'text-red-800' : 'text-blue-800'

@@ -1,4 +1,3 @@
-// ./components/layout/Sidebar.tsx
 'use client'
 
 import { useState } from 'react'
@@ -10,14 +9,17 @@ import {
   Users, 
   Mail, 
   BarChart3,  
-  Settings, 
+  Settings,   
   HelpCircle,
   CreditCard,
   X,
   Menu,
   User,
   LogOut,
-  FileText
+  FileText,
+  Zap,
+  Inbox,
+  DollarSign
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -25,8 +27,11 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
+  { name: 'Inbox', href: '/inbox', icon: Inbox, badge: 'new' }, // 📥 New unified inbox
   { name: 'Templates', href: '/templates', icon: FileText },
+  { name: 'Integrations', href: '/integrations', icon: Zap },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Affiliate', href: '/affiliate', icon: DollarSign }, // 💰 New affiliate section
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Help & Support', href: '/help', icon: HelpCircle },
   { name: 'Billing', href: '/billing', icon: CreditCard }
@@ -95,7 +100,7 @@ export function Sidebar() {
                   key={item.name}
                   href={item.href}
                   className={clsx(
-                    'group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200',
+                    'group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 relative',
                     isActive
                       ? 'bg-[#0f66db] text-white'
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
@@ -109,7 +114,21 @@ export function Sidebar() {
                         : 'text-gray-500 group-hover:text-gray-700'
                     )}
                   />
-                  <span>{item.name}</span>
+                  <span className="flex-1">{item.name}</span>
+                  
+                  {/* Badge for new features */}
+                  {item.badge === 'new' && (
+                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-emerald-100 text-emerald-800 rounded-full">
+                      New
+                    </span>
+                  )}
+                  
+                  {/* Special badge for Affiliate */}
+                  {item.name === 'Affiliate' && (
+                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">
+                      Earn $
+                    </span>
+                  )}
                 </Link>
               )
             })}
@@ -123,7 +142,7 @@ export function Sidebar() {
                   <span className="text-sm font-semibold text-white">
                     {user?.first_name?.charAt(0) || 'U'}
                   </span>
-                </div>
+                </div> 
               </div>
               <div className="ml-3 flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate">

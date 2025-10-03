@@ -13,7 +13,7 @@ const staggerContainer = {
     transition: {
       staggerChildren: 0.1
     }
-  }
+  } 
 }
 
 const staggerItem = {
@@ -24,7 +24,7 @@ const staggerItem = {
 
 function VerificationErrorContent() {
   const searchParams = useSearchParams()
-  const error = searchParams.get('error')
+  const error = searchParams?.get('error') // Add optional chaining
   const [isResending, setIsResending] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
 
@@ -229,16 +229,22 @@ function VerificationErrorContent() {
   )
 }
 
+// 🎯 Simple Loading Component
+function LoadingSpinner() {
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-2 text-sm text-gray-600">Loading...</p>
+      </div>
+    </div>
+  )
+}
+
+// 🎯 Main Page Component - Server Component by default
 export default function VerificationErrorPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600">Loading...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<LoadingSpinner />}>
       <VerificationErrorContent />
     </Suspense>
   )

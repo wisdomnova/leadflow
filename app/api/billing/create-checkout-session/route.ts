@@ -7,12 +7,15 @@ export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get('auth-token')?.value
 
-    if (!token) {
+    if (!token) { 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
     const { planType, billingCycle } = await request.json()
+
+    // 🎯 NEW: Get referral code from cookie
+    const referralCode = request.cookies.get('referral_code')?.value
 
     // Get user and organization
     const { data: user, error: userError } = await supabase
@@ -67,18 +70,21 @@ export async function POST(request: NextRequest) {
       mode: 'subscription',
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing/upgrade`,
+      client_reference_id: referralCode || '', // 🎯 NEW: Track referral code
       metadata: {
         userId: user.id,
         organizationId: user.organization_id,
         planType,
-        billingCycle
+        billingCycle,
+        referralCode: referralCode || '' // 🎯 NEW: Include referral code
       },
       subscription_data: {
         metadata: {
           userId: user.id,
           organizationId: user.organization_id,
           planType,
-          billingCycle
+          billingCycle,
+          referralCode: referralCode || '' // 🎯 NEW: Include referral code
         }
       }
     })

@@ -1,6 +1,6 @@
-// ./app/(dashboard)/billing/upgrade/page.tsx
 'use client'
 
+import { Suspense } from 'react'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTrialStatus } from '@/hooks/useTrialStatus'
@@ -13,7 +13,7 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 
 // Theme colors - consistent with dashboard
 const THEME_COLORS = {
-  primary: '#0f66db',     // Main blue
+  primary: '#0f66db',     // Main blue 
   success: '#25b43d',     // Green
   secondary: '#6366f1',   // Indigo
   accent: '#059669',      // Emerald
@@ -74,7 +74,20 @@ const staggerItem = {
   animate: { opacity: 1, y: 0 }
 }
 
-export default function UpgradePage() {
+// 🎯 Loading Component
+function UpgradePageLoading() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-sm text-gray-600">Loading upgrade options...</p>
+      </div>
+    </div>
+  )
+}
+
+// 🎯 Main Content Component
+function UpgradePageContent() {
   const { user } = useAuth()
   const { daysRemaining, isTrialActive } = useTrialStatus()
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
@@ -393,3 +406,17 @@ export default function UpgradePage() {
     </div> 
   )
 }
+
+// 🎯 Main Page Component with Suspense
+export default function UpgradePage() {
+  return (
+    <Suspense fallback={<UpgradePageLoading />}>
+      <UpgradePageContent />
+    </Suspense>
+  )
+}
+
+// 🎯 Force dynamic rendering to prevent SSR issues
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const revalidate = 0

@@ -11,7 +11,7 @@ export default function TrialExpiredModal() {
 
   useEffect(() => {
     // Only show modal if:
-    // 1. User is still on trial status (not paid)
+    // 1. User is still on trial status (not paid) 
     // 2. Trial is not active (expired)
     // 3. Days remaining is 0 or negative
     const shouldShowModal = 

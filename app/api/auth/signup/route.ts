@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { AffiliateManager } from '@/lib/affiliate/affiliate-manager'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { sendEmail } from '@/lib/resend'
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const { data: existingUser } = await supabase
+    const { data: existingUser } = await supabase 
       .from('users')  
       .select('id, email_verified')
       .eq('email', email.toLowerCase())
@@ -94,6 +95,31 @@ export async function POST(request: NextRequest) {
       .from('users')
       .update({ email_verification_token: finalVerificationToken })
       .eq('id', userData.id)
+
+    // 🎯 NEW: Track affiliate referral if exists
+    const referralCode = request.cookies.get('referral_code')?.value
+    
+    if (referralCode) {
+      try {
+        await AffiliateManager.trackSignup(
+          referralCode,
+          userData.id,
+          orgData.id,
+          {
+            email: email.toLowerCase(),
+            ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+            user_agent: request.headers.get('user-agent') || 'unknown',
+            utm_source: request.headers.get('utm_source') ?? undefined,
+            utm_medium: request.headers.get('utm_medium') ?? undefined,
+            utm_campaign: request.headers.get('utm_campaign') ?? undefined
+          }
+        )
+        console.log(`Tracked referral signup: ${email} via ${referralCode}`)
+      } catch (referralError) {
+        console.error('Failed to track referral:', referralError)
+        // Don't fail signup for referral tracking error
+      }
+    }
 
     // Create verification URL
     const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${finalVerificationToken}`

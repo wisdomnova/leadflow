@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
 
-    // Get user plan to determine limits
+    // Get user plan to determine limits 
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('plan_type, organization_id, subscription_status') 

@@ -17,5 +17,5 @@ export function useFeatureAccess() {
     canExportData,
     canAccessAnalytics,
     isTrialExpired: !isTrialActive && subscriptionStatus === 'trial'
-  }
+  } 
 }

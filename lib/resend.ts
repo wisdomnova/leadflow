@@ -15,7 +15,7 @@ export const sendEmail = async ({
   to: string | string[]
   subject: string
   html: string
-  from?: string
+  from?: string 
 }) => { 
   try {
     if (!process.env.RESEND_API_KEY) {
