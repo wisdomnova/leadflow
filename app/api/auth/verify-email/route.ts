@@ -1,7 +1,8 @@
+// app/api/auth/verify-email/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
-import { sendEmail } from '@/lib/resend'
+import { sendSESEmail } from '@/lib/ses'
 import { emailVerifiedSuccessTemplate } from '@/lib/email-templates'
 
 export async function GET(request: NextRequest) {
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     // Verify the token
     let decoded: any
-    try {
+    try { 
       decoded = jwt.verify(token, process.env.JWT_SECRET!)
     } catch (error) {
       return NextResponse.redirect(new URL('/auth/verification-error?error=invalid-token', request.url))
@@ -61,15 +62,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/verification-error?error=update-failed', request.url))
     }
 
-    // Send welcome email (optional)
+    // Send welcome email via SES (optional)
     try {
-      await sendEmail({
+      const result = await sendSESEmail({
         to: user.email,
         subject: 'Welcome to LeadFlow - Email Verified!',
         html: emailVerifiedSuccessTemplate(user.first_name || 'there')
       })
+
+      if (!result.success) {
+        console.warn('Failed to send welcome email via SES:', result.error)
+      }
     } catch (emailError) {
-      console.warn('Failed to send welcome email:', emailError)
+      console.warn('Failed to send welcome email via SES:', emailError)
       // Don't fail the verification for this
     }
 

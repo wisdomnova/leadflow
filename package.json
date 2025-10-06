@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.901.0",
+    "@aws-sdk/client-sesv2": "^3.901.0",
     "@hubspot/api-client": "^13.4.0",
     "@stripe/stripe-js": "^7.8.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",

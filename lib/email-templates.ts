@@ -15,7 +15,7 @@ export interface CampaignTemplate {
   category: 'sales' | 'marketing' | 'onboarding' | 'nurture' | 'follow-up'
   popular?: boolean
   steps: {
-    subject: string
+    subject: string 
     content: string
     delay_days: number
     delay_hours: number

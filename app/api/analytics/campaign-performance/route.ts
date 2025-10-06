@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const timeRange = searchParams.get('timeRange') || '7d'
-    
+     
     const token = request.cookies.get('auth-token')?.value
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
-
+ 
     // Find user
     const { data: user, error: userError } = await supabase
       .from('users')

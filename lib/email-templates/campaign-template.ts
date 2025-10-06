@@ -12,7 +12,7 @@ export const generateCampaignEmailHTML = ({
   recipientName,
   unsubscribeUrl,
   companyName = 'LeadFlow'
-}: CampaignEmailProps): string => {
+}: CampaignEmailProps): string => { 
   return `
 <!DOCTYPE html>
 <html lang="en">

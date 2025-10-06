@@ -1,6 +1,7 @@
+// app/api/auth/forgot-password/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { sendEmail } from '@/lib/resend'
+import { sendSESEmail } from '@/lib/ses'
 import { passwordResetTemplate } from '@/lib/email-templates'
 import crypto from 'crypto'
 
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
 
-    // Find user by email
+    // Find user by email 
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('*')
@@ -48,9 +49,9 @@ export async function POST(request: NextRequest) {
     // Create reset URL
     const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password?token=${resetToken}`
 
-    // Send password reset email
+    // Send password reset email via SES
     try {
-      await sendEmail({
+      const result = await sendSESEmail({
         to: user.email,
         subject: 'Reset Your LeadFlow Password',
         html: passwordResetTemplate({
@@ -58,8 +59,12 @@ export async function POST(request: NextRequest) {
           resetUrl
         })
       })
+
+      if (!result.success) {
+        throw new Error(result.error)
+      }
     } catch (emailError) {
-      console.error('Failed to send reset email:', emailError)
+      console.error('Failed to send reset email via SES:', emailError)
       return NextResponse.json({ error: 'Failed to send reset email' }, { status: 500 })
     }
 

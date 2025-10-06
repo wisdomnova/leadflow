@@ -16,7 +16,7 @@ interface Campaign {
   sent_at: string | null
   total_recipients: number
   delivered: number
-  opened: number 
+  opened: number  
   clicked: number
   created_at: string
   updated_at: string

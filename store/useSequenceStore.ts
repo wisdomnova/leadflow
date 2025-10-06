@@ -16,7 +16,7 @@ interface SequenceStore {
   reorderSteps: (startIndex: number, endIndex: number) => void
   setSteps: (steps: SequenceStep[]) => void
   resetSequence: () => void
-  setCurrentStep: (step: number) => void
+  setCurrentStep: (step: number) => void 
   
   // API actions
   saveSequence: (campaignId: string) => Promise<void>

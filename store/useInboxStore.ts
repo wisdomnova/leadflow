@@ -10,7 +10,7 @@ interface InboxState {
   currentView: 'messages' | 'threads'
   filter: 'all' | 'unread' | 'starred' | 'archived' | 'high_priority' | 'requires_attention'
   selectedMessages: string[]
-  
+   
   // AI Classification filters
   intentFilter: string
   sentimentFilter: string
@@ -87,7 +87,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
         total: result.total,
         hasMore: result.hasMore,
         currentPage: 1,
-        loading: false
+        loading: false 
       })
       
     } catch (error) {

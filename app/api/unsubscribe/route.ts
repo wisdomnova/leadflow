@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     // Log unsubscribe event
     await EmailService.logEmailEvent({
       campaignId,
-      contactId,
+      contactId, 
       stepNumber: 1,
       type: 'unsubscribe'
     })

@@ -13,7 +13,7 @@ interface TemplateVariablePickerProps {
 export default function TemplateVariablePicker({ 
   onInsert, 
   customFields = [] 
-}: TemplateVariablePickerProps) {
+}: TemplateVariablePickerProps) { 
   const [isOpen, setIsOpen] = useState(false) 
 
   const getVariableIcon = (key: string) => {

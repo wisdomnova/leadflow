@@ -13,7 +13,7 @@ export interface InboxMessage {
   subject: string
   content: string
   html_content?: string
-  from_email: string
+  from_email: string 
   from_name?: string
   to_email: string
   to_name?: string

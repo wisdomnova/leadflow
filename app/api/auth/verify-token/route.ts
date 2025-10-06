@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     // Get user from database with fresh data
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select(`
+      .select(` 
         id,
         email,
         first_name,

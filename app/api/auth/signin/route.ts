@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       .from('users')
       .select(`
         *,
-        organizations (
+        organizations ( 
           id,
           name,
           trial_ends_at,

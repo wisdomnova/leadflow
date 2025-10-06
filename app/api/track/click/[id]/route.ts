@@ -14,7 +14,7 @@ export async function GET(
     if (!targetUrl) {
       console.error('No target URL provided for click tracking')
       return NextResponse.redirect(process.env.NEXT_PUBLIC_APP_URL || 'https://leadflow.com')
-    }
+    } 
 
     const trackingData = EmailService.decodeTrackingId(trackingId)
 

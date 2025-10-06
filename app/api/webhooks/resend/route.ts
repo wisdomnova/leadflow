@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
         console.log('✅ Logged email click event')
         break
 
-      // *** NEW: Handle incoming replies ***
+      // *** NEW: Handle incoming replies *** 
       case 'email.received':
         try {
           // Get organization ID from campaign

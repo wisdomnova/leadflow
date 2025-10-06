@@ -15,7 +15,7 @@ export interface EmailJob {
   last_error?: string 
   created_at?: string
   updated_at?: string
-}
+} 
 
 export class EmailScheduler {
   static async scheduleContactForCampaign(

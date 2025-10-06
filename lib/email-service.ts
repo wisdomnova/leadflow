@@ -1,9 +1,7 @@
-// ./lib/email-service.ts
-import { Resend } from 'resend'
+// lib/email-service.ts
+import { sendSESEmail } from './ses'
 import { supabase } from './supabase'
 import crypto from 'crypto'
-
-const resend = new Resend(process.env.RESEND_API_KEY!)
 
 interface SendEmailOptions {
   to: string
@@ -13,7 +11,7 @@ interface SendEmailOptions {
   contactId: string 
   stepNumber?: number 
   from?: string
-  replyTo?: string
+  replyTo?: string 
   trackOpens?: boolean
   trackClicks?: boolean
 }
@@ -83,7 +81,7 @@ export class EmailService {
         campaignId,
         contactId,
         stepNumber = 1,
-        from = `LeadFlow <noreply@${process.env.RESEND_SENDING_DOMAIN || 'leadflow.com'}>`,
+        from = `${process.env.AWS_SES_FROM_NAME || 'LeadFlow'} <${process.env.AWS_SES_FROM_EMAIL}>`,
         replyTo,
         trackOpens = true,
         trackClicks = true
@@ -110,23 +108,25 @@ export class EmailService {
         }
       }
 
-      // Send email via Resend
-      const { data, error } = await resend.emails.send({
-        from,
+      // Send email via SES
+      const result = await sendSESEmail({
         to: [to],
         subject,
         html: processedHtml,
-        replyTo: replyTo ? [replyTo] : undefined,
-        tags: [
-          { name: 'campaign_id', value: campaignId },
-          { name: 'contact_id', value: contactId },
-          { name: 'step_number', value: stepNumber.toString() }
-        ]
+        from,
+        replyTo: replyTo,
+        tags: {
+          campaign_id: campaignId,
+          contact_id: contactId,
+          step_number: stepNumber.toString(),
+          source: 'leadflow'
+        },
+        configurationSet: process.env.AWS_SES_CONFIGURATION_SET
       })
 
-      if (error) {
-        console.error('Resend error:', error)
-        return { success: false, error: error.message }
+      if (!result.success) {
+        console.error('SES send error:', result.error)
+        return { success: false, error: result.error }
       }
 
       // Log email send event
@@ -134,8 +134,8 @@ export class EmailService {
         campaignId,
         contactId,
         stepNumber,
-        type: 'delivery',
-        messageId: data?.id,
+        type: 'sent', // Changed from 'delivery' to 'sent' for initial send
+        messageId: result.messageId,
         metadata: { to, subject, from }
       })
 
@@ -145,11 +145,11 @@ export class EmailService {
         .update({
           status: 'sent',
           sent_at: new Date().toISOString(),
-          last_email_id: data?.id
+          last_email_id: result.messageId
         })
         .eq('id', contactId)
 
-      return { success: true, messageId: data?.id }
+      return { success: true, messageId: result.messageId }
 
     } catch (error) {
       console.error('Email send error:', error)
@@ -160,106 +160,110 @@ export class EmailService {
     }
   }
 
-static async logEmailEvent(event: {
-  campaignId: string
-  contactId: string
-  stepNumber: number
-  type: 'sent' | 'delivery' | 'open' | 'click' | 'bounce' | 'complaint' | 'unsubscribe'
-  messageId?: string
-  url?: string
-  userAgent?: string
-  ipAddress?: string
-  metadata?: any
-}): Promise<void> {
-  try {
-    console.log('🔍 EmailService.logEmailEvent called with:', {
-      campaignId: event.campaignId,
-      contactId: event.contactId,
-      stepNumber: event.stepNumber,
-      type: event.type,
-      messageId: event.messageId
-    })
-
-    const eventData = {
-      campaign_id: event.campaignId,
-      contact_id: event.contactId,
-      step_number: event.stepNumber,
-      event_type: event.type,
-      message_id: event.messageId,
-      url: event.url,
-      user_agent: event.userAgent,
-      ip_address: event.ipAddress,
-      metadata: event.metadata,
-      created_at: new Date().toISOString()
-    }
-
-    console.log('📝 Inserting email event data:', eventData)
-
-    const { data, error } = await supabase
-      .from('email_events')
-      .insert(eventData)
-      .select() // Add select to see what was inserted
-
-    if (error) {
-      console.error('❌ Failed to insert email event:', error)
-      console.error('Error details:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
+  static async logEmailEvent(event: {
+    campaignId: string
+    contactId: string
+    stepNumber: number
+    type: 'sent' | 'delivery' | 'open' | 'click' | 'bounce' | 'complaint' | 'unsubscribe'
+    messageId?: string
+    url?: string
+    userAgent?: string
+    ipAddress?: string
+    metadata?: any
+  }): Promise<void> {
+    try {
+      console.log('🔍 EmailService.logEmailEvent called with:', {
+        campaignId: event.campaignId,
+        contactId: event.contactId,
+        stepNumber: event.stepNumber,
+        type: event.type,
+        messageId: event.messageId
       })
-    } else {
-      console.log('✅ Email event inserted successfully:', data)
-    }
 
-    // Update contact timestamps based on event type
-    const updates: any = {}
-    
-    switch (event.type) {
-      case 'delivery':
-        // Don't update status for delivery, keep it as 'sent'
-        console.log('📧 Delivery event - not updating contact status')
-        break
-      case 'open':
-        updates.opened_at = new Date().toISOString()
-        if (!updates.status || updates.status === 'sent') {
-          updates.status = 'opened'
-        }
-        break
-      case 'click':
-        updates.clicked_at = new Date().toISOString()
-        updates.status = 'clicked'
-        break
-      case 'bounce':
-        updates.bounced_at = new Date().toISOString()
-        updates.status = 'bounced'
-        break
-      case 'complaint':
-        updates.status = 'complained'
-        break
-      case 'unsubscribe':
-        updates.unsubscribed_at = new Date().toISOString()
-        updates.status = 'unsubscribed'
-        break
-    }
-
-    if (Object.keys(updates).length > 0) {
-      console.log('📝 Updating campaign_contacts with:', updates)
-      
-      const { error: updateError } = await supabase
-        .from('campaign_contacts')
-        .update(updates)
-        .eq('id', event.contactId)
-
-      if (updateError) {
-        console.error('❌ Failed to update campaign_contacts:', updateError)
-      } else {
-        console.log('✅ Campaign contact updated successfully')
+      const eventData = {
+        campaign_id: event.campaignId,
+        contact_id: event.contactId,
+        step_number: event.stepNumber,
+        event_type: event.type,
+        message_id: event.messageId,
+        url: event.url,
+        user_agent: event.userAgent,
+        ip_address: event.ipAddress,
+        metadata: event.metadata,
+        created_at: new Date().toISOString()
       }
-    }
 
-  } catch (error) {
-    console.error('❌ Failed to log email event:', error)
+      console.log('📝 Inserting email event data:', eventData)
+
+      const { data, error } = await supabase
+        .from('email_events')
+        .insert(eventData)
+        .select()
+
+      if (error) {
+        console.error('❌ Failed to insert email event:', error)
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+      } else {
+        console.log('✅ Email event inserted successfully:', data)
+      }
+
+      // Update contact timestamps based on event type
+      const updates: any = {}
+      
+      switch (event.type) {
+        case 'sent':
+          // Keep status as 'sent' for initial send
+          console.log('📧 Sent event - keeping status as sent')
+          break
+        case 'delivery':
+          // Update to delivered status
+          updates.status = 'delivered'
+          break
+        case 'open':
+          updates.opened_at = new Date().toISOString()
+          if (!updates.status || updates.status === 'sent' || updates.status === 'delivered') {
+            updates.status = 'opened'
+          }
+          break
+        case 'click':
+          updates.clicked_at = new Date().toISOString()
+          updates.status = 'clicked'
+          break
+        case 'bounce':
+          updates.bounced_at = new Date().toISOString()
+          updates.status = 'bounced'
+          break
+        case 'complaint':
+          updates.status = 'complained'
+          break
+        case 'unsubscribe':
+          updates.unsubscribed_at = new Date().toISOString()
+          updates.status = 'unsubscribed'
+          break
+      }
+
+      if (Object.keys(updates).length > 0) {
+        console.log('📝 Updating campaign_contacts with:', updates)
+        
+        const { error: updateError } = await supabase
+          .from('campaign_contacts')
+          .update(updates)
+          .eq('id', event.contactId)
+
+        if (updateError) {
+          console.error('❌ Failed to update campaign_contacts:', updateError)
+        } else {
+          console.log('✅ Campaign contact updated successfully')
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to log email event:', error)
+    }
   }
-}
 }

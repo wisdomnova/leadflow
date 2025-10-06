@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     // Get user's organization
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('organization_id')
+      .select('organization_id') 
       .eq('id', decoded.userId)
       .single()
 

@@ -16,7 +16,7 @@ const THEME_COLORS = {
   warning: '#dc2626'      // Red
 }
 
-interface SequenceBuilderProps { 
+interface SequenceBuilderProps {  
   campaignId?: string 
   onSave?: () => void 
   templateApplied?: boolean

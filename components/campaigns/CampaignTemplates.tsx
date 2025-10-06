@@ -12,7 +12,7 @@ const THEME_COLORS = {
   secondary: '#6366f1',   // Indigo
   accent: '#059669',      // Emerald
   warning: '#dc2626'      // Red
-}
+} 
 
 interface Template {
   id: string

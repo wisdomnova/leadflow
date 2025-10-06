@@ -1,9 +1,10 @@
+// app/api/auth/signup/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { AffiliateManager } from '@/lib/affiliate/affiliate-manager'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { sendEmail } from '@/lib/resend'
+import { sendSESEmail } from '@/lib/ses'
 import { emailVerificationTemplate } from '@/lib/email-templates'
 
 export async function POST(request: NextRequest) {
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
       .update({ email_verification_token: finalVerificationToken })
       .eq('id', userData.id)
 
-    // 🎯 NEW: Track affiliate referral if exists
+    // Track affiliate referral if exists
     const referralCode = request.cookies.get('referral_code')?.value
     
     if (referralCode) {
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
           referralCode,
           userData.id,
           orgData.id,
-          {
+          { 
             email: email.toLowerCase(),
             ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
             user_agent: request.headers.get('user-agent') || 'unknown',
@@ -124,9 +125,9 @@ export async function POST(request: NextRequest) {
     // Create verification URL
     const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${finalVerificationToken}`
 
-    // Send verification email
+    // Send verification email via SES
     try {
-      await sendEmail({
+      const result = await sendSESEmail({
         to: email,
         subject: 'Welcome to LeadFlow - Verify Your Email',
         html: emailVerificationTemplate({
@@ -134,8 +135,13 @@ export async function POST(request: NextRequest) {
           verificationUrl
         })
       })
+
+      if (!result.success) {
+        console.error('SES email send failed:', result.error)
+        // Continue with signup but log the error
+      }
     } catch (emailError) {
-      console.error('Failed to send verification email:', emailError)
+      console.error('Failed to send verification email via SES:', emailError)
       // Don't fail registration for email error, but log it
     }
 

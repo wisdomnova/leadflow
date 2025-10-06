@@ -15,7 +15,7 @@ interface EmailStepEditorProps {
   onRemove: (stepId: string) => void
   onDragStart?: (index: number) => void
   onDragOver?: (index: number) => void
-  onDrop?: (index: number) => void
+  onDrop?: (index: number) => void 
   customFields?: string[]
 }
 

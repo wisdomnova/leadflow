@@ -19,7 +19,7 @@ export async function GET(
 
       // Log open event
       await EmailService.logEmailEvent({
-        campaignId: trackingData.campaignId,
+        campaignId: trackingData.campaignId, 
         contactId: trackingData.contactId,
         stepNumber: trackingData.stepNumber,
         type: 'open',

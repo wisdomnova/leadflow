@@ -19,7 +19,7 @@ export const BUILT_IN_VARIABLES: TemplateVariable[] = [
     description: 'Contact\'s last name',
     example: 'Smith'
   },
-  {
+  { 
     key: 'company',
     label: 'Company',
     description: 'Contact\'s company name',

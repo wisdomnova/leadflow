@@ -13,7 +13,7 @@ interface AnalyticsData {
     totalBounced: number
     totalComplaints: number
     totalUnsubscribed: number
-  }
+  } 
   rates: {
     deliveryRate: number
     openRate: number

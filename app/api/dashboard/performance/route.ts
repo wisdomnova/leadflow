@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       .from('users')
       .select('organization_id')
       .eq('id', decoded.userId)
-      .single()
+      .single() 
 
     if (userError || !userData) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })

@@ -1,16 +1,12 @@
-import { Resend } from 'resend'
+// lib/resend.ts
+import { sendSESEmail } from './ses'
 
-if (!process.env.RESEND_API_KEY) {
-  console.warn('RESEND_API_KEY is not set in environment variables')
-}
-
-export const resend = new Resend(process.env.RESEND_API_KEY)
-
+// Keep this for backward compatibility during migration
 export const sendEmail = async ({
   to,
   subject,
   html,
-  from = 'contact@tryleadflow.ai' // Update with your verified domain
+  from = `${process.env.AWS_SES_FROM_NAME || 'LeadFlow'} <${process.env.AWS_SES_FROM_EMAIL}>`
 }: {
   to: string | string[]
   subject: string
@@ -18,22 +14,30 @@ export const sendEmail = async ({
   from?: string 
 }) => { 
   try {
-    if (!process.env.RESEND_API_KEY) {
-      console.log('Email would be sent (RESEND_API_KEY not configured):', { to, subject })
-      return { id: 'test-email-id' }
-    }
-
-    const data = await resend.emails.send({
-      from,
+    console.log('📧 Legacy sendEmail called - redirecting to SES')
+    
+    const result = await sendSESEmail({
       to,
       subject,
-      html
+      html,
+      from
     })
 
-    console.log('Email sent successfully:', data)
-    return data
+    if (result.success) {
+      console.log('Email sent successfully via SES:', result)
+      return { id: result.messageId }
+    } else {
+      throw new Error(result.error)
+    }
   } catch (error) {
-    console.error('Failed to send email:', error)
+    console.error('Failed to send email via SES:', error)
     throw error
+  }
+}
+
+// Deprecated - use SES directly
+export const resend = {
+  emails: {
+    send: sendEmail
   }
 }
