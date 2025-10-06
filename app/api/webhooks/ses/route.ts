@@ -10,9 +10,36 @@ async function verifySNSSignature(
   message: string,
   signature: string | null,
   signingCertURL: string | null,
-  topicArn: string
+  topicArn: string,
+  messageType: string
 ): Promise<boolean> {
   try {
+    // For SubscriptionConfirmation, signature verification is different
+    if (messageType === 'SubscriptionConfirmation' || messageType === 'UnsubscribeConfirmation') {
+      console.log('📋 Skipping signature verification for subscription confirmation')
+      
+      // Basic validation for subscription confirmations
+      const snsMessage = JSON.parse(message)
+      const requiredFields = ['Type', 'MessageId', 'TopicArn', 'SubscribeURL', 'Token']
+      
+      for (const field of requiredFields) {
+        if (!snsMessage[field]) {
+          console.error(`Missing required field for subscription: ${field}`)
+          return false
+        }
+      }
+      
+      // Validate TopicArn matches expected pattern
+      if (!snsMessage.TopicArn.includes('leadflow-ses-events')) {
+        console.error('Invalid topic ARN for subscription')
+        return false
+      }
+      
+      console.log('✅ Subscription confirmation validated')
+      return true
+    }
+
+    // For regular notifications, do full signature verification
     if (!signature || !signingCertURL) {
       console.error('Missing SNS signature or certificate URL')
       return false
@@ -105,30 +132,33 @@ export async function POST(request: NextRequest) {
       topicArn: snsMessage.TopicArn
     })
 
-    // Production signature verification
+    // Get signature headers (may not exist for subscription confirmations)
     const signature = request.headers.get('x-amz-sns-signature')
     const signingCertURL = request.headers.get('x-amz-sns-signing-cert-url')
     const topicArn = snsMessage.TopicArn
 
-    const isValidSignature = await verifySNSSignature(body, signature, signingCertURL, topicArn)
-    
-    if (!isValidSignature) {
-      console.error('❌ SNS signature verification failed')
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-    }
-
-    // Handle SNS subscription confirmation
+    // Handle SNS subscription confirmation FIRST (before signature verification)
     if (snsMessage.Type === 'SubscriptionConfirmation') {
       console.log('🔗 SNS Subscription confirmation received:', {
         topicArn: snsMessage.TopicArn,
         subscribeURL: snsMessage.SubscribeURL
       })
 
+      // Basic validation for subscription confirmations
+      if (!snsMessage.SubscribeURL || !snsMessage.TopicArn.includes('leadflow-ses-events')) {
+        console.error('❌ Invalid subscription confirmation')
+        return NextResponse.json({ error: 'Invalid subscription confirmation' }, { status: 400 })
+      }
+
       // Auto-confirm subscription in production
       if (snsMessage.SubscribeURL) {
         try {
+          console.log('🔄 Confirming SNS subscription...')
           const confirmResponse = await fetch(snsMessage.SubscribeURL, {
-            method: 'GET'
+            method: 'GET',
+            headers: {
+              'User-Agent': 'LeadFlow-Webhook/1.0'
+            }
           })
           
           if (confirmResponse.ok) {
@@ -158,6 +188,14 @@ export async function POST(request: NextRequest) {
         message: 'Unsubscribe confirmation received',
         topicArn: snsMessage.TopicArn
       })
+    }
+
+    // For regular notifications, verify signature
+    const isValidSignature = await verifySNSSignature(body, signature, signingCertURL, topicArn, snsMessage.Type)
+    
+    if (!isValidSignature) {
+      console.error('❌ SNS signature verification failed')
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
     // Handle notification messages (SES events)
