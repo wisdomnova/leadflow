@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
     try {
       await supabase
         .from('activity_logs') 
-        .insert([{
+        .insert([{ 
           organization_id: orgData.id,
           user_id: userData.id,
           action: 'user_registered',
