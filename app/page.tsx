@@ -55,31 +55,31 @@ export default function Home() {
     {
       id: 'starter',
       name: 'Starter',
-      monthly: 49,
-      yearly: 490,
+      monthly: 29,
+      yearly: 290,
       description: 'Perfect for individual sales professionals',
-      dailyLimit: '5,000',
-      monthlyEquivalent: '~150k',
+      monthlyEmails: '10,000',
       features: [
-        '1 user, 1 sending domain',
-        '5,000 emails/day (~150k/month)',
-        'Basic AI generator (limited)',
-        'Basic open & click tracking',
-        'Email support'
+        '1 user, unlimited sending domains',
+        '10,000 emails/month',
+        'Unlimited AI generator & personalization',
+        'AI subject lines & follow-up suggestions',
+        'Central inbox (Unibox)',
+        'Advanced analytics dashboard',
+        'Email & chat support'
       ]
     },
     {
       id: 'growth',
       name: 'Growth',
-      monthly: 149,
-      yearly: 1490,
+      monthly: 99,
+      yearly: 990,
       description: 'Best for growing sales teams',
-      dailyLimit: '25,000',
-      monthlyEquivalent: '~750k',
+      monthlyEmails: '100,000',
       features: [
-        '3 users, 3 sending domains',
-        '25,000 emails/day (~750k/month)',
-        'Unlimited AI generator',
+        '3 users, unlimited sending domains',
+        '100,000 emails/month',
+        'Unlimited AI generator & personalization',
         'AI subject lines & follow-up suggestions',
         'Central inbox (Unibox)',
         'Advanced analytics dashboard',
@@ -90,18 +90,17 @@ export default function Home() {
     {
       id: 'pro',
       name: 'Pro',
-      monthly: 399,
-      yearly: 3990,
+      monthly: 299,
+      yearly: 2990,
       description: 'For enterprise teams at scale',
-      dailyLimit: '100,000',
-      monthlyEquivalent: '~3M',
+      monthlyEmails: '500,000',
       features: [
-        '10 users, 10 sending domains',
-        '100,000 emails/day (~3M/month)',
-        'Full AI automation (emails, follow-ups, subject lines)',
-        'Deliverability monitor (SPF/DKIM/DMARC checks, spam score)',
-        'Advanced analytics + CSV/PDF export',
-        'API access + webhooks',
+        '10 users, unlimited sending domains',
+        '500,000 emails/month',
+        'Unlimited AI generator & personalization',
+        'AI subject lines & follow-up suggestions',
+        'Central inbox (Unibox)',
+        'Advanced analytics dashboard',
         'Dedicated account manager + premium support'
       ]
     }
@@ -1024,7 +1023,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pricing Section */}
+            {/* Pricing Section */}
       <section id="pricing" className="bg-gray-50 py-32 relative overflow-hidden">
         {/* Subtle background gradient */}
         <div className="absolute inset-0 pointer-events-none">
@@ -1155,27 +1154,26 @@ export default function Home() {
                   
                   <div className="mb-2">
                     <span className="text-4xl lg:text-5xl font-bold text-gray-900">
-                      €{billingCycle === 'monthly' ? plan.monthly : plan.yearly}
+                      ${billingCycle === 'monthly' ? plan.monthly : plan.yearly}
                     </span>
                     <span className="text-gray-600 text-lg lg:text-xl">
                       /{billingCycle === 'monthly' ? 'month' : 'year'}
                     </span>
                   </div>
 
-                  {/* Daily/Monthly Limits */}
+                  {/* Monthly Email Limit */}
                   <div className="mb-4">
                     <div 
                       className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold text-white"
                       style={{ backgroundColor: `${THEME_COLORS.primary}20`, color: THEME_COLORS.primary }}
                     >
-                      {plan.dailyLimit} emails/day
+                      {plan.monthlyEmails} emails/month
                     </div>
-                    <p className="text-gray-500 text-sm mt-1">{plan.monthlyEquivalent}/month</p>
                   </div>
 
                   {billingCycle === 'yearly' && (
                     <p className="font-semibold" style={{ color: THEME_COLORS.success }}>
-                      Save €{(plan.monthly * 12) - plan.yearly} per year
+                      Save ${(plan.monthly * 12) - plan.yearly} per year
                     </p>
                   )}
                 </div>

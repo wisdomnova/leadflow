@@ -605,13 +605,13 @@ export default function InboxPage() {
             </div>
             
             <div className="flex items-center space-x-4">
-              <Link
+              {/* <Link
                 href="/inbox/rules"
                 className="inline-flex items-center px-6 py-3 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md transition-all duration-200"
               >
                 <Brain className="h-4 w-4 mr-2" />
                 AI Rules
-              </Link>
+              </Link> */}
               <Link
                 href="/campaigns/create"
                 className="inline-flex items-center px-6 py-3 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md transition-all duration-200"
@@ -699,7 +699,7 @@ export default function InboxPage() {
                 <select
                   value={intentFilter}
                   onChange={(e) => setIntentFilter(e.target.value)}
-                  className="px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                  className="px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white text-black"
                 >
                   {intentOptions.map(option => (
                     <option key={option.value} value={option.value}>
@@ -711,7 +711,7 @@ export default function InboxPage() {
                 <select
                   value={sentimentFilter}
                   onChange={(e) => setSentimentFilter(e.target.value)}
-                  className="px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                  className="px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white text-black"
                 >
                   {sentimentOptions.map(option => (
                     <option key={option.value} value={option.value}>

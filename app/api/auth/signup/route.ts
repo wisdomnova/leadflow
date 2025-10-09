@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
           action: 'user_registered',
           description: 'User account created - email verification pending'
         }])
-    } catch (logError) {
+    } catch (logError) { 
       console.warn('Failed to log registration activity:', logError)
     }
 
