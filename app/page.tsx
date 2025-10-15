@@ -1205,7 +1205,7 @@ export default function Home() {
           </motion.div>
 
           {/* Bottom CTA */}
-          <motion.div 
+          <motion.div  
             className="text-center mt-16"
             initial="initial"
             whileInView="animate"

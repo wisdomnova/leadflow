@@ -36,7 +36,7 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <GoogleAnalytics />
         </Suspense>
-      </head>
+      </head> 
       <body
         className={`${raleway.variable} antialiased font-sans`}
       >
