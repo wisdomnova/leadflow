@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Raleway } from "next/font/google";
 import "./globals.css";
 import { Suspense } from "react";
-import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
+import GoogleTagManager, { GoogleTagManagerNoscript } from "@/components/analytics/GoogleAnalytics";
 
 const raleway = Raleway({
   variable: "--font-raleway",
@@ -32,15 +32,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* 🎯 Wrap GoogleAnalytics in Suspense */}
+        {/* Google Tag Manager - Head */}
         <Suspense fallback={null}>
-          <GoogleAnalytics />
+          <GoogleTagManager />
         </Suspense>
       </head> 
       <body
         className={`${raleway.variable} antialiased font-sans`}
       >
-        {/* 🎯 Wrap children in Suspense to handle any useSearchParams usage */}
+        {/* Google Tag Manager - Body (noscript) */}
+        <GoogleTagManagerNoscript />
+        
+        {/* Main content */}
         <Suspense fallback={<LayoutLoading />}>
           {children}
         </Suspense>
