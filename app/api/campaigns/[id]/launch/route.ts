@@ -52,10 +52,23 @@ export async function POST(
       }, { status: 400 })
     }
 
+    // Get campaign steps for email content
+    const { data: campaignSteps, error: stepsError } = await supabase
+      .from('campaign_steps')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .order('order_index')
+
+    if (stepsError || !campaignSteps || campaignSteps.length === 0) {
+      return NextResponse.json({ 
+        error: 'No email steps found. Please add email content to your campaign.' 
+      }, { status: 400 })
+    }
+
     // Get campaign contacts
     const { data: campaignContacts, error: contactsError } = await supabase
       .from('campaign_contacts')
-      .select('id') // Changed from 'contact_id' to 'id'
+      .select('id')
       .eq('campaign_id', campaignId)
 
     if (contactsError || !campaignContacts || campaignContacts.length === 0) {
@@ -64,17 +77,27 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Queue emails for each contact
-    const emailsToQueue = campaignContacts.map((cc, index) => ({
-      campaign_id: campaignId,
-      email_account_id: campaign.email_account_id,
-      contact_id: cc.id, // Changed from cc.contact_id to cc.id
-      subject: campaign.subject,
-      body: campaign.body,
-      variables: {}, // Add any custom variables here
-      scheduled_for: new Date(Date.now() + index * 60000).toISOString(),
-      status: 'pending'
-    }))
+    // Queue emails for each contact and each step
+    const emailsToQueue = []
+    
+    for (const contact of campaignContacts) {
+      for (let stepIndex = 0; stepIndex < campaignSteps.length; stepIndex++) {
+        const step = campaignSteps[stepIndex]
+        const baseDelay = stepIndex * 60000 // 1 minute between contacts for same step
+        const stepDelay = (step.delay_days * 24 * 60 * 60 * 1000) + (step.delay_hours * 60 * 60 * 1000)
+        
+        emailsToQueue.push({
+          campaign_id: campaignId,
+          email_account_id: campaign.email_account_id,
+          contact_id: contact.id,
+          subject: step.subject || 'No Subject',
+          body: step.content || 'No Content',
+          variables: {},
+          scheduled_for: new Date(Date.now() + baseDelay + stepDelay).toISOString(),
+          status: 'pending'
+        })
+      }
+    }
 
     const { error: queueError } = await supabase
       .from('email_queue')
@@ -99,7 +122,7 @@ export async function POST(
 
     return NextResponse.json({ 
       success: true,
-      message: `Campaign launched! ${emailsToQueue.length} emails queued.`
+      message: `Campaign launched! ${emailsToQueue.length} emails queued across ${campaignSteps.length} steps.`
     })
 
   } catch (error: any) {

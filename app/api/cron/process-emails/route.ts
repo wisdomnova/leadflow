@@ -140,12 +140,18 @@ async function processEmailQueue() {
 }
 
 function replaceVariables(text: string, variables: any, contact: any) {
+  // Add null check
+  if (!text || typeof text !== 'string') {
+    return text || ''
+  }
+  
   let result = text
   
-  // Replace contact variables
-  result = result.replace(/\{\{first_name\}\}/g, contact.first_name || '')
-  result = result.replace(/\{\{last_name\}\}/g, contact.last_name || '')
-  result = result.replace(/\{\{email\}\}/g, contact.email || '')
+  // Replace contact variables with null checks
+  result = result.replace(/\{\{first_name\}\}/g, contact?.first_name || '')
+  result = result.replace(/\{\{last_name\}\}/g, contact?.last_name || '')
+  result = result.replace(/\{\{email\}\}/g, contact?.email || '')
+  result = result.replace(/\{\{company\}\}/g, contact?.company || '')
   
   // Replace custom variables
   if (variables && typeof variables === 'object') {

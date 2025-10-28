@@ -200,8 +200,8 @@ export default function CreateCampaignPage() {
             type: 'email',
             subject: step.subject,
             content: step.content,
-            delay_days: step.delay_days,
-            delay_hours: step.delay_hours,
+            delay_days: step.delay_days || 0, // Use snake_case for API
+            delay_hours: step.delay_hours || 0, // Use snake_case for API
             order_index: i
           })
         })
