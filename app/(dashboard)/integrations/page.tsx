@@ -143,32 +143,51 @@ const IntegrationCard = ({
   const statusConfig = getStatusConfig(integration.status || 'disconnected')
   const StatusIcon = statusConfig.icon
 
+  const isComingSoon = integration.integration_providers?.isComingSoon || false
+  const isDisabled = isComingSoon || isConnecting
+
   return (
     <motion.div
       layout
-      className="bg-white rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 p-8 group min-h-[400px] flex flex-col"
-      whileHover={{ scale: 1.02 }}
+      className={`bg-white rounded-2xl border border-gray-200 shadow-lg transition-all duration-300 p-8 group ${
+        isComingSoon ? 'opacity-75' : 'hover:shadow-xl hover:scale-105'
+      }`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      {/* Header Section */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-            <Globe className="h-8 w-8 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-bold text-gray-900 mb-1">
-              {integration.integration_providers?.display_name || integration.name}
-            </h3>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              {integration.integration_providers?.description || 'CRM Integration'}
-            </p>
-          </div>
+      {/* Icon at the top - matching stats cards */}
+      <div className="flex items-center justify-between mb-4">
+        <div 
+          className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md transition-transform duration-200"
+          style={{ 
+            backgroundColor: integration.status === 'connected' ? THEME_COLORS.success : 
+                           isComingSoon ? '#9ca3af' : THEME_COLORS.primary 
+          }}
+        >
+          <Database className="h-7 w-7 text-white" />
         </div>
-        
+        {isComingSoon && (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+            Coming Soon
+          </span>
+        )}
+      </div>
+
+      {/* Title and description */}
+      <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">
+        {integration.integration_providers?.display_name || integration.name}
+      </h3>
+      <p className="text-lg font-bold text-gray-900 mb-4">
+        {isComingSoon 
+          ? 'Integration coming soon! Stay tuned for updates.'
+          : (integration.integration_providers?.description || 'CRM Integration')
+        }
+      </p>
+
+      {/* Status Badge */}
+      <div className="mb-6">
         <div className={clsx(
-          "inline-flex items-center px-3 py-2 rounded-full text-xs font-medium flex-shrink-0",
+          "inline-flex items-center px-3 py-2 rounded-xl text-xs font-medium shadow-sm",
           statusConfig.bg,
           statusConfig.text
         )}>
@@ -182,111 +201,112 @@ const IntegrationCard = ({
 
       {/* Stats Section - Only show if connected */}
       {integration.status === 'connected' && (
-        <div className="mb-8 flex-1">
-          <div className="grid grid-cols-1 gap-4 mb-6">
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-              <div className="flex items-center justify-between mb-2">
-                <Users className="h-5 w-5 text-blue-600" />
-                <span className="text-xs text-blue-600 font-medium">Contacts Synced</span>
-              </div>
-              <p className="text-2xl font-bold text-blue-900">
+        <div className="mb-8">
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">
                 {integration.total_synced_contacts?.toLocaleString() || 0}
-              </p>
-            </div>
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
-              <div className="flex items-center justify-between mb-2">
-                <TrendingUp className="h-5 w-5 text-green-600" />
-                <span className="text-xs text-green-600 font-medium">Deals Created</span>
               </div>
-              <p className="text-2xl font-bold text-green-900">
+              <div className="text-xs text-gray-500">Contacts</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">
                 {integration.total_synced_deals?.toLocaleString() || 0}
-              </p>
+              </div>
+              <div className="text-xs text-gray-500">Deals</div>
             </div>
           </div>
           
           {integration.last_sync_at && (
-            <div className="flex items-center text-sm text-gray-600 mb-4">
-              <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
+            <div className="flex items-center justify-center text-xs text-gray-500 mb-4">
+              <Clock className="h-3 w-3 mr-1" />
               <span>Last sync: {new Date(integration.last_sync_at).toLocaleDateString()}</span>
             </div>
           )}
         </div>
       )}
 
-      {/* Spacer for disconnected cards */}
+      {/* Empty state for disconnected cards */}
       {integration.status !== 'connected' && (
-        <div className="flex-1 mb-8">
-          <div className="text-center py-8">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-              <Database className="h-10 w-10 text-gray-400" />
-            </div>
-            <p className="text-gray-500 text-sm">
-              Connect to start syncing your CRM data
-            </p>
+        <div className="text-center py-8 mb-8">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+            <Database className="h-8 w-8 text-gray-400" />
           </div>
+          <p className="text-gray-500 text-sm">
+            {isComingSoon ? 'Integration in development' : 'Connect to start syncing your CRM data'}
+          </p>
         </div>
       )}
 
       {/* Action Section */}
-      <div className="mt-auto">
-        <div className="flex flex-col space-y-3">
-          {integration.status === 'connected' ? (
-            <>
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={handleTestConnection}
-                  disabled={isTesting}
-                  className="flex-1 inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-xl hover:bg-gray-200 disabled:opacity-50 transition-colors"
-                >
-                  {isTesting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                  )}
-                  Test Connection
-                </button>
-                
-                {testResult && (
-                  <span className={clsx(
-                    "text-sm font-medium px-3 py-2 rounded-lg",
-                    testResult === 'success' 
-                      ? 'text-green-700 bg-green-100' 
-                      : 'text-red-700 bg-red-100'
-                  )}>
-                    {testResult === 'success' ? '✓ Working' : '✗ Failed'}
-                  </span>
-                )}
-              </div>
-              
+      <div className="space-y-3">
+        {integration.status === 'connected' ? (
+          <>
+            <div className="flex items-center space-x-3">
               <button
-                onClick={() => onDisconnect(integration.id)}
-                className="w-full inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors"
+                onClick={handleTestConnection}
+                disabled={isTesting}
+                className="flex-1 inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-xl hover:bg-gray-200 disabled:opacity-50 transition-colors"
               >
-                <X className="h-4 w-4 mr-2" />
-                Disconnect Integration
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => onConnect(integration.integration_providers?.name)}
-              disabled={isConnecting}
-              className="w-full inline-flex items-center justify-center px-6 py-4 border border-transparent text-sm font-semibold rounded-xl text-white hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundColor: THEME_COLORS.primary }}
-            >
-              {isConnecting ? (
-                <>
+                {isTesting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Connect Integration
-                </>
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Test Connection
+              </button>
+              
+              {testResult && (
+                <span className={clsx(
+                  "text-sm font-medium px-3 py-2 rounded-lg",
+                  testResult === 'success' 
+                    ? 'text-green-700 bg-green-100' 
+                    : 'text-red-700 bg-red-100'
+                )}>
+                  {testResult === 'success' ? '✓ Working' : '✗ Failed'}
+                </span>
               )}
+            </div>
+            
+            <button
+              onClick={() => onDisconnect(integration.id)}
+              className="w-full inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Disconnect Integration
             </button>
-          )}
-        </div>
+          </>
+        ) : (
+          <button
+            onClick={() => !isDisabled && onConnect(integration.integration_providers?.name)}
+            disabled={isDisabled}
+            className={`w-full inline-flex items-center justify-center px-6 py-4 border border-transparent text-sm font-semibold rounded-xl transition-all ${
+              isDisabled 
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'text-white hover:shadow-lg'
+            }`}
+            style={{ 
+              backgroundColor: isDisabled ? undefined : THEME_COLORS.primary
+            }}
+          >
+            {isConnecting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Connecting...
+              </>
+            ) : isComingSoon ? (
+              <>
+                <Clock className="h-4 w-4 mr-2" />
+                Coming Soon
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Connect Integration
+              </>
+            )}
+          </button>
+        )}
       </div>
     </motion.div>
   )
@@ -515,9 +535,15 @@ export default function IntegrationsPage() {
       i => i.integration_providers?.name === provider.name
     )
     
+    // Check if this provider should be disabled
+    const isComingSoon = provider.name === 'salesforce'
+    
     return existingIntegration || {
       id: `new-${provider.name}`,
-      integration_providers: provider,
+      integration_providers: {
+        ...provider,
+        isComingSoon // Add coming soon flag
+      },
       status: 'disconnected',
       total_synced_contacts: 0,
       total_synced_deals: 0
@@ -571,45 +597,61 @@ export default function IntegrationsPage() {
             </div>
           </motion.div>
 
-          {/* Stats Overview */}
-          <motion.div 
-            className="grid grid-cols-1 md:grid-cols-3 gap-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-gray-600">Connected Integrations</h3>
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-              </div>
-              <p className="text-3xl font-bold text-gray-900">
-                {integrations.filter(i => i.status === 'connected').length}
-              </p>
-            </div>
+          {/* Stats Overview - Updated to match dashboard design */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                title: 'Connected Integrations',
+                value: integrations.filter(i => i.status === 'connected').length,
+                icon: CheckCircle2,
+                color: THEME_COLORS.success
+              },
+              {
+                title: 'Total Contacts Synced',
+                value: integrations.reduce((sum, i) => sum + (i.total_synced_contacts || 0), 0),
+                icon: Users,
+                color: THEME_COLORS.primary,
+                format: 'number'
+              },
+              {
+                title: 'Total Deals Created',
+                value: integrations.reduce((sum, i) => sum + (i.total_synced_deals || 0), 0),
+                icon: TrendingUp,
+                color: THEME_COLORS.secondary,
+                format: 'number'
+              }
+            ].map((stat, index) => {
+              const Icon = stat.icon
+              let displayValue: string | number = stat.value
+              
+              if (stat.format === 'number') {
+                displayValue = stat.value.toLocaleString()
+              }
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-gray-600">Total Contacts Synced</h3>
-                <Users className="h-5 w-5 text-blue-500" />
-              </div>
-              <p className="text-3xl font-bold text-gray-900">
-                {integrations.reduce((sum, i) => sum + (i.total_synced_contacts || 0), 0).toLocaleString()}
-              </p>
-            </div>
+              return (
+                <motion.div
+                  key={stat.title}
+                  className="bg-white rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 p-6 group hover:scale-105"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div 
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-200"
+                      style={{ backgroundColor: stat.color }}
+                    >
+                      <Icon className="h-7 w-7 text-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">{stat.title}</h3>
+                  <p className="text-3xl font-bold text-gray-900">{displayValue}</p>
+                </motion.div>
+              )
+            })}
+          </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-gray-600">Total Deals Created</h3>
-                <TrendingUp className="h-5 w-5 text-purple-500" />
-              </div>
-              <p className="text-3xl font-bold text-gray-900">
-                {integrations.reduce((sum, i) => sum + (i.total_synced_deals || 0), 0).toLocaleString()}
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Available Integrations */}
+          {/* Available Integrations - Better grid layout */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -620,7 +662,7 @@ export default function IntegrationsPage() {
               <p className="text-gray-600">Connect your CRM to automatically sync contacts and deals</p>
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnimatePresence>
                 {allProviders.map((integration) => (
                   <IntegrationCard

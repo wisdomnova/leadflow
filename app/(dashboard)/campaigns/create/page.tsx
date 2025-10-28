@@ -44,6 +44,11 @@ export default function CreateCampaignPage() {
   const searchParams = useSearchParams()
   const { createCampaign, isLoading } = useCampaignStore()
   
+  // Add email account check state
+  const [emailAccounts, setEmailAccounts] = useState<any[]>([])
+  const [showEmailAccountModal, setShowEmailAccountModal] = useState(false)
+  const [loadingEmailAccounts, setLoadingEmailAccounts] = useState(true)
+  
   // Initialize state from URL params or localStorage
   const [currentStep, setCurrentStep] = useState(() => {
     // Check URL params first
@@ -307,6 +312,43 @@ export default function CreateCampaignPage() {
     if (stepId === 2) return createdCampaignId !== null
     if (stepId === 3) return createdCampaignId !== null
     return false
+  }
+
+  // Check email accounts on mount
+  useEffect(() => {
+    const fetchEmailAccounts = async () => {
+      try {
+        const response = await fetch('/api/email-accounts')
+        if (response.ok) {
+          const data = await response.json()
+          const accounts = data.accounts || []
+          setEmailAccounts(accounts)
+          
+          const activeAccounts = accounts.filter((acc: any) => 
+            acc.status === 'active' || acc.status === 'warming_up'
+          )
+          
+          if (activeAccounts.length === 0) {
+            setShowEmailAccountModal(true)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching email accounts:', error)
+        setShowEmailAccountModal(true)
+      } finally {
+        setLoadingEmailAccounts(false)
+      }
+    }
+
+    fetchEmailAccounts()
+  }, [])
+
+  if (loadingEmailAccounts) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: THEME_COLORS.primary }}></div>
+      </div>
+    )
   }
 
   return (
@@ -1036,6 +1078,49 @@ export default function CreateCampaignPage() {
             </div>
           )} 
         </motion.div>
+
+        {/* Email Account Required Modal */}
+        {showEmailAccountModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <motion.div 
+              className="relative p-8 border w-[480px] max-w-[90vw] shadow-xl rounded-2xl bg-white"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="text-center">
+                <div 
+                  className="mx-auto flex items-center justify-center h-16 w-16 rounded-2xl mb-6 shadow-md"
+                  style={{ backgroundColor: `${THEME_COLORS.warning}20` }}
+                >
+                  <Mail className="h-8 w-8" style={{ color: THEME_COLORS.warning }} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">Email Account Required</h3>
+                <p className="text-gray-600 mb-8 leading-relaxed">
+                  You need to connect a Gmail or Outlook account before creating campaigns. This ensures better deliverability and allows you to send from your own email address.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => {
+                      clearSavedState()
+                      router.push('/campaigns')
+                    }}
+                    className="flex-1 px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 hover:shadow-md transition-all duration-200 font-medium"
+                  >
+                    Back to Campaigns
+                  </button>
+                  <button
+                    onClick={() => router.push('/email-accounts')}
+                    className="flex-1 px-6 py-3 text-white rounded-xl hover:shadow-lg transition-all duration-200 font-medium"
+                    style={{ backgroundColor: THEME_COLORS.primary }}
+                  >
+                    Connect Email Account
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
 
         {/* Templates Modal */}
         {showTemplates && (

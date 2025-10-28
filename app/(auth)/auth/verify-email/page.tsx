@@ -12,7 +12,7 @@ const staggerContainer = {
     transition: {
       staggerChildren: 0.1
     }
-  }
+  } 
 }
 
 const staggerItem = {
@@ -21,7 +21,7 @@ const staggerItem = {
   transition: { duration: 0.5 }
 }
 
-function VerifyEmailContent() {
+function VerifyEmailContent() { 
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
@@ -29,44 +29,35 @@ function VerifyEmailContent() {
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
-    const verifyEmail = async () => {
-      if (!token) {
-        setStatus('error')
-        setErrorMessage('Invalid verification link')
-        return
-      }
-
-      try {
-        const response = await fetch('/api/auth/verify-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
-        })
-
-        const data = await response.json()
-
-        if (response.ok) {
-          if (data.alreadyVerified) {
-            setStatus('already-verified')
-          } else {
-            setStatus('success')
-            // Redirect to sign in after 3 seconds
-            setTimeout(() => {
-              router.push('/auth/sign-in')
-            }, 3000)
-          }
-        } else {
-          setStatus('error')
-          setErrorMessage(data.error || 'Verification failed')
-        }
-      } catch (error) {
-        setStatus('error')
-        setErrorMessage('Network error. Please try again.')
-      }
+    // If we have a token, make a GET request to trigger verification
+    if (token) {
+      // Redirect to the GET endpoint which will handle verification and redirect back
+      window.location.href = `/api/auth/verify-email?token=${token}`
+    } else {
+      setStatus('error')
+      setErrorMessage('Invalid verification link - no token provided')
     }
+  }, [token])
 
-    verifyEmail()
-  }, [token, router])
+  // If we're here with success/error query params, it means we were redirected back
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    
+    if (window.location.pathname === '/auth/verification-success') {
+      if (urlParams.get('already-verified') === 'true') {
+        setStatus('already-verified')
+      } else {
+        setStatus('success')
+        // Redirect to sign in after 3 seconds
+        setTimeout(() => {
+          router.push('/auth/sign-in')
+        }, 3000)
+      }
+    } else if (window.location.pathname === '/auth/verification-error') {
+      setStatus('error')
+      setErrorMessage(urlParams.get('error') || 'Verification failed')
+    }
+  }, [router])
 
   if (status === 'loading') {
     return (

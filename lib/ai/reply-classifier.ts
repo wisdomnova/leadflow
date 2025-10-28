@@ -1,405 +1,290 @@
 // lib/ai/reply-classifier.ts
-import { openai, isOpenAIConfigured } from '@/lib/openai'
+import OpenAI from 'openai'
 import { supabase } from '@/lib/supabase'
 
-export interface ReplyClassification {
-  intent: 'interested' | 'not_interested' | 'objection' | 'question' | 'auto_reply' | 'neutral' | 'complaint'
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY, 
+})
+
+interface ReplyClassification {
+  category: 'interested' | 'not_interested' | 'question' | 'out_of_office' | 'bounce' | 'neutral'
   sentiment: 'positive' | 'negative' | 'neutral'
+  needsResponse: boolean
+  confidence: number
+  summary: string
+}
+
+export interface AIClassification {
+  intent: string
+  sentiment: string
   confidence: number
   reasoning: string
   suggested_response?: string
-  priority: 'high' | 'medium' | 'low'
+  priority: 'low' | 'medium' | 'high'
   tags: string[]
   requires_human_attention: boolean
-  next_action: 'follow_up' | 'schedule_call' | 'send_info' | 'no_action' | 'escalate'
-}
-
-export interface ClassificationRule {
-  id: string
-  organization_id: string
-  name: string
-  description: string
-  conditions: {
-    intent?: string[]
-    sentiment?: string[]
-    keywords?: string[]
-    sender_domain?: string[]
-  }
-  actions: {
-    auto_tag?: string[]
-    priority?: 'high' | 'medium' | 'low'
-    assign_to?: string
-    auto_reply?: boolean
-    auto_reply_template?: string
-  }
-  is_active: boolean
-  created_at: string
+  next_action?: string
 }
 
 export class ReplyClassifierService {
-
+  /**
+   * Enhanced AI classification for email replies
+   */
   static async classifyReply(
-    messageContent: string,
+    content: string,
     subject: string,
-    senderEmail: string,
+    fromEmail: string,
     campaignContext?: {
       campaignName: string
       campaignType: string
       originalMessage: string
     }
-  ): Promise<ReplyClassification> {
-    
-    if (!isOpenAIConfigured || !openai) {
-      // Fallback classification without AI
-      return this.getFallbackClassification(messageContent, subject)
-    }
-
+  ): Promise<AIClassification> {
     try {
-      const prompt = this.buildClassificationPrompt(
-        messageContent, 
-        subject, 
-        senderEmail, 
-        campaignContext
-      )
+      const contextPrompt = campaignContext 
+        ? `Original campaign: "${campaignContext.campaignName}" (${campaignContext.campaignType})\nOriginal message: ${campaignContext.originalMessage.substring(0, 500)}...\n\n`
+        : ''
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini", // Using mini for cost efficiency
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
         messages: [
           {
-            role: "system",
-            content: `You are an expert email reply classifier for B2B cold email campaigns. 
-            Your job is to analyze replies and provide structured classification data.
-            Always respond with valid JSON only, no additional text.`
+            role: 'system',
+            content: `You are an AI that classifies email replies from sales/marketing campaigns. Analyze the email and provide a JSON response with:
+
+- intent: "interested" | "not_interested" | "question" | "objection" | "out_of_office" | "bounce" | "neutral" | "meeting_request" | "price_inquiry"
+- sentiment: "positive" | "negative" | "neutral"
+- confidence: number (0-1)
+- reasoning: string (brief explanation)
+- suggested_response: string (optional, what to reply)
+- priority: "low" | "medium" | "high"
+- tags: string[] (relevant tags like ["hot_lead", "budget_question", "competitor_mention"])
+- requires_human_attention: boolean
+- next_action: string (what should be done next)
+
+Intent definitions:
+- interested: Person wants to learn more, continue conversation
+- not_interested: Explicit rejection, unsubscribe request
+- question: Asks questions about product/service/pricing
+- objection: Raises concerns or objections
+- out_of_office: Automated reply
+- bounce: Delivery failure
+- meeting_request: Wants to schedule a call/meeting
+- price_inquiry: Specifically asking about pricing
+- neutral: General acknowledgment`
           },
           {
-            role: "user",
-            content: prompt
+            role: 'user',
+            content: `${contextPrompt}Subject: ${subject}\nFrom: ${fromEmail}\nContent: ${content}`
           }
         ],
-        temperature: 0.1, // Low temperature for consistent results
-        max_tokens: 800,
-        response_format: { type: "json_object" }
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
       })
 
-      const responseContent = completion.choices[0]?.message?.content
-      if (!responseContent) {
-        throw new Error('No response from OpenAI')
+      const result = JSON.parse(response.choices[0].message.content || '{}')
+
+      return {
+        intent: result.intent || 'neutral',
+        sentiment: result.sentiment || 'neutral',
+        confidence: result.confidence || 0.5,
+        reasoning: result.reasoning || 'No reasoning provided',
+        suggested_response: result.suggested_response,
+        priority: result.priority || 'medium',
+        tags: result.tags || [],
+        requires_human_attention: result.requires_human_attention || false,
+        next_action: result.next_action || 'no_action'
       }
-
-      const classification = JSON.parse(responseContent) as ReplyClassification
-      
-      // Validate and sanitize the response 
-      return this.validateClassification(classification)
-      
     } catch (error) {
-      console.error('OpenAI classification failed:', error)
-      // Fallback to rule-based classification
-      return this.getFallbackClassification(messageContent, subject)
+      console.error('AI classification error:', error)
+      
+      // Fallback to simple keyword matching
+      return this.classifyWithKeywords(content, subject)
     }
   }
 
-  private static buildClassificationPrompt(
-    messageContent: string,
-    subject: string,
-    senderEmail: string,
-    campaignContext?: {
-      campaignName: string
-      campaignType: string  
-      originalMessage: string
+  /**
+   * Fallback keyword-based classification
+   */
+  static classifyWithKeywords(content: string, subject: string): AIClassification {
+    const lowerBody = content.toLowerCase()
+    const lowerSubject = subject.toLowerCase()
+
+    // Out of office
+    if (lowerBody.includes('out of office') || lowerBody.includes('away from desk') || 
+        lowerSubject.includes('out of office')) {
+      return {
+        intent: 'out_of_office',
+        sentiment: 'neutral',
+        confidence: 0.9,
+        reasoning: 'Detected out of office keywords',
+        priority: 'low',
+        tags: ['auto_reply'],
+        requires_human_attention: false,
+        next_action: 'ignore'
+      }
     }
-  ): string {
-    return `
-Analyze this email reply from a B2B cold email campaign and classify it:
 
-EMAIL DETAILS:
-- Subject: ${subject}
-- From: ${senderEmail}
-- Content: ${messageContent}
-
-${campaignContext ? `
-CAMPAIGN CONTEXT:
-- Campaign: ${campaignContext.campaignName}
-- Type: ${campaignContext.campaignType}
-- Original Message: ${campaignContext.originalMessage.substring(0, 500)}...
-` : ''}
-
-Classify this reply with the following JSON structure:
-
-{
-  "intent": "interested|not_interested|objection|question|auto_reply|neutral|complaint",
-  "sentiment": "positive|negative|neutral", 
-  "confidence": 0.85,
-  "reasoning": "Brief explanation of the classification",
-  "suggested_response": "Optional suggested reply text",
-  "priority": "high|medium|low",
-  "tags": ["relevant", "keywords", "from", "content"],
-  "requires_human_attention": true|false,
-  "next_action": "follow_up|schedule_call|send_info|no_action|escalate"
-}
-
-CLASSIFICATION GUIDELINES:
-- "interested": Shows genuine interest, asks for more info, wants to schedule a call
-- "not_interested": Polite decline, not a fit, already has a solution  
-- "objection": Concerns about price, timing, features, authority
-- "question": Asking for clarification, more details, or has concerns
-- "auto_reply": Out of office, vacation messages, auto-responders
-- "neutral": Acknowledgment without clear intent
-- "complaint": Negative feedback, spam complaints, unsubscribe requests
-
-PRIORITY LEVELS:
-- "high": Interested prospects, hot leads, complaints
-- "medium": Questions, objections, lukewarm responses  
-- "low": Auto-replies, not interested, neutral responses
-
-HUMAN ATTENTION NEEDED:
-- High-priority responses
-- Complex objections
-- Complaints or negative sentiment
-- Unclear intent requiring judgment
-
-Respond with valid JSON only.
-`
-  }
-
-  private static validateClassification(classification: any): ReplyClassification {
-    const validIntents = ['interested', 'not_interested', 'objection', 'question', 'auto_reply', 'neutral', 'complaint']
-    const validSentiments = ['positive', 'negative', 'neutral']
-    const validPriorities = ['high', 'medium', 'low']
-    const validNextActions = ['follow_up', 'schedule_call', 'send_info', 'no_action', 'escalate']
-
-    return {
-      intent: validIntents.includes(classification.intent) ? classification.intent : 'neutral',
-      sentiment: validSentiments.includes(classification.sentiment) ? classification.sentiment : 'neutral',
-      confidence: Math.min(Math.max(classification.confidence || 0.5, 0), 1),
-      reasoning: classification.reasoning || 'Automated classification',
-      suggested_response: classification.suggested_response,
-      priority: validPriorities.includes(classification.priority) ? classification.priority : 'medium',
-      tags: Array.isArray(classification.tags) ? classification.tags.slice(0, 10) : [],
-      requires_human_attention: Boolean(classification.requires_human_attention),
-      next_action: validNextActions.includes(classification.next_action) ? classification.next_action : 'no_action'
+    // Not interested
+    if (lowerBody.includes('not interested') || lowerBody.includes('unsubscribe') || 
+        lowerBody.includes('remove me') || lowerBody.includes('stop emailing')) {
+      return {
+        intent: 'not_interested',
+        sentiment: 'negative',
+        confidence: 0.8,
+        reasoning: 'Explicit rejection detected',
+        priority: 'low',
+        tags: ['rejection'],
+        requires_human_attention: false,
+        next_action: 'unsubscribe'
+      }
     }
-  }
 
-  private static getFallbackClassification(messageContent: string, subject: string): ReplyClassification {
-    const content = messageContent.toLowerCase()
-    const subjectLower = subject.toLowerCase()
+    // Meeting request
+    if (lowerBody.includes('schedule') || lowerBody.includes('meeting') ||
+        lowerBody.includes('call') || lowerBody.includes('demo') ||
+        lowerBody.includes('available')) {
+      return {
+        intent: 'meeting_request',
+        sentiment: 'positive',
+        confidence: 0.7,
+        reasoning: 'Meeting/call keywords detected',
+        priority: 'high',
+        tags: ['hot_lead', 'meeting'],
+        requires_human_attention: true,
+        next_action: 'schedule_meeting'
+      }
+    }
 
-    // Simple keyword-based classification
-    const interestedKeywords = ['interested', 'tell me more', 'schedule', 'call', 'meeting', 'demo', 'yes', 'sounds good']
-    const notInterestedKeywords = ['not interested', 'no thank you', 'remove me', 'unsubscribe', 'stop', 'not a fit']
-    const autoReplyKeywords = ['out of office', 'vacation', 'auto', 'away', 'automatic']
-    const objectionKeywords = ['expensive', 'cost', 'price', 'budget', 'timing', 'busy']
-    const complaintKeywords = ['spam', 'harassment', 'abuse', 'report', 'legal', 'lawyer', 'violation']
+    // Price inquiry
+    if (lowerBody.includes('price') || lowerBody.includes('cost') ||
+        lowerBody.includes('budget') || lowerBody.includes('expensive')) {
+      return {
+        intent: 'price_inquiry',
+        sentiment: 'neutral',
+        confidence: 0.6,
+        reasoning: 'Price-related keywords detected',
+        priority: 'medium',
+        tags: ['pricing'],
+        requires_human_attention: true,
+        next_action: 'send_pricing'
+      }
+    }
 
-    let intent: ReplyClassification['intent'] = 'neutral'
-    let sentiment: ReplyClassification['sentiment'] = 'neutral'
-    let priority: ReplyClassification['priority'] = 'medium'
+    // Interested
+    if (lowerBody.includes('interested') || lowerBody.includes('tell me more')) {
+      return {
+        intent: 'interested',
+        sentiment: 'positive',
+        confidence: 0.7,
+        reasoning: 'Interest keywords detected',
+        priority: 'high',
+        tags: ['interested'],
+        requires_human_attention: true,
+        next_action: 'follow_up'
+      }
+    }
 
-    if (interestedKeywords.some(keyword => content.includes(keyword))) {
-      intent = 'interested'
-      sentiment = 'positive'
-      priority = 'high'
-    } else if (notInterestedKeywords.some(keyword => content.includes(keyword))) {
-      intent = 'not_interested'
-      sentiment = 'negative'
-      priority = 'low'
-    } else if (autoReplyKeywords.some(keyword => content.includes(keyword))) {
-      intent = 'auto_reply'
-      priority = 'low'
-    } else if (objectionKeywords.some(keyword => content.includes(keyword))) {
-      intent = 'objection'
-      priority = 'medium'
-    } else if (complaintKeywords.some(keyword => content.includes(keyword))) {
-      intent = 'complaint'
-      sentiment = 'negative'
-      priority = 'high' 
+    // Question
+    if (lowerBody.includes('?') || lowerBody.includes('how') || 
+        lowerBody.includes('what') || lowerBody.includes('when')) {
+      return {
+        intent: 'question',
+        sentiment: 'neutral',
+        confidence: 0.6,
+        reasoning: 'Question patterns detected',
+        priority: 'medium',
+        tags: ['question'],
+        requires_human_attention: true,
+        next_action: 'answer_question'
+      }
     }
 
     return {
-      intent,
-      sentiment,
-      confidence: 0.6, // Lower confidence for fallback
-      reasoning: 'Keyword-based classification (AI unavailable)',
-      priority,
+      intent: 'neutral',
+      sentiment: 'neutral',
+      confidence: 0.5,
+      reasoning: 'No specific patterns detected',
+      priority: 'low',
       tags: [],
-      requires_human_attention: priority === 'high' || intent === 'complaint',
-      next_action: intent === 'interested' ? 'follow_up' : 'no_action'
+      requires_human_attention: false,
+      next_action: 'monitor'
     }
   }
 
-  // Apply classification rules
+  /**
+   * Apply automated rules based on classification
+   */
   static async applyClassificationRules(
     messageId: string,
-    classification: ReplyClassification,
+    classification: AIClassification,
     organizationId: string
   ): Promise<void> {
     try {
-      // Get active classification rules for the organization
-      const { data: rules } = await supabase
-        .from('classification_rules')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
+      // Auto-archive out of office replies
+      if (classification.intent === 'out_of_office') {
+        await supabase
+          .from('inbox_messages')
+          .update({ is_archived: true })
+          .eq('id', messageId)
+      }
 
-      if (!rules || rules.length === 0) return
+      // Auto-star high priority messages
+      if (classification.priority === 'high') {
+        await supabase
+          .from('inbox_messages')
+          .update({ is_starred: true })
+          .eq('id', messageId)
+      }
 
-      for (const rule of rules) {
-        const matchesRule = this.checkRuleConditions(rule, classification)
-        
-        if (matchesRule) {
-          await this.executeRuleActions(messageId, rule, classification)
-        }
+      // Create tasks for messages requiring attention
+      if (classification.requires_human_attention && classification.next_action !== 'ignore') {
+        await supabase
+          .from('tasks')
+          .insert({
+            organization_id: organizationId,
+            title: `Follow up on ${classification.intent} reply`,
+            description: `Message classified as ${classification.intent} with ${classification.sentiment} sentiment. ${classification.reasoning}`,
+            type: 'follow_up',
+            priority: classification.priority,
+            related_message_id: messageId,
+            due_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+            status: 'pending'
+          })
       }
 
     } catch (error) {
       console.error('Failed to apply classification rules:', error)
     }
   }
+}
 
-  private static checkRuleConditions(rule: ClassificationRule, classification: ReplyClassification): boolean {
-    const conditions = rule.conditions
-
-    // Check intent conditions
-    if (conditions.intent && conditions.intent.length > 0) {
-      if (!conditions.intent.includes(classification.intent)) {
-        return false
-      }
+/**
+ * Legacy function for backward compatibility
+ */
+export async function classifyReplyWithAI(emailBody: string): Promise<ReplyClassification> {
+  try {
+    const classification = await ReplyClassifierService.classifyReply(emailBody, '', '')
+    
+    return {
+      category: classification.intent as any,
+      sentiment: classification.sentiment as any,
+      needsResponse: classification.requires_human_attention,
+      confidence: classification.confidence,
+      summary: classification.reasoning
     }
-
-    // Check sentiment conditions  
-    if (conditions.sentiment && conditions.sentiment.length > 0) {
-      if (!conditions.sentiment.includes(classification.sentiment)) {
-        return false
-      }
-    }
-
-    // Check keyword conditions
-    if (conditions.keywords && conditions.keywords.length > 0) {
-      const hasKeyword = conditions.keywords.some(keyword =>
-        classification.tags.some(tag => tag.toLowerCase().includes(keyword.toLowerCase()))
-      )
-      if (!hasKeyword) {
-        return false
-      }
-    }
-
-    return true
-  }
-
-  private static async executeRuleActions(
-    messageId: string,
-    rule: ClassificationRule,
-    classification: ReplyClassification
-  ): Promise<void> {
-    const actions = rule.actions
-    const updates: any = {}
-
-    // Apply auto-tagging
-    if (actions.auto_tag && actions.auto_tag.length > 0) {
-      const existingTags = classification.tags || []
-      updates.tags = [...new Set([...existingTags, ...actions.auto_tag])]
-    }
-
-    // Override priority if specified
-    if (actions.priority) {
-      updates.priority = actions.priority
-    }
-
-    // Update requires_human_attention if high priority
-    if (actions.priority === 'high') {
-      updates.requires_human_attention = true
-    }
-
-    // Update the inbox message with rule-based modifications
-    if (Object.keys(updates).length > 0) {
-      const { error } = await supabase
-        .from('inbox_messages')
-        .update({
-          tags: updates.tags,
-          classification: JSON.stringify({
-            ...classification,
-            ...updates,
-            applied_rules: [rule.name]
-          })
-        })
-        .eq('id', messageId)
-
-      if (error) {
-        console.error('Failed to update message with rule actions:', error)
-      }
-    }
-
-    // Log rule application
-    await supabase
-      .from('classification_rule_logs')
-      .insert({
-        message_id: messageId,
-        rule_id: rule.id,
-        actions_applied: actions,
-        applied_at: new Date().toISOString()
-      })
-  }
-
-  // Create or update classification rules
-  static async createClassificationRule(
-    organizationId: string,
-    rule: Omit<ClassificationRule, 'id' | 'organization_id' | 'created_at'>
-  ): Promise<ClassificationRule> {
-    const { data, error } = await supabase
-      .from('classification_rules')
-      .insert({
-        ...rule,
-        organization_id: organizationId
-      })
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(`Failed to create classification rule: ${error.message}`)
-    }
-
-    return data
-  }
-
-  // Get classification rules for an organization
-  static async getClassificationRules(organizationId: string): Promise<ClassificationRule[]> {
-    const { data, error } = await supabase
-      .from('classification_rules')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      throw new Error(`Failed to fetch classification rules: ${error.message}`)
-    }
-
-    return data || []
-  }
-
-  // Update classification rule
-  static async updateClassificationRule(
-    ruleId: string,
-    updates: Partial<ClassificationRule>
-  ): Promise<void> {
-    const { error } = await supabase
-      .from('classification_rules')
-      .update(updates)
-      .eq('id', ruleId)
-
-    if (error) {
-      throw new Error(`Failed to update classification rule: ${error.message}`)
-    }
-  }
-
-  // Delete classification rule
-  static async deleteClassificationRule(ruleId: string): Promise<void> {
-    const { error } = await supabase
-      .from('classification_rules')
-      .delete()
-      .eq('id', ruleId)
-
-    if (error) {
-      throw new Error(`Failed to delete classification rule: ${error.message}`)
+  } catch (error) {
+    console.error('Legacy AI classification error:', error)
+    
+    return {
+      category: 'neutral',
+      sentiment: 'neutral',
+      needsResponse: false,
+      confidence: 0.5,
+      summary: 'Classification failed'
     }
   }
 }
+
+// Default export
+export default ReplyClassifierService

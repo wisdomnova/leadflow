@@ -161,7 +161,8 @@ export class EmailProcessor {
             reply_to,
             organization_id,
             track_opens,
-            track_clicks
+            track_clicks,
+            email_account_id
           )
         `)
         .eq('id', campaignContactId)
@@ -258,7 +259,7 @@ export class EmailProcessor {
         companyName: campaign.from_name || 'LeadFlow'
       })
 
-      // Send email using EmailService (which now uses SES)
+      // Send email using EmailService with proper parameters
       const emailResult = await EmailService.sendEmail({
         to: contact.email,
         subject: processedSubject,
@@ -271,7 +272,8 @@ export class EmailProcessor {
           undefined,
         replyTo: campaign.reply_to || undefined,
         trackOpens: campaign.track_opens !== false,
-        trackClicks: campaign.track_clicks !== false
+        trackClicks: campaign.track_clicks !== false,
+        emailAccountId: campaign.email_account_id // Use campaign's connected email account
       })
 
       if (!emailResult.success) {
@@ -289,7 +291,7 @@ export class EmailProcessor {
         })
         .eq('id', campaignContactId)
 
-      console.log(`✅ Email sent to ${contact.email} via SES`)
+      console.log(`✅ Email sent to ${contact.email}`)
       return { success: true }
 
     } catch (error) {

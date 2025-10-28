@@ -31,6 +31,7 @@ export async function GET(
         contactId: trackingData.contactId,
         stepNumber: trackingData.stepNumber,
         type: 'click',
+        messageId: undefined,
         url: decodeURIComponent(targetUrl),
         userAgent,
         ipAddress

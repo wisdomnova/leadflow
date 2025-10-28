@@ -475,6 +475,11 @@ export default function CampaignsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({})
+  
+  // Add email account check state
+  const [emailAccounts, setEmailAccounts] = useState<any[]>([])
+  const [showEmailAccountModal, setShowEmailAccountModal] = useState(false)
+  const [loadingEmailAccounts, setLoadingEmailAccounts] = useState(true)
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300)
 
@@ -499,6 +504,27 @@ export default function CampaignsPage() {
 
     return filtered
   }, [allCampaigns, debouncedSearchQuery, statusFilter])
+
+  // Fetch email accounts
+  useEffect(() => {
+    const fetchEmailAccounts = async () => {
+      if (!user) return
+      
+      try {
+        const response = await fetch('/api/email-accounts')
+        if (response.ok) {
+          const data = await response.json()
+          setEmailAccounts(data.accounts || [])
+        }
+      } catch (error) {
+        console.error('Error fetching email accounts:', error)
+      } finally {
+        setLoadingEmailAccounts(false)
+      }
+    }
+
+    fetchEmailAccounts()
+  }, [user])
 
   useEffect(() => {
     fetchCampaigns()
@@ -653,6 +679,23 @@ export default function CampaignsPage() {
     )
   }
 
+  // Handle create campaign click
+  const handleCreateCampaign = () => {
+    if (loadingEmailAccounts) return
+    
+    const activeAccounts = emailAccounts.filter(acc => 
+      acc.status === 'active' || acc.status === 'warming_up'
+    )
+    
+    if (activeAccounts.length === 0) {
+      setShowEmailAccountModal(true)
+      return
+    }
+    
+    clearCreateCampaignState()
+    router.push('/campaigns/create')
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-full mx-auto px-6 py-6">
@@ -670,15 +713,19 @@ export default function CampaignsPage() {
                 Create and manage your email marketing campaigns
               </p>
             </div>
-            <Link
-              href="/campaigns/create"
-              onClick={clearCreateCampaignState}
-              className="inline-flex items-center px-8 py-3 border border-transparent text-sm font-semibold rounded-xl text-white hover:shadow-lg transition-all duration-200"
+            <button
+              onClick={handleCreateCampaign}
+              disabled={loadingEmailAccounts}
+              className="inline-flex items-center px-8 py-3 border border-transparent text-sm font-semibold rounded-xl text-white hover:shadow-lg transition-all duration-200 disabled:opacity-50"
               style={{ backgroundColor: THEME_COLORS.primary }}
             >
-              <Plus className="h-4 w-4 mr-2" />
+              {loadingEmailAccounts ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
               Create Campaign
-            </Link>
+            </button>
           </motion.div>
 
           {/* Stats Cards */}
@@ -809,15 +856,19 @@ export default function CampaignsPage() {
               </p>
               {!searchQuery && statusFilter === 'all' && (
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link
-                    href="/campaigns/create"
-                    onClick={clearCreateCampaignState}
-                    className="inline-flex items-center px-8 py-3 border border-transparent text-sm font-semibold rounded-xl text-white hover:shadow-lg transition-all duration-200"
+                  <button
+                    onClick={handleCreateCampaign}
+                    disabled={loadingEmailAccounts}
+                    className="inline-flex items-center px-8 py-3 border border-transparent text-sm font-semibold rounded-xl text-white hover:shadow-lg transition-all duration-200 disabled:opacity-50"
                     style={{ backgroundColor: THEME_COLORS.primary }}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
+                    {loadingEmailAccounts ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <Plus className="h-4 w-4 mr-2" />
+                    )}
                     Create Your First Campaign
-                  </Link>
+                  </button>
                   <Link
                     href="/campaigns/templates"
                     className="inline-flex items-center px-6 py-3 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md transition-all duration-200"
@@ -1080,6 +1131,49 @@ export default function CampaignsPage() {
               )}
             </motion.div>
           )}
+
+          {/* Email Account Required Modal */}
+          <AnimatePresence>
+            {showEmailAccountModal && (
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <motion.div 
+                  className="relative p-8 border w-[480px] max-w-[90vw] shadow-xl rounded-2xl bg-white"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="text-center">
+                    <div 
+                      className="mx-auto flex items-center justify-center h-16 w-16 rounded-2xl mb-6 shadow-md"
+                      style={{ backgroundColor: `${THEME_COLORS.warning}20` }}
+                    >
+                      <Mail className="h-8 w-8" style={{ color: THEME_COLORS.warning }} />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-3">Email Account Required</h3>
+                    <p className="text-gray-600 mb-8 leading-relaxed">
+                      You need to connect a Gmail or Outlook account before creating campaigns. This ensures better deliverability and allows you to send from your own email address.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={() => setShowEmailAccountModal(false)}
+                        className="flex-1 px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 hover:shadow-md transition-all duration-200 font-medium"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => router.push('/email-accounts')}
+                        className="flex-1 px-6 py-3 text-white rounded-xl hover:shadow-lg transition-all duration-200 font-medium"
+                        style={{ backgroundColor: THEME_COLORS.primary }}
+                      >
+                        Connect Email Account
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
 
           {/* Delete Modal */}
           <AnimatePresence>

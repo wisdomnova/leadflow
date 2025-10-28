@@ -1,7 +1,7 @@
-// ./app/(dashboard)/dashboard/page.tsx
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useAuthStore } from '@/store/useAuthStore'
@@ -15,18 +15,21 @@ import {
   Activity,
   BarChart3,
   ArrowUpRight,
-  Eye,
+  Eye, 
   TrendingUp,
   Target,
-  FileText,
+  FileText, 
   Reply,
   Clock,
   Zap,
   MousePointer,
   CreditCard,
   Shield,
-  Wifi
-} from 'lucide-react'
+  Wifi,
+  CheckCircle2,
+  AlertCircle,
+  X
+} from 'lucide-react'  
 import {
   LineChart,
   Line,
@@ -41,6 +44,7 @@ import {
   Pie,
   Cell
 } from 'recharts'
+import { EmailAccountBanner } from '@/components/EmailAccountBanner'
 
 // Theme colors - consistent throughout the site
 const THEME_COLORS = {
@@ -65,6 +69,12 @@ const getActivityIcon = (type: string) => {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
+  const searchParams = useSearchParams()
+  const onboardingStatus = searchParams.get('onboarding')
+  
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
+  const [showSkippedBanner, setShowSkippedBanner] = useState(false)
+
   const { 
     stats, 
     performanceData,
@@ -80,6 +90,19 @@ export default function DashboardPage() {
     unsubscribeFromRealtime,
     calculateTrialDays
   } = useDashboardStore()
+
+  useEffect(() => {
+    // Handle onboarding status banners
+    if (onboardingStatus === 'complete') {
+      setShowSuccessBanner(true)
+      // Auto-hide after 8 seconds
+      setTimeout(() => setShowSuccessBanner(false), 8000)
+    } else if (onboardingStatus === 'skipped') {
+      setShowSkippedBanner(true)
+      // Auto-hide after 10 seconds
+      setTimeout(() => setShowSkippedBanner(false), 10000)
+    }
+  }, [onboardingStatus])
 
   useEffect(() => {
     // Fetch all dashboard data
@@ -138,6 +161,105 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-full mx-auto px-6 py-6">
         
+        {/* Onboarding Success Banner */}
+        {showSuccessBanner && (
+          <motion.div 
+            className="mb-6 p-5 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl shadow-lg"
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ duration: 0.5, type: "spring" }}
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center shadow-md">
+                  <CheckCircle2 className="w-7 h-7 text-white" />
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-bold text-green-900 mb-2">
+                  🎉 Welcome to LeadFlow!
+                </h3>
+                <p className="text-base text-green-800 mb-3">
+                  Your email account is connected and ready to send campaigns. You're all set to start generating leads!
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href="/campaigns/create"
+                    className="inline-flex items-center px-5 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-xl hover:bg-green-700 hover:shadow-lg transition-all"
+                  >
+                    Create Your First Campaign
+                    <ArrowUpRight className="w-4 h-4 ml-2" />
+                  </Link>
+                  <Link
+                    href="/contacts/import"
+                    className="inline-flex items-center px-5 py-2.5 bg-white text-green-700 text-sm font-semibold rounded-xl border-2 border-green-300 hover:bg-green-50 transition-all"
+                  >
+                    Import Contacts
+                  </Link>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSuccessBanner(false)}
+                className="flex-shrink-0 text-green-600 hover:text-green-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Onboarding Skipped Banner */}
+        {showSkippedBanner && (
+          <motion.div 
+            className="mb-6 p-5 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl shadow-lg"
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ duration: 0.5, type: "spring" }}
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-md">
+                  <AlertCircle className="w-7 h-7 text-white" />
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-bold text-amber-900 mb-2">
+                  ⚡ Quick Reminder
+                </h3>
+                <p className="text-base text-amber-800 mb-3">
+                  You'll need to connect an email account before you can send campaigns. Don't worry, it only takes 2 minutes!
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href="/email-accounts"
+                    className="inline-flex items-center px-5 py-2.5 bg-amber-600 text-white text-sm font-semibold rounded-xl hover:bg-amber-700 hover:shadow-lg transition-all"
+                  >
+                    Connect Email Account
+                    <Mail className="w-4 h-4 ml-2" />
+                  </Link>
+                  <Link
+                    href="/contacts/import"
+                    className="inline-flex items-center px-5 py-2.5 bg-white text-amber-700 text-sm font-semibold rounded-xl border-2 border-amber-300 hover:bg-amber-50 transition-all"
+                  >
+                    Import Contacts First
+                  </Link>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSkippedBanner(false)}
+                className="flex-shrink-0 text-amber-600 hover:text-amber-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Email Account Connection Banner (if no OAuth) */}
+        <EmailAccountBanner />
+
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">

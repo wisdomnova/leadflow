@@ -1,22 +1,21 @@
+// app/api/campaigns/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
-import jwt from 'jsonwebtoken'
+import { createClient } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
+  const supabase = createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
-    const token = request.cookies.get('auth-token')?.value
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-
     // Get user's organization
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('organization_id')
-      .eq('id', decoded.userId)
+      .eq('id', user.id) 
       .single()  
 
     if (userError || !userData) {
@@ -77,14 +76,44 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const token = request.cookies.get('auth-token')?.value
+  const supabase = createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    // ✅ CHECK: User must have at least one active email account
+    const { data: emailAccounts, error: emailAccountError } = await supabase
+      .from('email_accounts')
+      .select('id, email, status, provider')
+      .eq('user_id', user.id)
+      .in('status', ['active', 'warming_up'])
+      .limit(1)
+
+    if (emailAccountError) {
+      console.error('Email account check error:', emailAccountError)
+      return NextResponse.json(
+        { error: 'Failed to verify email account' },
+        { status: 500 }
+      )
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    if (!emailAccounts || emailAccounts.length === 0) {
+      return NextResponse.json(
+        { 
+          error: 'You must connect an email account before creating campaigns',
+          code: 'NO_EMAIL_ACCOUNT',
+          action: 'redirect_to_settings',
+          message: 'Please connect a Gmail or Outlook account in Settings to send campaigns.'
+        },
+        { status: 400 }
+      )
+    }
+
+    console.log('✅ Email account verified:', emailAccounts[0])
+
     const body = await request.json()
 
     console.log('Creating campaign with body:', body)
@@ -93,7 +122,7 @@ export async function POST(request: NextRequest) {
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('organization_id')
-      .eq('id', decoded.userId)
+      .eq('id', user.id)
       .single() 
 
     if (userError || !userData) {
@@ -102,6 +131,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('User organization:', userData.organization_id)
+
+    // Use the connected email account as default sender if not specified
+    const defaultEmailAccount = emailAccounts[0]
 
     // Prepare campaign data with ALL required fields
     const campaignData = {
@@ -113,9 +145,10 @@ export async function POST(request: NextRequest) {
       status: body.status || 'draft',
       type: body.type || 'one-time',
       
-      // IMPORTANT: Add the missing sender fields
+      // Use connected email account as default sender
       from_name: body.from_name || null,
-      from_email: body.from_email || null,
+      from_email: body.from_email || defaultEmailAccount.email,
+      email_account_id: body.email_account_id || defaultEmailAccount.id,
       
       // Sequence-specific fields
       is_sequence: body.type === 'sequence',
@@ -170,9 +203,14 @@ export async function POST(request: NextRequest) {
         .from('activity_logs')
         .insert([{
           organization_id: userData.organization_id,
-          user_id: decoded.userId,
+          user_id: user.id,
           action: 'campaign_created',
-          description: `Created campaign "${campaign.name}"`
+          description: `Created campaign "${campaign.name}"`,
+          metadata: {
+            campaign_id: campaign.id,
+            campaign_type: campaign.type,
+            email_account_provider: defaultEmailAccount.provider
+          }
         }])
     } catch (activityError) {
       console.warn('Activity logging failed:', activityError)

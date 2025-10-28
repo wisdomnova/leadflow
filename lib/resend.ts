@@ -1,12 +1,13 @@
 // lib/resend.ts
-import { sendSESEmail } from './ses'
+import { Resend } from 'resend'
 
-// Keep this for backward compatibility during migration
+const resend = new Resend(process.env.RESEND_API_KEY)
+
 export const sendEmail = async ({
   to,
   subject,
   html,
-  from = `${process.env.AWS_SES_FROM_NAME || 'LeadFlow'} <${process.env.AWS_SES_FROM_EMAIL}>`
+  from = `LeadFlow <${process.env.RESEND_SENDING_DOMAIN}>`
 }: {
   to: string | string[]
   subject: string
@@ -14,30 +15,21 @@ export const sendEmail = async ({
   from?: string 
 }) => { 
   try {
-    console.log('📧 Legacy sendEmail called - redirecting to SES')
+    console.log('📧 Sending email via Resend')
     
-    const result = await sendSESEmail({
+    const result = await resend.emails.send({
+      from,
       to,
       subject,
       html,
-      from
     })
 
-    if (result.success) {
-      console.log('Email sent successfully via SES:', result)
-      return { id: result.messageId }
-    } else {
-      throw new Error(result.error)
-    }
+    console.log('Email sent successfully via Resend:', result)
+    return { id: result.data?.id }
   } catch (error) {
-    console.error('Failed to send email via SES:', error)
+    console.error('Failed to send email via Resend:', error)
     throw error
   }
 }
 
-// Deprecated - use SES directly
-export const resend = {
-  emails: {
-    send: sendEmail
-  }
-}
+export { resend }

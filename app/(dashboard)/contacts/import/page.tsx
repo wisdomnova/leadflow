@@ -14,7 +14,7 @@ import {
   X,
   ArrowLeft,
   Users,
-  AlertTriangle,
+  AlertTriangle, 
   File,
   Eye,
   Shield,
@@ -90,9 +90,9 @@ export default function ImportContactsPage() {
   }
 
   const downloadTemplate = () => {
-    const csvContent = 'email,first_name,last_name,company,job_title,phone,tags\n' +
-                      'john.doe@example.com,John,Doe,Example Corp,CEO,+1234567890,"lead,vip"\n' +
-                      'jane.smith@test.com,Jane,Smith,Test Inc,Manager,+0987654321,lead'
+    const csvContent = 'email,first_name,last_name,company,job_title,phone,tags,website,notes\n' +
+                      'john.doe@example.com,John,Doe,Example Corp,CEO,+1234567890,"lead,vip",https://example.com,Important client\n' +
+                      'jane.smith@test.com,Jane,Smith,Test Inc,Manager,+0987654321,lead,https://test.com,Follow up needed'
     
     const blob = new Blob([csvContent], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
@@ -261,7 +261,15 @@ export default function ImportContactsPage() {
                         </div>
                         <div className="flex items-center">
                           <CheckCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.success }} />
-                          <span>Optional: <code className="bg-gray-200 px-1 rounded text-xs font-mono">first_name</code>, <code className="bg-gray-200 px-1 rounded text-xs font-mono">last_name</code>, <code className="bg-gray-200 px-1 rounded text-xs font-mono">company</code>, etc.</span>
+                          <span>Optional: <code className="bg-gray-200 px-1 rounded text-xs font-mono">first_name</code>, <code className="bg-gray-200 px-1 rounded text-xs font-mono">last_name</code>, <code className="bg-gray-200 px-1 rounded text-xs font-mono">company</code>, <code className="bg-gray-200 px-1 rounded text-xs font-mono">phone</code></span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.success }} />
+                          <span>Smart mapping: <code className="bg-gray-200 px-1 rounded text-xs font-mono">phone_number</code> → <code className="bg-gray-200 px-1 rounded text-xs font-mono">phone</code>, <code className="bg-gray-200 px-1 rounded text-xs font-mono">firstName</code> → <code className="bg-gray-200 px-1 rounded text-xs font-mono">first_name</code></span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.success }} />
+                          <span>Additional fields will be stored as custom data</span>
                         </div>
                         <div className="flex items-center">
                           <CheckCircle className="h-4 w-4 mr-2" style={{ color: THEME_COLORS.success }} />
@@ -496,6 +504,45 @@ export default function ImportContactsPage() {
                     <div className="text-gray-700 font-medium">Errors</div>
                   </motion.div>
                 </div>
+
+                {/* Enhanced Results Summary */}
+                {importResult.fieldsFound && (
+                  <motion.div 
+                    className="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-6"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <h4 className="text-lg font-bold text-gray-900 mb-3 flex items-center">
+                      <Eye className="h-5 w-5 mr-2" style={{ color: THEME_COLORS.primary }} />
+                      Fields Detected
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <h5 className="font-medium text-gray-700 mb-2">CSV Columns Found:</h5>
+                        <div className="flex flex-wrap gap-1">
+                          {importResult.fieldsFound.map((field: string) => (
+                            <span key={field} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                              {field}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {importResult.customFieldsExtracted && importResult.customFieldsExtracted.length > 0 && (
+                        <div>
+                          <h5 className="font-medium text-gray-700 mb-2">Custom Fields Extracted:</h5>
+                          <div className="flex flex-wrap gap-1">
+                            {importResult.customFieldsExtracted.map((field: string) => (
+                              <span key={field} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
+                                {field}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Error Details */}
                 {importResult.details && importResult.details.length > 0 && (

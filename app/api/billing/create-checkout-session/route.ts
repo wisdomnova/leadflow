@@ -1,65 +1,44 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { stripe, STRIPE_PLANS } from '@/lib/stripe'
-import { supabase } from '@/lib/supabase'
-import jwt from 'jsonwebtoken'
+// app/api/billing/create-checkout-session/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { createClient } from '@/lib/supabase';
+import { PLANS, getPlanByPriceId } from '@/lib/plans';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-07-30.basil',
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get('auth-token')?.value
+    const supabase = createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!token) { 
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-    const { planType, billingCycle } = await request.json()
+    const { priceId, planId } = await request.json();
 
-    // 🎯 NEW: Get referral code from cookie
-    const referralCode = request.cookies.get('referral_code')?.value
-
-    // Get user and organization
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('*, organizations(*)')
-      .eq('id', decoded.userId)
-      .single() 
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (!priceId || !planId) {
+      return NextResponse.json({ error: 'Missing priceId or planId' }, { status: 400 });
     }
 
-    // Get or create Stripe customer
-    let customerId = user.stripe_customer_id
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: `${user.first_name} ${user.last_name}`,
-        metadata: {
-          userId: user.id,
-          organizationId: user.organization_id
-        }
-      })
-
-      customerId = customer.id
-
-      // Update user with Stripe customer ID
-      await supabase
-        .from('users')
-        .update({ stripe_customer_id: customerId })
-        .eq('id', user.id)
+    // Validate plan exists
+    const plan = PLANS[planId as keyof typeof PLANS];
+    if (!plan) {
+      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
     }
 
-    // Get price ID
-    const priceId = STRIPE_PLANS[planType as keyof typeof STRIPE_PLANS][billingCycle as 'monthly' | 'yearly']
-
-    if (!priceId) {
-      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
-    }
+    // Check if user already has a subscription
+    const { data: existingSubscription } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
-      customer: customerId,
+      customer_email: user.email,
       payment_method_types: ['card'],
       line_items: [
         {
@@ -68,34 +47,27 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing/upgrade`,
-      client_reference_id: referralCode || '', // 🎯 NEW: Track referral code
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing?success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing?canceled=true`,
       metadata: {
         userId: user.id,
-        organizationId: user.organization_id,
-        planType,
-        billingCycle,
-        referralCode: referralCode || '' // 🎯 NEW: Include referral code
+        planId: planId,
       },
       subscription_data: {
         metadata: {
           userId: user.id,
-          organizationId: user.organization_id,
-          planType,
-          billingCycle,
-          referralCode: referralCode || '' // 🎯 NEW: Include referral code
-        }
-      }
-    })
+          planId: planId,
+        },
+      },
+      allow_promotion_codes: true,
+    });
 
-    return NextResponse.json({ 
-      sessionId: session.id,
-      url: session.url 
-    })
-
-  } catch (error) {
-    console.error('Create checkout session error:', error)
-    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
+    return NextResponse.json({ url: session.url });
+  } catch (error: any) {
+    console.error('Error creating checkout session:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to create checkout session' },
+      { status: 500 }
+    );
   }
 }

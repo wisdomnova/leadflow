@@ -422,7 +422,7 @@ export class ReplyDetectionService {
               sentiment: aiClassification.sentiment,
               priority: aiClassification.priority,
               requiresAttention: aiClassification.requires_human_attention,
-              nextAction: aiClassification.next_action
+              nextAction: aiClassification.next_action || 'review'
             }
 
             // Trigger async CRM sync (don't await to avoid blocking email processing)
@@ -892,7 +892,7 @@ export class ReplyDetectionService {
               sentiment: aiClassification.sentiment,
               priority: aiClassification.priority,
               requiresAttention: aiClassification.requires_human_attention,
-              nextAction: aiClassification.next_action
+              nextAction: aiClassification.next_action || 'review'
             }
 
             // Trigger async CRM sync

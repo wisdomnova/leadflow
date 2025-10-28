@@ -64,13 +64,13 @@ export default function SignUpPage() {
     )
 
     if (result.error) {
-      setError(result.error)
+      setError(result.error) 
     } else if (result.requiresVerification) {
       // Redirect to success page with email parameter
       router.push(`/auth/signup-success?email=${encodeURIComponent(formData.email)}`)
     } else {
-      // Fallback - shouldn't happen with email verification enabled
-      router.push('/dashboard')
+      // ✅ CHANGED: Redirect to onboarding instead of dashboard
+      router.push('/onboarding')
     }
     
     setLoading(false)

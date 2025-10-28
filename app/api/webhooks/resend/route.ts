@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
             to: event.data?.to,
             subject: event.data?.subject,
             from: event.data?.from,
-            deliveredAt: event.data?.created_at || event.created_at
+            sentAt: event.data?.created_at || event.created_at
           }
         })
         console.log('✅ Logged email delivery event')
@@ -162,7 +162,6 @@ export async function POST(request: NextRequest) {
           type: 'click',
           messageId: event.data?.id,
           metadata: {
-            clickedAt: event.created_at,
             url: event.data?.url,
             userAgent: event.data?.userAgent,
             ip: event.data?.ip

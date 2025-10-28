@@ -668,6 +668,16 @@ export default function ContactsPage() {
                                   {contact.phone}
                                 </div>
                               )}
+                              {/* Display custom fields if they exist */}
+                              {contact.custom_fields && Object.keys(contact.custom_fields).length > 0 && (
+                                <div className="mt-1">
+                                  {Object.entries(contact.custom_fields).slice(0, 2).map(([key, value]) => (
+                                    <div key={key} className="text-xs text-gray-500">
+                                      <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span> {String(value)}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -682,6 +692,22 @@ export default function ContactsPage() {
                                     <div className="text-xs text-gray-500">{contact.job_title}</div>
                                   )}
                                 </div>
+                              </div>
+                            )}
+                            {/* Show tags if they exist */}
+                            {contact.tags && contact.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {contact.tags.slice(0, 3).map((tag, index) => (
+                                  <span
+                                    key={index}
+                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                                {contact.tags.length > 3 && (
+                                  <span className="text-xs text-gray-500">+{contact.tags.length - 3} more</span>
+                                )}
                               </div>
                             )}
                           </div>

@@ -1,172 +1,185 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
-import { supabase } from '@/lib/supabase'
-import { AffiliateManager } from '@/lib/affiliate/affiliate-manager'
-import Stripe from 'stripe'
+// app/api/webhooks/stripe/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
+import { PLANS, getPlanByPriceId } from '@/lib/plans';
 
-export async function POST(request: NextRequest) { 
-  const sig = request.headers.get('stripe-signature')!
-  const body = await request.text()
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-07-30.basil',
+});
 
-  let event: Stripe.Event
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(request: NextRequest) {
+  const body = await request.text();
+  const signature = request.headers.get('stripe-signature');
+
+  if (!signature) {
+    return NextResponse.json({ error: 'No signature' }, { status: 400 });
+  }
+
+  let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err)
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (err: any) {
+    console.error('Webhook signature verification failed:', err.message);
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 
   try {
-    switch (event.type) {  
-      case 'checkout.session.completed':
-        const session = event.data.object as Stripe.Checkout.Session
-        await handleCheckoutCompleted(session)
-        break
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await handleCheckoutCompleted(session);
+        break;
+      }
 
-      case 'invoice.payment_succeeded':
-        const invoice = event.data.object as Stripe.Invoice
-        await handlePaymentSucceeded(invoice)
-        break
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription;
+        await handleSubscriptionUpdated(subscription);
+        break;
+      }
 
-      case 'customer.subscription.updated':
-        const subscription = event.data.object as Stripe.Subscription
-        await handleSubscriptionUpdated(subscription)
-        break
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        await handleSubscriptionDeleted(subscription);
+        break;
+      }
 
-      case 'customer.subscription.deleted':
-        const deletedSubscription = event.data.object as Stripe.Subscription
-        await handleSubscriptionDeleted(deletedSubscription)
-        break
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice;
+        await handlePaymentSucceeded(invoice);
+        break;
+      }
 
-      default:
-        console.log(`Unhandled event type: ${event.type}`)
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        await handlePaymentFailed(invoice);
+        break;
+      }
     }
 
-    // Log all events
-    await supabase
-      .from('billing_events')
-      .insert([{
-        organization_id: ('metadata' in event.data.object && event.data.object.metadata?.organizationId) || null,
-        event_type: event.type,
-        stripe_event_id: event.id,
-        data: event.data.object
-      }])
-
-    return NextResponse.json({ received: true })
-
-  } catch (error) {
-    console.error('Webhook error:', error)
-    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
+    return NextResponse.json({ received: true });
+  } catch (error: any) {
+    console.error('Webhook handler error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const { userId, organizationId, planType, billingCycle, referralCode } = session.metadata!
+  const userId = session.metadata?.userId;
+  const planId = session.metadata?.planId;
+  const { organizationId, planType, billingCycle, referralCode } = session.metadata!
 
-  // Update user subscription status
-  await supabase
-    .from('users')
-    .update({
-      subscription_status: 'active',
-      plan_type: planType,
-      billing_cycle: billingCycle,
-      stripe_subscription_id: session.subscription as string
-    })
-    .eq('id', userId)
+  if (!userId || !planId) {
+    console.error('Missing metadata in checkout session');
+    return;
+  }
 
-  // Create subscription record
-  await supabase
+  const plan = PLANS[planId as keyof typeof PLANS];
+  if (!plan) {
+    console.error('Invalid plan ID:', planId);
+    return;
+  }
+
+  const subscription = await stripe.subscriptions.retrieve(
+    session.subscription as string
+  );
+
+  const { error } = await supabase.from('subscriptions').upsert({
+    user_id: userId,
+    stripe_subscription_id: subscription.id,
+    stripe_customer_id: subscription.customer as string,
+    plan_id: planId,
+    plan_name: plan.name,
+    status: subscription.status,
+    current_period_start: new Date().toISOString(),
+    current_period_end: new Date(Date.now() + (billingCycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString(),
+    cancel_at_period_end: subscription.cancel_at_period_end,
+    monthly_email_limit: plan.limits.monthlyEmails,
+    max_team_members: plan.limits.maxUsers,
+  });
+
+  if (error) {
+    console.error('Error upserting subscription:', error);
+  }
+}
+
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  const userId = subscription.metadata?.userId;
+  const planId = subscription.metadata?.planId;
+
+  const { organizationId, planType, billingCycle, referralCode } = subscription.metadata!
+
+  if (!userId) {
+    console.error('Missing userId in subscription metadata');
+    return;
+  }
+
+  const plan = planId ? PLANS[planId as keyof typeof PLANS] : null;
+
+  const updateData: any = {
+    status: subscription.status,
+    current_period_start: new Date().toISOString(),
+    current_period_end: new Date(Date.now() + (billingCycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString(),
+    cancel_at_period_end: subscription.cancel_at_period_end,
+  };
+
+  if (plan) {
+    updateData.plan_id = planId;
+    updateData.plan_name = plan.name;
+    updateData.monthly_email_limit = plan.limits.monthlyEmails;
+    updateData.max_team_members = plan.limits.maxUsers;
+  }
+
+  const { error } = await supabase
     .from('subscriptions')
-    .insert([{
-      organization_id: organizationId,
-      stripe_subscription_id: session.subscription as string,
-      stripe_customer_id: session.customer as string,
-      status: 'active',
-      plan_type: planType,
-      billing_cycle: billingCycle,
-      current_period_start: new Date().toISOString(),
-      current_period_end: new Date(Date.now() + (billingCycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString()
-    }])
+    .update(updateData)
+    .eq('stripe_subscription_id', subscription.id);
 
-  // 🎯 NEW: Track affiliate conversion if referred
-  if (referralCode) {
-    try {
-      await AffiliateManager.trackSubscription(
-        userId,
-        session.subscription as string,
-        session.amount_total! / 100, // Convert from cents
-        session.currency?.toUpperCase() || 'USD'
-      )
-      console.log(`Tracked affiliate conversion for referral: ${referralCode}`)
-    } catch (error) {
-      console.error('Failed to track affiliate conversion:', error)
-    }
+  if (error) {
+    console.error('Error updating subscription:', error);
+  }
+}
+
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  const { error } = await supabase
+    .from('subscriptions')
+    .update({ status: 'canceled' })
+    .eq('stripe_subscription_id', subscription.id);
+
+  if (error) {
+    console.error('Error canceling subscription:', error);
   }
 }
 
 async function handlePaymentSucceeded(invoice: any) {
-  if (!invoice.subscription) return
+  // Reset monthly usage on successful payment
+  if (invoice.subscription) {
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('user_id')
+      .eq('stripe_subscription_id', invoice.subscription)
+      .single();
 
-  // Update subscription status
-  await supabase
-    .from('users')
-    .update({ subscription_status: 'active' })
-    .eq('stripe_subscription_id', invoice.subscription)
-
-  // 🎯 NEW: Process recurring affiliate commission for monthly/yearly renewals
-  if (invoice.billing_reason === 'subscription_cycle') {
-    try {
-      await AffiliateManager.processRecurringCommission(
-        invoice.subscription,
-        invoice.amount_paid / 100, // Convert from cents
-        invoice.payment_intent,
-        new Date(invoice.period_start * 1000).toISOString().split('T')[0],
-        new Date(invoice.period_end * 1000).toISOString().split('T')[0]
-      )
-      console.log(`Processed recurring affiliate commission for subscription: ${invoice.subscription}`)
-    } catch (error) {
-      console.error('Failed to process recurring affiliate commission:', error)
+    if (subscription) {
+      await supabase
+        .from('subscriptions')
+        .update({ monthly_emails_sent: 0 })
+        .eq('user_id', subscription.user_id);
     }
   }
 }
 
-async function handleSubscriptionUpdated(subscription: any) {
-  const { organizationId } = subscription.metadata
-
-  await supabase
-    .from('subscriptions')
-    .update({
-      status: subscription.status,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
-      updated_at: new Date().toISOString()
-    })
-    .eq('stripe_subscription_id', subscription.id)
-
-  // Update user status
-  await supabase
-    .from('users')
-    .update({ subscription_status: subscription.status })
-    .eq('stripe_subscription_id', subscription.id)
-}
-
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  await supabase
-    .from('users')
-    .update({ 
-      subscription_status: 'cancelled',
-      stripe_subscription_id: null
-    })
-    .eq('stripe_subscription_id', subscription.id)
-
-  await supabase
-    .from('subscriptions')
-    .update({
-      status: 'cancelled',
-      canceled_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
-    .eq('stripe_subscription_id', subscription.id)
+async function handlePaymentFailed(invoice: Stripe.Invoice) {
+  console.log('Payment failed for invoice:', invoice.id);
+  // TODO: Send email notification to user
 }

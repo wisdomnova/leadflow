@@ -19,12 +19,14 @@ import {
   FileText,
   Zap,
   Inbox,
-  DollarSign
+  DollarSign,
+  AtSign
 } from 'lucide-react'
 import clsx from 'clsx'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Email Accounts', href: '/email-accounts', icon: AtSign }, // Changed from Mail to AtSign
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
   { name: 'Inbox', href: '/inbox', icon: Inbox, badge: 'new' }, // 📥 New unified inbox
@@ -34,7 +36,7 @@ const navigation = [
   { name: 'Affiliate', href: '/affiliate', icon: DollarSign }, // 💰 New affiliate section
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Help & Support', href: '/help', icon: HelpCircle },
-  { name: 'Billing', href: '/billing', icon: CreditCard }
+  { name: 'Billing', href: '/billing', icon: CreditCard },
 ]
 
 export function Sidebar() {

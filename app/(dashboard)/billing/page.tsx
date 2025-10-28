@@ -1,531 +1,268 @@
-// ./app/(dashboard)/billing/page.tsx
+// app/(dashboard)/billing/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Check, Loader2 } from 'lucide-react'
+import { PLANS, getDiscountPercentage } from '@/lib/plans'
 import { useAuth } from '@/hooks/useAuth'
-import { useTrialStatus } from '@/hooks/useTrialStatus'
-import { motion, AnimatePresence } from 'framer-motion'
-import {  
-  CreditCard, 
-  ExternalLink, 
-  AlertCircle,
-  Calendar,
-  TrendingUp,
-  Users,
-  Mail,
-  Target,
-  Clock,
-  CheckCircle,
-  ArrowUpRight
-} from 'lucide-react' 
-import Link from 'next/link'
-
-// Theme colors - consistent with dashboard
-const THEME_COLORS = {
-  primary: '#0f66db',     // Main blue
-  success: '#25b43d',     // Green
-  secondary: '#6366f1',   // Indigo
-  accent: '#059669',      // Emerald
-  warning: '#dc2626'      // Red
-}
-
-interface BillingInfo {
-  subscription: any
-  nextBilling: string | null
-  amount: number
-  isLoading: boolean
-}
-
-interface UsageStats {
-  contacts: { used: number; limit: number }
-  campaigns: { used: number; limit: number }
-  emails: { used: number; limit: number }
-}
-
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 }
-}
-
-const staggerContainer = {
-  animate: {
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-}
-
-const staggerItem = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 }
-}
+import { createClient } from '@/lib/supabase'
 
 export default function BillingPage() {
-  const { user } = useAuth()
-  const { subscriptionStatus, planType, daysRemaining, isTrialActive } = useTrialStatus()
-  const [billingInfo, setBillingInfo] = useState<BillingInfo>({
-    subscription: null,
-    nextBilling: null,
-    amount: 0,
-    isLoading: true
-  })
-  const [usageStats, setUsageStats] = useState<UsageStats>({
-    contacts: { used: 0, limit: 1000 },
-    campaigns: { used: 0, limit: 10 },
-    emails: { used: 0, limit: 5000 }
-  })
-  const [isLoadingPortal, setIsLoadingPortal] = useState(false)
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
+  const [loading, setLoading] = useState<string | null>(null)
+  const { user, subscription } = useAuth()
+  const supabase = createClient()
 
-  useEffect(() => {
-    fetchBillingInfo()
-    fetchUsageStats()
-  }, [user])
-
-  const fetchBillingInfo = async () => {
-    try {
-      const response = await fetch('/api/billing/info')
-      if (response.ok) {
-        const data = await response.json()
-        setBillingInfo({
-          subscription: data.subscription,
-          nextBilling: data.nextBilling,
-          amount: data.amount,
-          isLoading: false
-        })
-      } else {
-        setBillingInfo(prev => ({ ...prev, isLoading: false }))
-      }
-    } catch (error) {
-      console.error('Failed to fetch billing info:', error)
-      setBillingInfo(prev => ({ ...prev, isLoading: false }))
+  const handleCheckout = async (planId: string, cycle: 'monthly' | 'yearly') => {
+    if (!user) {
+      window.location.href = '/auth/login'
+      return
     }
-  }
 
-  const fetchUsageStats = async () => {
+    setLoading(planId)
     try {
-      const response = await fetch('/api/usage/stats')
-      if (response.ok) {
-        const data = await response.json()
-        setUsageStats(data)
+      const plan = PLANS[planId as keyof typeof PLANS]
+      const priceId = cycle === 'monthly' ? plan.monthlyPriceId : plan.yearlyPriceId
+
+      if (!priceId) {
+        console.error('Price ID not configured for', planId, cycle)
+        alert('This plan is not available yet. Please contact support.')
+        setLoading(null)
+        return
       }
-    } catch (error) {
-      console.error('Failed to fetch usage stats:', error)
-    }
-  }
 
-  const handleManageBilling = async () => {
-    setIsLoadingPortal(true)
-    try {
-      const response = await fetch('/api/billing/customer-portal', {
-        method: 'POST'
+      const response = await fetch('/api/billing/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId, planId })
       })
-      
-      if (response.ok) {
-        const { url } = await response.json()
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session')
+      }
+
+      const { url } = await response.json()
+      if (url) {
         window.location.href = url
       }
     } catch (error) {
-      console.error('Failed to open customer portal:', error)
+      console.error('Checkout error:', error)
+      alert('Failed to start checkout. Please try again.')
+    } finally {
+      setLoading(null)
     }
-    setIsLoadingPortal(false)
   }
 
-  const getPlanDisplayName = (plan: string) => {
-    return plan.charAt(0).toUpperCase() + plan.slice(1)
-  }
+  const handleManageSubscription = async () => {
+    try {
+      const response = await fetch('/api/billing/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      trial: { bg: `${THEME_COLORS.primary}20`, text: THEME_COLORS.primary, label: 'Free Trial' },
-      active: { bg: `${THEME_COLORS.success}20`, text: THEME_COLORS.success, label: 'Active' },
-      cancelled: { bg: `${THEME_COLORS.warning}20`, text: THEME_COLORS.warning, label: 'Cancelled' },
-      past_due: { bg: '#fef3c7', text: '#d97706', label: 'Past Due' }
+      if (!response.ok) {
+        throw new Error('Failed to create portal session')
+      }
+
+      const { url } = await response.json()
+      if (url) {
+        window.location.href = url
+      }
+    } catch (error) {
+      console.error('Portal error:', error)
+      alert('Failed to open billing portal. Please try again.')
     }
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.trial
-
-    return (
-      <span 
-        className="inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-semibold shadow-sm"
-        style={{ backgroundColor: config.bg, color: config.text }}
-      >
-        {config.label}
-      </span>
-    )
   }
 
-  const getPlanPrice = (plan: string, cycle: string) => {
-    const prices = {
-      starter: { monthly: 29, yearly: 290 },
-      pro: { monthly: 79, yearly: 790 }
-    }
-    return prices[plan as keyof typeof prices]?.[cycle as keyof typeof prices.starter] || 0
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
-
-  const calculatePercentage = (used: number, limit: number) => {
-    return Math.min((used / limit) * 100, 100)
-  }
-
-  const getUsageColor = (percentage: number) => {
-    if (percentage >= 90) return THEME_COLORS.warning
-    if (percentage >= 75) return '#d97706'
-    return THEME_COLORS.primary
-  }
-
-  const usageItems = [
-    {
-      label: 'Contacts',
-      used: usageStats.contacts.used,
-      limit: usageStats.contacts.limit,
-      icon: Users,
-      color: THEME_COLORS.primary
-    },
-    {
-      label: 'Email Campaigns This Month',
-      used: usageStats.campaigns.used,
-      limit: usageStats.campaigns.limit,
-      icon: Target,
-      color: THEME_COLORS.success
-    },
-    {
-      label: 'Emails Sent This Month',
-      used: usageStats.emails.used,
-      limit: usageStats.emails.limit,
-      icon: Mail,
-      color: THEME_COLORS.secondary
-    }
-  ]
+  const discountPercentage = getDiscountPercentage()
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        
+    <div className="container mx-auto py-8 px-4">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <motion.div 
-          className="mb-8"
-          initial="initial"
-          animate="animate"
-          variants={fadeInUp}
-        >
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Billing & Subscription
-          </h1>
-          <p className="text-lg text-gray-600">
-            Manage your subscription and billing information
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
+          <p className="text-xl text-muted-foreground">
+            Scale your outreach with the right plan for your team
           </p>
-        </motion.div>
 
-        <motion.div
-          className="space-y-8"
-          variants={staggerContainer}
-          initial="initial"
-          animate="animate"
-        >
-          {/* Current Plan */}
-          <motion.div 
-            className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8"
-            variants={staggerItem}
-          >
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center">
-                <div 
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center mr-4 shadow-md"
-                  style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
-                >
-                  <CreditCard className="h-6 w-6" style={{ color: THEME_COLORS.primary }} />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Current Plan</h2>
-                  <p className="text-gray-600">Your subscription details and status</p>
-                </div>
-              </div>
-              {getStatusBadge(subscriptionStatus)}
-            </div>
+          {/* Billing Toggle */}
+          <div className="flex items-center justify-center gap-4 mt-8">
+            <span className={billingCycle === 'monthly' ? 'font-semibold' : 'text-muted-foreground'}>
+              Monthly
+            </span>
+            <button
+              onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
+              className="relative inline-flex h-6 w-11 items-center rounded-full bg-primary transition-colors"
+              aria-label="Toggle billing cycle"
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            <span className={billingCycle === 'yearly' ? 'font-semibold' : 'text-muted-foreground'}>
+              Yearly
+              <Badge className="ml-2 bg-green-100 text-green-800 border-green-200">
+                Save {discountPercentage}%
+              </Badge>
+            </span>
+          </div>
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                <div className="flex items-center mb-3">
-                  <div 
-                    className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-sm"
-                    style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
-                  >
-                    <TrendingUp className="h-5 w-5" style={{ color: THEME_COLORS.primary }} />
-                  </div>
-                  <p className="text-sm font-semibold text-gray-700">Plan</p>
-                </div>
-                <p className="text-2xl font-bold text-gray-900">{getPlanDisplayName(planType)}</p>
-              </div>
-              
-              {isTrialActive ? (
-                <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
-                  <div className="flex items-center mb-3">
-                    <div 
-                      className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-sm"
-                      style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
-                    >
-                      <Clock className="h-5 w-5" style={{ color: THEME_COLORS.primary }} />
-                    </div>
-                    <p className="text-sm font-semibold" style={{ color: THEME_COLORS.primary }}>Trial Days Remaining</p>
-                  </div>
-                  <p className="text-2xl font-bold" style={{ color: THEME_COLORS.primary }}>{daysRemaining} days</p>
-                </div>
-              ) : (
-                <div className="bg-green-50 rounded-2xl p-6 border border-green-100">
-                  <div className="flex items-center mb-3">
-                    <div 
-                      className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-sm"
-                      style={{ backgroundColor: `${THEME_COLORS.success}20` }}
-                    >
-                      <Calendar className="h-5 w-5" style={{ color: THEME_COLORS.success }} />
-                    </div>
-                    <p className="text-sm font-semibold" style={{ color: THEME_COLORS.success }}>Billing Cycle</p>
-                  </div>
-                  <p className="text-2xl font-bold" style={{ color: THEME_COLORS.success }}>
-                    {billingInfo.subscription?.billing_cycle ? billingInfo.subscription.billing_cycle.charAt(0).toUpperCase() + billingInfo.subscription.billing_cycle.slice(1) : 'Monthly'}
-                  </p>
-                </div>
-              )}
-
-              <div className="bg-purple-50 rounded-2xl p-6 border border-purple-100">
-                <div className="flex items-center mb-3">
-                  <div 
-                    className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-sm"
-                    style={{ backgroundColor: `${THEME_COLORS.secondary}20` }}
-                  >
-                    <CheckCircle className="h-5 w-5" style={{ color: THEME_COLORS.secondary }} />
-                  </div>
-                  <p className="text-sm font-semibold" style={{ color: THEME_COLORS.secondary }}>Status</p>
-                </div>
-                <p className="text-2xl font-bold" style={{ color: THEME_COLORS.secondary }}>
-                  {subscriptionStatus === 'trial' ? 'Free Trial' : 'Active'}
+        {/* Current Subscription */}
+        {subscription && subscription.status !== 'canceled' && (
+          <Card className="mb-8 p-6 bg-blue-50 border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-lg">
+                  Current Plan: {PLANS[subscription.plan_id as keyof typeof PLANS]?.name || 'Unknown'}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Status: {subscription.status === 'active' ? '✅ Active' : subscription.status}
+                  {subscription.current_period_end && 
+                    ` • Renews on ${new Date(subscription.current_period_end).toLocaleDateString()}`
+                  }
                 </p>
               </div>
+              <Button variant="outline" onClick={handleManageSubscription}>
+                Manage Subscription
+              </Button>
             </div>
+          </Card>
+        )}
 
-            <div className="flex flex-col sm:flex-row gap-4">
-              {subscriptionStatus === 'trial' ? (
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Link
-                    href="/billing/upgrade"
-                    className="inline-flex items-center justify-center px-8 py-3 text-white rounded-xl font-semibold transition-all shadow-sm hover:shadow-md"
-                    style={{ backgroundColor: THEME_COLORS.primary }}
-                  >
-                    <CreditCard className="h-5 w-5 mr-2" />
-                    Upgrade Now
-                    <ArrowUpRight className="h-4 w-4 ml-2" />
-                  </Link>
-                </motion.div>
-              ) : (
-                <>
-                  <motion.button
-                    onClick={handleManageBilling}
-                    disabled={isLoadingPortal}
-                    className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-gray-700 bg-white rounded-xl hover:bg-gray-50 hover:shadow-md transition-all disabled:opacity-50 font-medium"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <ExternalLink className="h-5 w-5 mr-2" />
-                    {isLoadingPortal ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
-                        Loading...
-                      </div>
-                    ) : (
-                      'Manage Billing'
-                    )}
-                  </motion.button>
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Link
-                      href="/billing/upgrade"
-                      className="inline-flex items-center justify-center px-6 py-3 text-white rounded-xl font-medium transition-all shadow-sm hover:shadow-md"
-                      style={{ backgroundColor: THEME_COLORS.primary }}
-                    >
-                      Change Plan
-                      <ArrowUpRight className="h-4 w-4 ml-2" />
-                    </Link>
-                  </motion.div>
-                </>
-              )}
-            </div>
-          </motion.div>
+        {/* Plans Grid */}
+        <div className="grid md:grid-cols-3 gap-8">
+          {Object.entries(PLANS).map(([key, plan]) => {
+            const price = billingCycle === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice
+            const monthlyEquivalent = billingCycle === 'yearly' ? Math.round(price / 12) : price
+            const isCurrentPlan = subscription?.plan_id === plan.id && subscription?.status === 'active'
 
-          {/* Usage Limits */}
-          <motion.div 
-            className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8"
-            variants={staggerItem}
-          >
-            <div className="flex items-center mb-8">
-              <div 
-                className="w-12 h-12 rounded-2xl flex items-center justify-center mr-4 shadow-md"
-                style={{ backgroundColor: `${THEME_COLORS.accent}20` }}
+            return (
+              <Card
+                key={key}
+                className={`relative p-8 flex flex-col ${
+                  plan.popular
+                    ? 'border-primary border-2 shadow-xl scale-105'
+                    : 'border-gray-200'
+                }`}
               >
-                <TrendingUp className="h-6 w-6" style={{ color: THEME_COLORS.accent }} />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Usage & Limits</h2>
-                <p className="text-gray-600">Track your current usage against plan limits</p>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              {usageItems.map((item, index) => {
-                const percentage = calculatePercentage(item.used, item.limit)
-                const Icon = item.icon
-                
-                return (
-                  <motion.div
-                    key={item.label} 
-                    className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:shadow-md transition-all duration-200"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center">
-                        <div 
-                          className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-sm"
-                          style={{ backgroundColor: `${item.color}20` }}
-                        >
-                          <Icon className="h-5 w-5" style={{ color: item.color }} />
-                        </div>
-                        <span className="font-semibold text-gray-900">{item.label}</span>
-                      </div>
-                      <span className="text-gray-600 font-medium">
-                        {item.used.toLocaleString()} / {item.limit.toLocaleString()}
-                      </span>
-                    </div>
-                    
-                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                      <motion.div 
-                        className="h-full rounded-full"
-                        style={{ backgroundColor: getUsageColor(percentage) }}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${percentage}%` }}
-                        transition={{ duration: 1, ease: "easeOut", delay: index * 0.2 }}
-                      />
-                    </div>
-                    
-                    <div className="flex justify-between mt-3 text-sm">
-                      <span 
-                        className="font-medium"
-                        style={{ 
-                          color: percentage >= 90 ? THEME_COLORS.warning :
-                                 percentage >= 75 ? '#d97706' :
-                                 '#6b7280'
-                        }}
-                      >
-                        {percentage.toFixed(1)}% used
-                      </span>
-                      {percentage >= 90 && (
-                        <span className="font-medium" style={{ color: THEME_COLORS.warning }}>
-                          Consider upgrading
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </div>
-          </motion.div>
-
-          {/* Billing History */}
-          <motion.div 
-            className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8"
-            variants={staggerItem}
-          >
-            <div className="flex items-center mb-8">
-              <div 
-                className="w-12 h-12 rounded-2xl flex items-center justify-center mr-4 shadow-md"
-                style={{ backgroundColor: `${THEME_COLORS.secondary}20` }}
-              >
-                <Calendar className="h-6 w-6" style={{ color: THEME_COLORS.secondary }} />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Billing History</h2>
-                <p className="text-gray-600">View your past invoices and payments</p>
-              </div>
-            </div>
-
-            {subscriptionStatus === 'trial' ? (
-              <div className="text-center py-12">
-                <div 
-                  className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-md"
-                  style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
-                >
-                  <AlertCircle className="h-10 w-10" style={{ color: THEME_COLORS.primary }} />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No billing history yet</h3>
-                <p className="text-gray-600">Your free trial is currently active. Billing history will appear here once you subscribe.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {billingInfo.isLoading ? (
-                  <div className="text-center py-8">
-                    <div 
-                      className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto"
-                      style={{ borderColor: THEME_COLORS.primary }}
-                    ></div>
-                  </div>
-                ) : billingInfo.subscription ? (
-                  <motion.div 
-                    className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:shadow-md transition-all duration-200"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div 
-                          className="w-12 h-12 rounded-xl flex items-center justify-center mr-4 shadow-sm"
-                          style={{ backgroundColor: `${THEME_COLORS.success}20` }}
-                        >
-                          <CheckCircle className="h-6 w-6" style={{ color: THEME_COLORS.success }} />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900 text-lg">
-                            LeadFlow {getPlanDisplayName(planType)} - {billingInfo.subscription?.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'}
-                          </p>
-                          <p className="text-gray-600 mt-1">
-                            Next billing: {billingInfo.nextBilling ? formatDate(billingInfo.nextBilling) : 'Processing...'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-gray-900">
-                          ${getPlanPrice(planType, billingInfo.subscription?.billing_cycle || 'monthly')}.00
-                        </p>
-                        <span 
-                          className="inline-flex items-center px-3 py-1 rounded-xl text-sm font-semibold mt-2 shadow-sm"
-                          style={{ backgroundColor: `${THEME_COLORS.success}20`, color: THEME_COLORS.success }}
-                        >
-                          Paid
-                        </span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <div className="text-center py-12">
-                    <div 
-                      className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-md"
-                      style={{ backgroundColor: `${THEME_COLORS.primary}20` }}
-                    >
-                      <AlertCircle className="h-10 w-10" style={{ color: THEME_COLORS.primary }} />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No billing history</h3>
-                    <p className="text-gray-600">Billing history will appear here once you subscribe.</p>
-                  </div>
+                {plan.popular && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white">
+                    Most Popular
+                  </Badge>
                 )}
-              </div>
-            )}
-          </motion.div>
-        </motion.div>
+
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-bold mb-4">{plan.name}</h3>
+                  <div className="mb-2">
+                    <span className="text-5xl font-bold">${monthlyEquivalent}</span>
+                    <span className="text-muted-foreground text-lg">/month</span>
+                  </div>
+                  {billingCycle === 'yearly' && (
+                    <p className="text-sm text-muted-foreground">
+                      ${price} billed annually
+                    </p>
+                  )}
+                  <p className="text-sm font-semibold text-primary mt-2">
+                    {typeof plan.limits.monthlyEmails === 'number' 
+                      ? `${plan.limits.monthlyEmails.toLocaleString()} emails/month`
+                      : 'Unlimited emails/month'
+                    }
+                  </p>
+                </div>
+
+                <ul className="space-y-4 mb-8 flex-grow">
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-3">
+                      <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm leading-relaxed">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  className="w-full h-12 text-base"
+                  variant={plan.popular ? 'default' : 'outline'}
+                  disabled={isCurrentPlan || loading === key}
+                  onClick={() => handleCheckout(key, billingCycle)}
+                >
+                  {loading === key ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : isCurrentPlan ? (
+                    'Current Plan'
+                  ) : (
+                    'Get Started'
+                  )}
+                </Button>
+
+                {/* Additional Info */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="space-y-2 text-xs text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Users:</span>
+                      <span className="font-medium text-foreground">{plan.limits.maxUsers}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Contacts:</span>
+                      <span className="font-medium text-foreground">
+                        {typeof plan.limits.contacts === 'number' 
+                          ? plan.limits.contacts.toLocaleString() 
+                          : 'Unlimited'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Sending Domains:</span>
+                      <span className="font-medium text-foreground">Unlimited</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+
+        {/* Additional Info */}
+        <div className="mt-16 text-center">
+          <Card className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+            <h3 className="text-xl font-bold mb-4">Need a Custom Plan?</h3>
+            <p className="text-muted-foreground mb-6">
+              Looking for more than 500,000 emails/month or need custom enterprise features?
+            </p>
+            <Button variant="outline" asChild>
+              <a href="/help">Contact Sales</a>
+            </Button>
+          </Card>
+        </div>
+
+        {/* FAQ */}
+        <div className="mt-12 grid md:grid-cols-2 gap-8">
+          <div>
+            <h4 className="font-semibold mb-2">💳 All plans include:</h4>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li>• Unlimited campaigns</li>
+              <li>• AI-powered personalization</li>
+              <li>• Advanced analytics dashboard</li>
+              <li>• Central inbox (Unibox)</li>
+              <li>• No hidden fees</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-2">🔒 Cancel anytime</h4>
+            <p className="text-sm text-muted-foreground">
+              All plans can be canceled at any time. You'll continue to have access until the end of your billing period.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )

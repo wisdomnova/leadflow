@@ -6,13 +6,19 @@ import { AlertTriangle, CreditCard, X } from 'lucide-react'
 import Link from 'next/link'
 
 export default function TrialExpiredModal() {
-  const { isTrialActive, daysRemaining, subscriptionStatus } = useTrialStatus()
+  const { isTrialActive, daysRemaining, subscriptionStatus, isLoading } = useTrialStatus()
   const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
+    // Don't show modal while still loading
+    if (isLoading) {
+      setShowModal(false)
+      return
+    }
+
     // Only show modal if:
     // 1. User is still on trial status (not paid) 
-    // 2. Trial is not active (expired)
+    // 2. Trial is not active (expired) 
     // 3. Days remaining is 0 or negative
     const shouldShowModal = 
       subscriptionStatus === 'trial' && 
@@ -20,10 +26,15 @@ export default function TrialExpiredModal() {
       daysRemaining <= 0
 
     setShowModal(shouldShowModal)
-  }, [isTrialActive, daysRemaining, subscriptionStatus])
+  }, [isTrialActive, daysRemaining, subscriptionStatus, isLoading])
 
   // Don't show modal for paid users
   if (subscriptionStatus === 'active' || subscriptionStatus === 'paid') {
+    return null
+  }
+
+  // Don't show modal while loading
+  if (isLoading) {
     return null
   }
 

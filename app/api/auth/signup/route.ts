@@ -4,10 +4,10 @@ import { supabase } from '@/lib/supabase'
 import { AffiliateManager } from '@/lib/affiliate/affiliate-manager'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { sendSESEmail } from '@/lib/ses'
+import { sendEmail } from '@/lib/resend'
 import { emailVerificationTemplate } from '@/lib/email-templates'
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest) { 
   try {
     const { email, password, firstName, lastName, companyName } = await request.json()
 
@@ -120,14 +120,14 @@ export async function POST(request: NextRequest) {
         console.error('Failed to track referral:', referralError)
         // Don't fail signup for referral tracking error
       }
-    }
+    } 
 
     // Create verification URL
-    const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${finalVerificationToken}`
+    const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/verify-email?token=${finalVerificationToken}`
 
-    // Send verification email via SES
+    // Send verification email via Resend
     try {
-      const result = await sendSESEmail({
+      await sendEmail({
         to: email,
         subject: 'Welcome to LeadFlow - Verify Your Email',
         html: emailVerificationTemplate({
@@ -135,13 +135,8 @@ export async function POST(request: NextRequest) {
           verificationUrl
         })
       })
-
-      if (!result.success) {
-        console.error('SES email send failed:', result.error)
-        // Continue with signup but log the error
-      }
     } catch (emailError) {
-      console.error('Failed to send verification email via SES:', emailError)
+      console.error('Failed to send verification email via Resend:', emailError)
       // Don't fail registration for email error, but log it
     }
 

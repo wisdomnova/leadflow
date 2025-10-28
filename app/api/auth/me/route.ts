@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
 
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest) { 
   try {
     console.log('🔍 Checking auth...')
     
@@ -23,14 +23,17 @@ export async function GET(request: NextRequest) {
     const decoded = jwt.verify(token, jwtSecret) as any
     console.log('✅ Token decoded:', decoded)
 
-    // Get user with organization
+    // Get user with organization - only select columns that exist
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select(`
         *,
         organizations (
           id,
-          name
+          name,
+          trial_ends_at,
+          subscription_status,
+          created_at
         )
       `)
       .eq('id', decoded.userId)
