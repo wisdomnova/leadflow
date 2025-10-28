@@ -1,21 +1,23 @@
 // app/api/campaigns/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
+import jwt from 'jsonwebtoken'
 
 export async function GET(request: NextRequest) {
-  const supabase = createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   try {
+    const token = request.cookies.get('auth-token')?.value
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+
     // Get user's organization
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('organization_id')
-      .eq('id', user.id) 
+      .eq('id', decoded.userId) 
       .single()  
 
     if (userError || !userData) {
@@ -76,19 +78,20 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   try {
+    const token = request.cookies.get('auth-token')?.value
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+
     // ✅ CHECK: User must have at least one active email account
     const { data: emailAccounts, error: emailAccountError } = await supabase
       .from('email_accounts')
       .select('id, email, status, provider')
-      .eq('user_id', user.id)
+      .eq('user_id', decoded.userId)
       .in('status', ['active', 'warming_up'])
       .limit(1)
 
@@ -122,7 +125,7 @@ export async function POST(request: NextRequest) {
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('organization_id')
-      .eq('id', user.id)
+      .eq('id', decoded.userId)
       .single() 
 
     if (userError || !userData) {
@@ -203,7 +206,7 @@ export async function POST(request: NextRequest) {
         .from('activity_logs')
         .insert([{
           organization_id: userData.organization_id,
-          user_id: user.id,
+          user_id: decoded.userId,
           action: 'campaign_created',
           description: `Created campaign "${campaign.name}"`,
           metadata: {

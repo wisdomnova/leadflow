@@ -21,14 +21,54 @@ export async function GET(request: NextRequest) {
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Error fetching email accounts:', error)
-      return NextResponse.json({ error: 'Failed to fetch email accounts' }, { status: 500 })
-    }
+    if (error) throw error
 
     return NextResponse.json({ accounts: accounts || [] })
-  } catch (error) {
-    console.error('Email accounts API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (error: any) {
+    console.error('Failed to fetch email accounts:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    // Use custom JWT authentication
+    const token = request.cookies.get('auth-token')?.value
+    
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    const userId = decoded.userId
+    const body = await request.json()
+
+    // Get user's organization
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('organization_id')
+      .eq('id', userId)
+      .single()
+
+    if (userError || !userData) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { data: account, error } = await supabase
+      .from('email_accounts')
+      .insert([{
+        user_id: userId,
+        organization_id: userData.organization_id,
+        ...body
+      }])
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return NextResponse.json({ account })
+  } catch (error: any) {
+    console.error('Failed to create email account:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
