@@ -64,13 +64,17 @@ export default function EmailAccountsPage() {
     if (success === 'connected') {
       // Show success message
       setTimeout(() => {
-        window.history.replaceState({}, '', '/settings/email-accounts')
+        window.history.replaceState({}, '', '/email-accounts')
       }, 3000)
     }
     
     if (error) {
       // Show error message
       console.error('OAuth error:', error)
+      if (error === 'user_not_found') {
+        // Redirect to sign in if user not found
+        window.location.href = '/auth/sign-in?error=session_expired'
+      }
     }
   }, [user, isAuthenticated])
 

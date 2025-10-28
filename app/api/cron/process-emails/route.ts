@@ -1,4 +1,4 @@
-// app/api/cron/process-email-queue/route.ts
+// app/api/cron/process-emails/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendCampaignEmail } from '@/lib/campaign-email'
@@ -8,15 +8,24 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Handle both GET and POST requests for flexibility
+export async function GET(request: NextRequest) {
+  return handleEmailProcessing(request)
+}
+
 export async function POST(request: NextRequest) {
+  return handleEmailProcessing(request)
+}
+
+async function handleEmailProcessing(request: NextRequest) {
   try {
-    // Verify request is from Supabase
+    // Verify request is authorized
     const authHeader = request.headers.get('authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await processEmailQueue()
+    await processEmailQueue() 
     
     return NextResponse.json({ 
       success: true, 
@@ -42,8 +51,8 @@ async function processEmailQueue() {
       contacts (email, first_name, last_name)
     `)
     .eq('status', 'pending')
-    .lte('scheduled_at', new Date().toISOString())
-    .order('scheduled_at', { ascending: true })
+    .lte('scheduled_for', new Date().toISOString()) // Changed from scheduled_at to scheduled_for
+    .order('scheduled_for', { ascending: true }) // Changed from scheduled_at to scheduled_for
     .limit(50)
 
   if (error) {

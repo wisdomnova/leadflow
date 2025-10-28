@@ -23,25 +23,32 @@ export async function GET(request: NextRequest) {
   }
   
   try {
+    // Validate user exists in database first
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, organization_id')
+      .eq('id', state)
+      .single()
+    
+    if (userError || !userData) {
+      console.error('User not found:', state, userError)
+      return NextResponse.redirect(
+        new URL('/email-accounts?error=user_not_found', request.url)
+      );
+    }
+    
     const { accessToken, refreshToken, expiresAt, email } = await handleGoogleCallback(code);
     
     // Encrypt tokens
     const encryptedAccess = encryptToken(accessToken);
     const encryptedRefresh = encryptToken(refreshToken);
     
-    // Get user's organization_id
-    const { data: userData } = await supabase
-      .from('users')
-      .select('organization_id')
-      .eq('id', state)
-      .single()
-    
     // Store in database using service role
     const { error: dbError } = await supabase
       .from('email_accounts')
       .upsert({
-        user_id: state,
-        organization_id: userData?.organization_id,
+        user_id: userData.id,
+        organization_id: userData.organization_id,
         provider: 'google',
         email,
         access_token: encryptedAccess,

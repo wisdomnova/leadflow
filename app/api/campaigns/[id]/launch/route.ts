@@ -1,21 +1,35 @@
 // app/api/campaigns/[id]/launch/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
+import jwt from 'jsonwebtoken'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   try {
+    // Use custom JWT authentication
+    const token = request.cookies.get('auth-token')?.value
+    
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    const userId = decoded.userId
     const resolvedParams = await params
     const campaignId = resolvedParams.id
+
+    // Get user's organization
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('organization_id')
+      .eq('id', userId)
+      .single()
+
+    if (userError || !userData) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
 
     // Get campaign with email account
     const { data: campaign, error: campaignError } = await supabase
@@ -25,7 +39,7 @@ export async function POST(
         email_accounts (*)
       `)
       .eq('id', campaignId)
-      .eq('user_id', user.id)
+      .eq('organization_id', userData.organization_id)
       .single()
 
     if (campaignError || !campaign) {
@@ -41,7 +55,7 @@ export async function POST(
     // Get campaign contacts
     const { data: campaignContacts, error: contactsError } = await supabase
       .from('campaign_contacts')
-      .select('contact_id')
+      .select('id') // Changed from 'contact_id' to 'id'
       .eq('campaign_id', campaignId)
 
     if (contactsError || !campaignContacts || campaignContacts.length === 0) {
@@ -54,11 +68,11 @@ export async function POST(
     const emailsToQueue = campaignContacts.map((cc, index) => ({
       campaign_id: campaignId,
       email_account_id: campaign.email_account_id,
-      contact_id: cc.contact_id,
+      contact_id: cc.id, // Changed from cc.contact_id to cc.id
       subject: campaign.subject,
       body: campaign.body,
       variables: {}, // Add any custom variables here
-      scheduled_at: new Date(Date.now() + index * 60000).toISOString(), // 1 minute apart
+      scheduled_for: new Date(Date.now() + index * 60000).toISOString(),
       status: 'pending'
     }))
 
