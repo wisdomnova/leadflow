@@ -42,17 +42,24 @@ async function handleEmailProcessing(request: NextRequest) {
 }
 
 async function processEmailQueue() {
-  // Get pending emails that are due to be sent
+  // Get pending emails that are due to be sent - fix the join
   const { data: queuedEmails, error } = await supabase
     .from('email_queue')
     .select(`
       *,
       email_accounts (*),
-      contacts (email, first_name, last_name)
+      campaign_contacts!inner(
+        id,
+        email,
+        first_name,
+        last_name,
+        company,
+        phone
+      )
     `)
     .eq('status', 'pending')
-    .lte('scheduled_for', new Date().toISOString()) // Changed from scheduled_at to scheduled_for
-    .order('scheduled_for', { ascending: true }) // Changed from scheduled_at to scheduled_for
+    .lte('scheduled_for', new Date().toISOString())
+    .order('scheduled_for', { ascending: true })
     .limit(50)
 
   if (error) {
@@ -88,14 +95,14 @@ async function processEmailQueue() {
         .update({ status: 'sending' })
         .eq('id', email.id)
 
-      // Replace variables in subject and body
-      const processedSubject = replaceVariables(email.subject, email.variables, email.contacts)
-      const processedBody = replaceVariables(email.body, email.variables, email.contacts)
+      // Replace variables in subject and body - use campaign_contacts data
+      const processedSubject = replaceVariables(email.subject, email.variables, email.campaign_contacts)
+      const processedBody = replaceVariables(email.body, email.variables, email.campaign_contacts)
 
       // Send email
       const result = await sendCampaignEmail({
         emailAccountId: email.email_account_id,
-        to: email.contacts.email,
+        to: email.campaign_contacts.email,
         subject: processedSubject,
         body: processedBody
       })
@@ -111,10 +118,10 @@ async function processEmailQueue() {
         })
         .eq('id', email.id)
 
-      console.log(`✅ Sent email to ${email.contacts.email}`)
+      console.log(`✅ Sent email to ${email.campaign_contacts.email}`)
 
     } catch (error: any) {
-      console.error(`❌ Error sending email to ${email.contacts?.email}:`, error)
+      console.error(`❌ Error sending email to ${email.campaign_contacts?.email}:`, error)
 
       // Update status to failed
       await supabase
