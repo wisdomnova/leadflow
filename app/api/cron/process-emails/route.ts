@@ -76,6 +76,16 @@ async function processEmailQueue() {
 
   for (const email of queuedEmails) {
     try {
+      // Add debug logging
+      console.log('Processing email:', {
+        id: email.id,
+        subject: email.subject,
+        bodyLength: email.body?.length || 0,
+        to: email.campaign_contacts?.email,
+        hasSubject: !!email.subject,
+        hasBody: !!email.body
+      })
+
       // Skip if email account doesn't exist or is not active
       if (!email.email_accounts || 
           !['active', 'warming_up'].includes(email.email_accounts.status)) {
@@ -84,6 +94,19 @@ async function processEmailQueue() {
           .update({ 
             status: 'failed',
             error_message: 'Email account not active'
+          })
+          .eq('id', email.id)
+        continue
+      }
+
+      // Check if we have content before sending
+      if (!email.subject && !email.body) {
+        console.error('Email has no subject or body:', email.id)
+        await supabase
+          .from('email_queue')
+          .update({ 
+            status: 'failed',
+            error_message: 'No subject or body content'
           })
           .eq('id', email.id)
         continue

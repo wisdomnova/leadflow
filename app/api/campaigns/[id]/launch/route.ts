@@ -91,10 +91,11 @@ export async function POST(
           email_account_id: campaign.email_account_id,
           contact_id: contact.id,
           subject: step.subject || 'No Subject',
-          body: step.content || 'No Content',
+          body: step.content || 'No Content', // This should be the step content
           variables: {},
           scheduled_for: new Date(Date.now() + baseDelay + stepDelay).toISOString(),
-          status: 'pending'
+          status: 'pending',
+          step_number: stepIndex + 1 // Add step tracking
         })
       }
     }
