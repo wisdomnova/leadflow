@@ -2,7 +2,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Mail, Clock, Users, Target, ChevronRight, Star, X, ChevronDown, ChevronUp, Settings, Zap } from 'lucide-react'
+import { Mail, Clock, Users, Target, ChevronRight, Star, X, ChevronDown, ChevronUp, Settings, Zap, Sparkles, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // Theme colors - consistent with dashboard
@@ -403,6 +403,7 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [categoriesCollapsed, setCategoriesCollapsed] = useState(false)
   const [templatesCollapsed, setTemplatesCollapsed] = useState(false)
+  const [loadingTemplate, setLoadingTemplate] = useState<string | null>(null)
 
   const categories = [
     { id: 'all', name: 'All Templates', count: templates.length },
@@ -416,9 +417,19 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
     ? templates 
     : templates.filter(t => t.category === selectedCategory)
 
-  const handleUseTemplate = () => {
+  const handleUseTemplate = async () => {
     if (selectedTemplate) {
-      onSelectTemplate(selectedTemplate)
+      setLoadingTemplate(selectedTemplate.id)
+      
+      try {
+        // Add small delay to show loading state
+        await new Promise(resolve => setTimeout(resolve, 500))
+        onSelectTemplate(selectedTemplate)
+      } catch (error) {
+        console.error('Error selecting template:', error)
+      } finally {
+        setLoadingTemplate(null)
+      }
     }
   }
 
@@ -721,28 +732,34 @@ export default function CampaignTemplates({ onSelectTemplate, onClose }: Campaig
                     </div>
                   </div>
 
-                  {/* Sticky Action Bar */}
-                  <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 -mx-8 -mb-8 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm text-gray-600">
-                        Ready to customize this template for your campaign?
-                      </div>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={onClose}
-                          className="px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 hover:shadow-sm font-medium transition-all duration-200"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleUseTemplate}
-                          className="px-8 py-3 text-white rounded-xl font-medium flex items-center shadow-sm hover:shadow-md transition-all duration-200"
-                          style={{ backgroundColor: THEME_COLORS.primary }}
-                        >
-                          Use This Template
-                          <ChevronRight className="h-5 w-5 ml-2" />
-                        </button>
-                      </div>
+                  {/* Updated Action Bar */}
+                  <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 mt-8">
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => setSelectedTemplate(null)}
+                        className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                      >
+                        Back to Templates
+                      </button>
+                      
+                      <button
+                        onClick={handleUseTemplate}
+                        disabled={!!loadingTemplate}
+                        className="inline-flex items-center px-8 py-3 text-white rounded-xl hover:shadow-lg transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ backgroundColor: THEME_COLORS.primary }}
+                      >
+                        {loadingTemplate === selectedTemplate.id ? (
+                          <>
+                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                            Applying Template...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-5 w-5 mr-2" />
+                            Use This Template
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { AlertTriangle, Info, Variable } from 'lucide-react'
+import { AlertTriangle, Info, Variable, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 interface MissingVariable {
@@ -25,6 +25,7 @@ export default function MissingVariablesForm({
   fromName 
 }: MissingVariablesFormProps) {
   const [variableValues, setVariableValues] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
 
   const unfoundVariables = missingVariables.filter(v => !v.found)
 
@@ -42,11 +43,22 @@ export default function MissingVariablesForm({
     onVariablesChange(variableValues)
   }, [variableValues, onVariablesChange])
 
-  const handleVariableChange = (key: string, value: string) => {
-    setVariableValues(prev => ({
-      ...prev,
-      [key]: value
-    }))
+  const handleVariableChange = async (key: string, value: string) => {
+    setSaving(true)
+    
+    try {
+      setVariableValues(prev => ({
+        ...prev,
+        [key]: value
+      }))
+      
+      // Add small delay to show loading state
+      await new Promise(resolve => setTimeout(resolve, 200))
+    } catch (error) {
+      console.error('Error updating variable:', error)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const getVariableLabel = (key: string) => {
@@ -86,9 +98,17 @@ export default function MissingVariablesForm({
           <Variable className="w-4 h-4 text-orange-600" />
         </div>
         <div className="flex-1">
-          <h3 className="font-semibold text-orange-900 mb-1">
-            Missing Template Variables
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-orange-900 mb-1">
+              Missing Template Variables
+            </h3>
+            {saving && (
+              <div className="flex items-center text-xs text-orange-700">
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                Updating...
+              </div>
+            )}
+          </div>
           <p className="text-sm text-orange-800 mb-4">
             The "{templateName}" template uses variables that aren't in your contact fields. 
             Set static values below, or upload contacts with these fields for dynamic personalization.
@@ -107,13 +127,21 @@ export default function MissingVariablesForm({
                 </span>
               )}
             </label>
-            <input
-              type="text"
-              value={variableValues[variable.key] || ''}
-              onChange={(e) => handleVariableChange(variable.key, e.target.value)}
-              className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 bg-white"
-              placeholder={`Enter value for {{${variable.key}}}`}
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={variableValues[variable.key] || ''}
+                onChange={(e) => handleVariableChange(variable.key, e.target.value)}
+                disabled={saving}
+                className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900 bg-white disabled:opacity-50 transition-all duration-200"
+                placeholder={`Enter value for {{${variable.key}}}`}
+              />
+              {saving && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+                </div>
+              )}
+            </div>
             <p className="text-xs text-orange-700">
               {getVariableDescription(variable.key)}
             </p>
@@ -126,7 +154,7 @@ export default function MissingVariablesForm({
           <Info className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
           <div className="text-xs text-orange-700">
             <p className="mb-1">
-              <strong>Static values:</strong> Same text for all contacts (e.g., {'{from_name}'} = "John Smith")
+              <strong>Static values:</strong> Same text for all contacts (e.g., {`{{from_name}}`} = "John Smith")
             </p>
             <p>
               <strong>Dynamic values:</strong> Upload contacts with matching field names for personalization (e.g., each contact has their own company name)

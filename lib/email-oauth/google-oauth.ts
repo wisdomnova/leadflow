@@ -12,52 +12,34 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 export function getGoogleAuthUrl(userId: string): string {
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  )
-
   const scopes = [
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/userinfo.profile'
-  ]
-
-  return oauth2Client.generateAuthUrl({
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/userinfo.email'
+  ];
+  
+  return oauth2Client.generateAuthUrl({ 
     access_type: 'offline',
-    prompt: 'consent', // Force consent to get refresh token
     scope: scopes,
-    state: userId
-  })
+    state: userId,
+    prompt: 'consent' // Force to get refresh token
+  });
 }
 
 export async function handleGoogleCallback(code: string) {
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  )
-
-  const { tokens } = await oauth2Client.getToken(code)
+  const { tokens } = await oauth2Client.getToken(code);
   
-  if (!tokens.access_token || !tokens.refresh_token) {
-    throw new Error('Failed to get tokens from Google')
-  }
-
-  oauth2Client.setCredentials(tokens)
-
-  // Get user info
-  const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client })
-  const { data: userInfo } = await oauth2.userinfo.get()
-
+  oauth2Client.setCredentials(tokens);
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+  const profile = await gmail.users.getProfile({ userId: 'me' });
+  
   return {
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    expiresAt: new Date(tokens.expiry_date || Date.now() + 3600 * 1000),
-    email: userInfo.email!
-  }
+    accessToken: tokens.access_token!,
+    refreshToken: tokens.refresh_token!,
+    expiresAt: new Date(tokens.expiry_date!),
+    email: profile.data.emailAddress!
+  };
 }
 
 export async function refreshGoogleToken(refreshToken: string) {
@@ -140,48 +122,4 @@ export async function fetchGmailMessages(
   }
   
   return detailedMessages;
-}
-
-export async function sendGmailEmail(
-  accessToken: string,
-  to: string,
-  subject: string,
-  htmlContent: string,
-  fromName?: string,
-  fromEmail?: string
-): Promise<{ messageId: string; threadId?: string }> {
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  )
-
-  oauth2Client.setCredentials({ access_token: accessToken })
-  const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
-
-  // Construct email
-  const fromField = fromName ? `${fromName} <${fromEmail}>` : fromEmail
-  const emailLines = [
-    `To: ${to}`,
-    `From: ${fromField}`,
-    `Subject: ${subject}`,
-    'Content-Type: text/html; charset=utf-8',
-    '',
-    htmlContent
-  ]
-
-  const email = emailLines.join('\r\n')
-  const encodedEmail = Buffer.from(email).toString('base64url')
-
-  const response = await gmail.users.messages.send({
-    userId: 'me',
-    requestBody: {
-      raw: encodedEmail
-    }
-  })
-
-  return {
-    messageId: response.data.id!,
-    threadId: response.data.threadId || undefined
-  }
 }

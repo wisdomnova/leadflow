@@ -178,6 +178,9 @@ export default function SequenceBuilder({
   const [editingStep, setEditingStep] = useState<string | null>(null)
   const [previewingStep, setPreviewingStep] = useState<any | null>(null)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  
+  // Add button loading states
+  const [buttonLoading, setButtonLoading] = useState<Record<string, boolean>>({})
 
   const textareaRefs = useRef<{ [key: string]: HTMLTextAreaElement | HTMLInputElement | null }>({})
   const [activeField, setActiveField] = useState<{ stepId: string, field: 'subject' | 'content' } | null>(null)
@@ -236,11 +239,85 @@ export default function SequenceBuilder({
     setIsSaving(false)
   }
 
-  const handleManualReload = () => {
-    if (campaignId) {
-      console.log('Manual reload triggered')
-      setTemplateLoadAttempted(true)
-      loadSequence(campaignId)
+  const handleAddStep = async () => {
+    if (readOnly || steps.length >= 5) return
+    
+    setButtonLoading(prev => ({ ...prev, addStep: true }))
+    
+    try {
+      await addStep()
+    } catch (error) {
+      console.error('Failed to add step:', error)
+    } finally {
+      setButtonLoading(prev => ({ ...prev, addStep: false }))
+    }
+  }
+
+  const handleAddStepAtIndexWithLoading = async (index: number) => {
+    if (readOnly) return
+    
+    setButtonLoading(prev => ({ ...prev, [`addStepAt_${index}`]: true }))
+    
+    try {
+      const newStep = {
+        id: `step-${Date.now()}`,
+        stepNumber: index + 1,
+        name: `Step ${index + 1}`,
+        subject: '',
+        content: '',
+        delayAmount: 1,
+        delayUnit: 'days' as 'hours' | 'days',
+        order_index: index
+      }
+
+      if (addStepAtIndex) {
+        await addStepAtIndex(newStep, index)
+      } else {
+        await addStep()
+      }
+    } catch (error) {
+      console.error('Failed to add step:', error)
+    } finally {
+      setButtonLoading(prev => ({ ...prev, [`addStepAt_${index}`]: false }))
+    }
+  }
+
+  const handleRemoveStep = async (stepId: string) => {
+    if (readOnly) return
+    
+    setButtonLoading(prev => ({ ...prev, [`remove_${stepId}`]: true }))
+    
+    try {
+      await removeStep(stepId)
+      setEditingStep(null)
+    } catch (error) {
+      console.error('Failed to remove step:', error)
+    } finally {
+      setButtonLoading(prev => ({ ...prev, [`remove_${stepId}`]: false }))
+    }
+  }
+
+  const handleUpdateStep = async (stepId: string, updates: any) => {
+    if (readOnly) return
+    
+    try {
+      await updateStep(stepId, updates)
+    } catch (error) {
+      console.error('Failed to update step:', error)
+    }
+  }
+
+  const handleManualReload = async () => {
+    if (!campaignId) return
+    
+    setButtonLoading(prev => ({ ...prev, reload: true }))
+    
+    try {
+      await loadSequence(campaignId)
+    } catch (error) {
+      console.error('Failed to reload sequence:', error)
+    } finally {
+      setButtonLoading(prev => ({ ...prev, reload: false }))
     }
   }
 
@@ -422,16 +499,11 @@ export default function SequenceBuilder({
               }}
             >
               {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Sequence
-                </>
+                <Save className="h-4 w-4 mr-2" />
               )}
+              {isSaving ? 'Saving...' : 'Save Sequence'}
             </button>
           )}
         </div>
@@ -489,11 +561,16 @@ export default function SequenceBuilder({
                     {index > 0 && canAddStep && !readOnly && (
                       <div className="flex justify-center py-3">
                         <button
-                          onClick={() => handleAddStepAtIndex(index)}
-                          className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl border-2 border-dashed border-gray-300 text-gray-600 bg-white hover:bg-gray-50 hover:border-blue-600 hover:text-blue-600 transition-all duration-200"
+                          onClick={() => handleAddStepAtIndexWithLoading(index)}
+                          disabled={buttonLoading[`addStepAt_${index}`]}
+                          className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl border-2 border-dashed border-gray-300 text-gray-600 bg-white hover:bg-gray-50 hover:border-blue-600 hover:text-blue-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add step here
+                          {buttonLoading[`addStepAt_${index}`] ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Plus className="h-4 w-4 mr-2" />
+                          )}
+                          {buttonLoading[`addStepAt_${index}`] ? 'Adding...' : 'Add step here'}
                         </button>
                       </div>
                     )}
@@ -752,20 +829,29 @@ export default function SequenceBuilder({
                     transition={{ delay: steps.length * 0.1 }}
                   >
                     <button
-                      onClick={addStep}
-                      className="inline-flex items-center px-8 py-6 border-2 border-dashed border-gray-300 text-lg font-semibold rounded-2xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-lg transition-all duration-300"
+                      onClick={handleAddStep}
+                      disabled={buttonLoading.addStep}
+                      className="inline-flex items-center px-8 py-6 border-2 border-dashed border-gray-300 text-lg font-semibold rounded-2xl text-gray-700 bg-white hover:bg-gray-50 hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{}}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = THEME_COLORS.primary
-                        e.currentTarget.style.color = THEME_COLORS.primary
+                        if (!buttonLoading.addStep) {
+                          e.currentTarget.style.borderColor = THEME_COLORS.primary
+                          e.currentTarget.style.color = THEME_COLORS.primary
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db'
-                        e.currentTarget.style.color = '#374151'
+                        if (!buttonLoading.addStep) {
+                          e.currentTarget.style.borderColor = '#d1d5db'
+                          e.currentTarget.style.color = '#374151'
+                        }
                       }}
                     >
-                      <Plus className="h-6 w-6 mr-3" />
-                      Add Email Step ({steps.length}/5)
+                      {buttonLoading.addStep ? (
+                        <Loader2 className="h-6 w-6 mr-3 animate-spin" />
+                      ) : (
+                        <Plus className="h-6 w-6 mr-3" />
+                      )}
+                      {buttonLoading.addStep ? 'Adding Step...' : `Add Email Step (${steps.length}/5)`}
                     </button>
                   </motion.div>
                 )}
@@ -795,17 +881,27 @@ export default function SequenceBuilder({
                 <div className="flex items-center justify-center space-x-4">
                   <button
                     onClick={handleManualReload}
-                    className="px-6 py-3 border border-gray-300 text-gray-700 bg-white rounded-xl hover:bg-gray-50 hover:shadow-md font-medium transition-all duration-200"
+                    disabled={buttonLoading.reload}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 bg-white rounded-xl hover:bg-gray-50 hover:shadow-md font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Reload Steps
+                    {buttonLoading.reload ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin inline" />
+                    ) : null}
+                    {buttonLoading.reload ? 'Reloading...' : 'Reload Steps'}
                   </button>
                   <span className="text-gray-400 text-lg">or</span>
                   <button
-                    onClick={addStep}
-                    className="px-8 py-3 text-white rounded-xl hover:shadow-lg font-semibold transition-all duration-200"
+                    onClick={handleAddStep}
+                    disabled={buttonLoading.addStep}
+                    className="inline-flex items-center px-8 py-3 text-white rounded-xl hover:shadow-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ backgroundColor: THEME_COLORS.primary }}
                   >
-                    Add First Step
+                    {buttonLoading.addStep ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4 mr-2" />
+                    )}
+                    {buttonLoading.addStep ? 'Adding...' : 'Add First Step'}
                   </button>
                 </div>
               )}
