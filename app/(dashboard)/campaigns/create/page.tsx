@@ -9,6 +9,14 @@ import CampaignTemplates from '@/components/campaigns/CampaignTemplates'
 import ContactSelector from '@/components/campaigns/ContactSelector'
 import { ArrowLeft, ArrowRight, Save, Mail, Settings, CheckCircle, Users, RotateCcw, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { 
+  extractVariablesFromTemplate, 
+  checkVariableAvailability, 
+  getContactFieldMapping,
+  type TemplateVariable 
+} from '@/lib/template-variable-extractor'
+import MissingVariablesForm from '@/components/campaigns/MissingVariablesForm'
+import { useAuthStore } from '@/store/useAuthStore'
 
 // Theme colors - consistent with dashboard
 const THEME_COLORS = {
@@ -43,6 +51,7 @@ export default function CreateCampaignPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { createCampaign, isLoading } = useCampaignStore()
+  const { user } = useAuthStore()
   
   // Add email account check state
   const [emailAccounts, setEmailAccounts] = useState<any[]>([])
@@ -84,6 +93,10 @@ export default function CreateCampaignPage() {
     const saved = localStorage.getItem('createCampaign_showForm')
     return saved ? JSON.parse(saved) : false
   })
+
+  // Add template variables state
+  const [templateVariables, setTemplateVariables] = useState<TemplateVariable[]>([])
+  const [missingVariableValues, setMissingVariableValues] = useState<Record<string, string>>({})
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
@@ -193,15 +206,26 @@ export default function CreateCampaignPage() {
     try {
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i]
+        
+        // Replace missing variables with static values
+        let processedSubject = step.subject
+        let processedContent = step.content
+        
+        Object.entries(missingVariableValues).forEach(([key, value]) => {
+          const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g')
+          processedSubject = processedSubject.replace(regex, value)
+          processedContent = processedContent.replace(regex, value)
+        })
+        
         await fetch(`/api/campaigns/${campaignId}/steps`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'email',
-            subject: step.subject,
-            content: step.content,
-            delay_days: step.delay_days || 0, // Use snake_case for API
-            delay_hours: step.delay_hours || 0, // Use snake_case for API
+            subject: processedSubject,
+            content: processedContent,
+            delay_days: step.delay_days || 0,
+            delay_hours: step.delay_hours || 0,
             order_index: i
           })
         })
@@ -251,7 +275,7 @@ export default function CreateCampaignPage() {
       ...prev,
       name: template.name,
       description: template.description,
-      type: template.emails > 1 ? 'sequence' : 'single'
+      type: 'sequence' // Force sequence for templates
     }))
     setShowTemplates(false)
     setShowForm(true)
@@ -342,6 +366,31 @@ export default function CreateCampaignPage() {
 
     fetchEmailAccounts()
   }, [])
+
+  // Pre-fill user data when component mounts
+  useEffect(() => {
+    if (user && !campaignData.from_name && !campaignData.from_email) {
+      const fullName = `${user.first_name} ${user.last_name}`.trim() || ''
+      setCampaignData((prev: any) => ({
+        ...prev,
+        from_name: fullName,
+        from_email: user.email || ''
+      }))
+    }
+  }, [user, campaignData.from_name, campaignData.from_email])
+
+  // Handle template variables when template is selected
+  useEffect(() => {
+    if (selectedTemplate) {
+      const templateVars = extractVariablesFromTemplate(selectedTemplate)
+      const contactFields = getContactFieldMapping()
+      const variableStatus = checkVariableAvailability(templateVars, contactFields)
+      setTemplateVariables(variableStatus)
+    } else {
+      setTemplateVariables([])
+      setMissingVariableValues({})
+    }
+  }, [selectedTemplate])
 
   if (loadingEmailAccounts) {
     return (
@@ -658,6 +707,16 @@ export default function CreateCampaignPage() {
                     </div>
                   </motion.div>
                 )}
+
+                {/* Missing Variables Form */}
+                {selectedTemplate && templateVariables.length > 0 && (
+                  <MissingVariablesForm
+                    missingVariables={templateVariables}
+                    onVariablesChange={setMissingVariableValues}
+                    templateName={selectedTemplate.name}
+                    fromName={campaignData.from_name} // Pass the from_name to pre-fill
+                  />
+                )}
                 
                 <form onSubmit={handleCampaignSubmit} className="space-y-8">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -704,9 +763,12 @@ export default function CreateCampaignPage() {
                         style={{ 
                           '--tw-ring-color': THEME_COLORS.primary
                         } as any}
-                        placeholder="John Doe"
+                        placeholder="John Smith"
                         required
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        This will be used for the {`{{from_name}}`} variable in templates
+                      </p>
                     </div>
                     
                     <div>
@@ -765,18 +827,20 @@ export default function CreateCampaignPage() {
                       </motion.div>
 
                       <motion.div 
-                        className={`relative p-6 border-2 rounded-2xl cursor-pointer transition-all duration-200 ${
-                          campaignData.type === 'single' 
-                            ? 'shadow-lg border-2' 
-                            : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                        className={`relative p-6 border-2 rounded-2xl transition-all duration-200 ${
+                          selectedTemplate 
+                            ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' 
+                            : campaignData.type === 'single' 
+                            ? 'shadow-lg border-2 cursor-pointer' 
+                            : 'border-gray-200 hover:border-gray-300 hover:shadow-md cursor-pointer'
                         }`}
-                        style={campaignData.type === 'single' ? {
+                        style={campaignData.type === 'single' && !selectedTemplate ? {
                           backgroundColor: `${THEME_COLORS.primary}10`,
                           borderColor: THEME_COLORS.primary
                         } : {}}
-                        onClick={() => setCampaignData((prev: any) => ({ ...prev, type: 'single' }))}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        onClick={() => !selectedTemplate && setCampaignData((prev: any) => ({ ...prev, type: 'single' }))}
+                        whileHover={!selectedTemplate ? { scale: 1.02 } : {}}
+                        whileTap={!selectedTemplate ? { scale: 0.98 } : {}}
                       >
                         <div className="flex items-center">
                           <input
@@ -784,8 +848,9 @@ export default function CreateCampaignPage() {
                             name="campaignType"
                             value="single"
                             checked={campaignData.type === 'single'}
-                            onChange={() => setCampaignData((prev: any) => ({ ...prev, type: 'single' }))}
-                            className="h-5 w-5 border-gray-300 focus:ring-2 transition-all"
+                            onChange={() => !selectedTemplate && setCampaignData((prev: any) => ({ ...prev, type: 'single' }))}
+                            disabled={!!selectedTemplate}
+                            className="h-5 w-5 border-gray-300 focus:ring-2 transition-all disabled:opacity-50"
                             style={{ 
                               color: THEME_COLORS.primary,
                               '--tw-ring-color': THEME_COLORS.primary
@@ -793,7 +858,12 @@ export default function CreateCampaignPage() {
                           />
                           <div className="ml-4">
                             <div className="font-semibold text-gray-900 text-lg">Single Email</div>
-                            <div className="text-sm text-gray-600 mt-1">One email sent immediately</div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              {selectedTemplate 
+                                ? 'Not available for templates' 
+                                : 'One email sent immediately'
+                              }
+                            </div>
                           </div>
                         </div>
                       </motion.div>

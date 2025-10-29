@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSequenceStore } from '@/store/useSequenceStore'
-import { Plus, Save, AlertCircle, CheckCircle, Clock, Mail, Edit2, Eye, Smartphone, Monitor, GripVertical, Trash2, X, Play, Settings } from 'lucide-react'
+import { Plus, Save, AlertCircle, CheckCircle, Clock, Mail, Edit2, Eye, Smartphone, Monitor, GripVertical, Trash2, X, Play, Settings, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TemplateVariablePicker from './TemplateVariablePicker'
 
@@ -421,8 +421,17 @@ export default function SequenceBuilder({
                 backgroundColor: THEME_COLORS.primary
               }}
             >
-              <Save className="h-4 w-4 mr-2" />
-              {isSaving ? 'Saving...' : 'Save Sequence'}
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Sequence
+                </>
+              )}
             </button>
           )}
         </div>
