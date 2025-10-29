@@ -12,62 +12,67 @@ const redirectUri = isDev
   : process.env.NEXT_PUBLIC_MICROSOFT_REDIRECT_URI_PROD!;
 
 export function getMicrosoftAuthUrl(userId: string): string {
+  const clientId = process.env.MICROSOFT_CLIENT_ID!
+  const redirectUri = process.env.MICROSOFT_REDIRECT_URI!
+  
   const scopes = [
     'https://graph.microsoft.com/Mail.Send',
     'https://graph.microsoft.com/Mail.Read',
-    'https://graph.microsoft.com/User.Read',
-    'offline_access'
-  ];
-  
-  const authUrl = new URL(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`);
-  authUrl.searchParams.append('client_id', clientId);
-  authUrl.searchParams.append('response_type', 'code');
-  authUrl.searchParams.append('redirect_uri', redirectUri);
-  authUrl.searchParams.append('scope', scopes.join(' '));
-  authUrl.searchParams.append('state', userId);
-  authUrl.searchParams.append('response_mode', 'query');
-  
-  return authUrl.toString();
+    'https://graph.microsoft.com/User.Read'
+  ]
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    scope: scopes.join(' '),
+    state: userId,
+    prompt: 'consent'
+  })
+
+  return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`
 }
 
 export async function handleMicrosoftCallback(code: string) {
-  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
-  
-  const params = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    code,
-    redirect_uri: redirectUri,
-    grant_type: 'authorization_code'
-  });
-  
-  const response = await fetch(tokenUrl, {
+  const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString()
-  });
-  
-  const data = await response.json();
-  
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      client_id: process.env.MICROSOFT_CLIENT_ID!,
+      client_secret: process.env.MICROSOFT_CLIENT_SECRET!,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: process.env.MICROSOFT_REDIRECT_URI!,
+    }),
+  })
+
   if (!response.ok) {
-    throw new Error(data.error_description || 'Failed to get tokens');
+    throw new Error('Failed to exchange code for tokens')
   }
+
+  const tokens = await response.json()
   
-  // Get user email
-  const client = Client.init({
-    authProvider: (done) => {
-      done(null, data.access_token);
-    }
-  });
-  
-  const user = await client.api('/me').get();
-  
+  // Get user info
+  const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+    headers: {
+      Authorization: `Bearer ${tokens.access_token}`,
+    },
+  })
+
+  if (!userResponse.ok) {
+    throw new Error('Failed to get user info')
+  }
+
+  const userInfo = await userResponse.json()
+
   return {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    expiresAt: new Date(Date.now() + data.expires_in * 1000),
-    email: user.mail || user.userPrincipalName
-  };
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+    email: userInfo.mail || userInfo.userPrincipalName
+  }
 }
 
 export async function refreshMicrosoftToken(refreshToken: string) {
@@ -129,14 +134,25 @@ export async function sendEmailViaOutlook(
     ]
   };
   
-  const result = await client.api('/me/sendMail').post({
-    message,
-    saveToSentItems: true
-  });
-  
+  const response = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message })
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Failed to send email: ${error}`)
+  }
+
+  // Microsoft Graph doesn't return message ID in response for sendMail
+  // We'll generate a unique ID for tracking
   return {
-    messageId: result.id || 'sent'
-  }; 
+    messageId: `outlook_${Date.now()}_${Math.random().toString(36).substring(7)}`
+  }
 }
 
 export async function fetchOutlookMessages(
