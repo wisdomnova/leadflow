@@ -76,16 +76,6 @@ async function processEmailQueue() {
 
   for (const email of queuedEmails) {
     try {
-      // Add debug logging
-      console.log('Processing email:', {
-        id: email.id,
-        subject: email.subject,
-        bodyLength: email.body?.length || 0,
-        to: email.campaign_contacts?.email,
-        hasSubject: !!email.subject,
-        hasBody: !!email.body
-      })
-
       // Skip if email account doesn't exist or is not active
       if (!email.email_accounts || 
           !['active', 'warming_up'].includes(email.email_accounts.status)) {
@@ -99,19 +89,6 @@ async function processEmailQueue() {
         continue
       }
 
-      // Check if we have content before sending
-      if (!email.subject && !email.body) {
-        console.error('Email has no subject or body:', email.id)
-        await supabase
-          .from('email_queue')
-          .update({ 
-            status: 'failed',
-            error_message: 'No subject or body content'
-          })
-          .eq('id', email.id)
-        continue
-      }
-
       // Update status to sending
       await supabase
         .from('email_queue')
@@ -119,16 +96,18 @@ async function processEmailQueue() {
         .eq('id', email.id)
 
       // Replace variables in subject and body - use campaign_contacts data
-      const processedSubject = replaceVariables(email.subject, email.variables, email.campaign_contacts)
-      const processedBody = replaceVariables(email.body, email.variables, email.campaign_contacts)
+      // const processedSubject = replaceVariables(email.subject, email.variables, email.campaign_contacts)
+      // const processedBody = replaceVariables(email.body, email.variables, email.campaign_contacts)
 
       // Send email
       const result = await sendCampaignEmail({
         emailAccountId: email.email_account_id,
         to: email.campaign_contacts.email,
-        subject: processedSubject,
-        body: processedBody
-      })
+        subject: email.subject,
+        body: email.body
+      });
+
+      console.log(`Sending email to: ${email.campaign_contacts.email}`, `with subject: ${email.subject}`, `and body: ${email.body}`);
 
       // Update status to sent
       await supabase

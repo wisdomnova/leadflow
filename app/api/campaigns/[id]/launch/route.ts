@@ -82,7 +82,7 @@ export async function POST(
     
     for (const contact of campaignContacts) {
       for (let stepIndex = 0; stepIndex < campaignSteps.length; stepIndex++) {
-        const step = campaignSteps[stepIndex]
+        const step = campaignSteps[stepIndex];
         const baseDelay = stepIndex * 60000 // 1 minute between contacts for same step
         const stepDelay = (step.delay_days * 24 * 60 * 60 * 1000) + (step.delay_hours * 60 * 60 * 1000)
         
@@ -91,11 +91,11 @@ export async function POST(
           email_account_id: campaign.email_account_id,
           contact_id: contact.id,
           subject: step.subject || 'No Subject',
-          body: step.content || 'No Content', // This should be the step content
+          body: step.content || 'No Content',
           variables: {},
+          step_id: step.id,
           scheduled_for: new Date(Date.now() + baseDelay + stepDelay).toISOString(),
-          status: 'pending',
-          step_number: stepIndex + 1 // Add step tracking
+          status: 'pending'
         })
       }
     }
