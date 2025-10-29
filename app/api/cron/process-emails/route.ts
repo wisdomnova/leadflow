@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendCampaignEmail } from '@/lib/campaign-email'
+import { VariableProcessor } from '@/lib/variable-processor'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,7 +55,12 @@ async function processEmailQueue() {
         first_name,
         last_name,
         company,
-        phone
+        phone,
+        job_title
+      ),
+      campaigns!inner(
+        id,
+        variables
       )
     `)
     .eq('status', 'pending')
@@ -95,19 +101,37 @@ async function processEmailQueue() {
         .update({ status: 'sending' })
         .eq('id', email.id)
 
-      // Replace variables in subject and body - use campaign_contacts data
-      // const processedSubject = replaceVariables(email.subject, email.variables, email.campaign_contacts)
-      // const processedBody = replaceVariables(email.body, email.variables, email.campaign_contacts)
+      // Process variables using the new system
+      const contact = {
+        first_name: email.campaign_contacts.first_name,
+        last_name: email.campaign_contacts.last_name,
+        email: email.campaign_contacts.email,
+        company: email.campaign_contacts.company,
+        phone: email.campaign_contacts.phone,
+        job_title: email.campaign_contacts.job_title
+      }
+
+      const campaignVariables = email.campaigns?.variables || {}
+
+      const processedSubject = VariableProcessor.processText(email.subject, {
+        contact,
+        campaignVariables,
+        preserveUnknown: true // Keep {{unknown_variable}} as-is
+      })
+
+      const processedBody = VariableProcessor.processText(email.body, {
+        contact,
+        campaignVariables,
+        preserveUnknown: true
+      })
 
       // Send email
       const result = await sendCampaignEmail({
         emailAccountId: email.email_account_id,
         to: email.campaign_contacts.email,
-        subject: email.subject,
-        body: email.body
-      });
-
-      console.log(`Sending email to: ${email.campaign_contacts.email}`, `with subject: ${email.subject}`, `and body: ${email.body}`);
+        subject: processedSubject,
+        body: processedBody
+      })
 
       // Update status to sent
       await supabase
@@ -139,29 +163,4 @@ async function processEmailQueue() {
     // Add delay between emails (rate limiting)
     await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second delay
   }
-}
-
-function replaceVariables(text: string, variables: any, contact: any) {
-  // Add null check
-  if (!text || typeof text !== 'string') {
-    return text || ''
-  }
-  
-  let result = text
-  
-  // Replace contact variables with null checks
-  result = result.replace(/\{\{first_name\}\}/g, contact?.first_name || '')
-  result = result.replace(/\{\{last_name\}\}/g, contact?.last_name || '')
-  result = result.replace(/\{\{email\}\}/g, contact?.email || '')
-  result = result.replace(/\{\{company\}\}/g, contact?.company || '')
-  
-  // Replace custom variables
-  if (variables && typeof variables === 'object') {
-    Object.keys(variables).forEach(key => {
-      const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g')
-      result = result.replace(regex, variables[key] || '')
-    })
-  }
-  
-  return result
 }
