@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { decryptToken, encryptToken } from './token-manager'
 import { fetchGmailMessages, refreshGoogleToken } from './google-oauth'
 import { fetchOutlookMessages, refreshMicrosoftToken } from './microsoft-oauth'
-import { classifyReplyWithAI } from '@/lib/ai/reply-classifier'
+import { ReplyDetectionService } from '@/lib/reply-detection'
 
 export async function pollInboxes() {
   try {
@@ -104,67 +104,63 @@ async function pollAccountInbox(account: any) {
 
 async function processIncomingEmail(email: any, account: any) {
   try {
-    const fromEmail = email.from?.toLowerCase()
-    const subject = email.subject || ''
-    const inReplyTo = email.inReplyTo
-    const references = email.references || []
+    // Get the organization ID from the email account
+    const organizationId = account.organization_id
 
-    // Check if this is a reply to a campaign email
-    const { data: campaignContacts, error } = await supabase
-      .from('campaign_contacts')
-      .select(`
-        id,
-        campaign_id,
-        email,
-        campaigns!inner(id, organization_id)
-      `)
-      .eq('email', fromEmail)
-      .in('status', ['sent', 'delivered', 'opened', 'clicked'])
-
-    if (error || !campaignContacts || campaignContacts.length === 0) {
-      return // Not a reply to our campaign
+    if (!organizationId) {
+      console.error('No organization_id found for email account:', account.email)
+      return
     }
 
-    // Find matching campaign contact
-    for (const contact of campaignContacts) {
-      // Check if this email is a reply (by subject or thread references)
-      const isReply = 
-        subject.toLowerCase().includes('re:') ||
-        inReplyTo ||
-        references.length > 0
+    // Use ReplyDetectionService to process the email completely
+    // This will handle AI classification, inbox_messages insertion, and reply detection
+    const inboxMessage = await ReplyDetectionService.processIncomingEmail({
+      message_id: email.messageId,
+      subject: email.subject || '',
+      content: email.content || email.body || '',
+      html_content: email.html_content || email.htmlBody,
+      from_email: email.from,
+      from_name: email.fromName,
+      to_email: account.email,
+      to_name: account.display_name,
+      headers: email.headers,
+      received_at: email.receivedAt
+    }, organizationId)
 
-      if (isReply) {
-        // Record the reply event
-        await supabase
-          .from('email_events')
-          .insert([{
-            campaign_id: contact.campaign_id,
-            contact_id: contact.id,
-            email_account_id: account.id,
-            event_type: 'reply',
-            metadata: {
-              subject: email.subject,
-              from: email.from,
-              messageId: email.messageId,
-              receivedAt: email.receivedAt
-            },
-            created_at: new Date().toISOString()
-          }])
+    console.log(`💬 Email processed and saved to inbox: ${email.from} -> ${account.email}`)
+    
+    // If it's a reply to a campaign, also log to email_events for analytics
+    if (inboxMessage.campaign_id && inboxMessage.contact_id) {
+      await supabase
+        .from('email_events')
+        .insert([{
+          campaign_id: inboxMessage.campaign_id,
+          contact_id: inboxMessage.contact_id,
+          email_account_id: account.id,
+          event_type: 'reply',
+          metadata: {
+            subject: email.subject,
+            from: email.from,
+            messageId: email.messageId,
+            receivedAt: email.receivedAt,
+            inboxMessageId: inboxMessage.id
+          },
+          created_at: new Date().toISOString()
+        }])
 
-        // Update campaign contact status
-        await supabase
-          .from('campaign_contacts')
-          .update({
-            status: 'replied',
-            replied_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', contact.id)
+      // Update campaign contact status
+      await supabase
+        .from('campaign_contacts')
+        .update({
+          status: 'replied',
+          replied_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', inboxMessage.contact_id)
 
-        console.log(`💬 Reply detected from ${fromEmail} to campaign ${contact.campaign_id}`)
-        break
-      }
+      console.log(`� Campaign reply recorded: ${email.from} to campaign ${inboxMessage.campaign_id}`)
     }
+
   } catch (error) {
     console.error('Error processing incoming email:', error)
   }
@@ -234,12 +230,49 @@ async function getGmailEmails(accessToken: string, sinceDate: string, account?: 
         const emailData = await detailResponse.json()
         const headers = emailData.payload?.headers || []
         
+        // Extract email content from payload
+        let content = ''
+        let htmlContent = ''
+        
+        // Function to extract content from message parts
+        const extractContent = (part: any): void => {
+          if (part.body?.data) {
+            const decodedContent = Buffer.from(part.body.data, 'base64').toString('utf-8')
+            if (part.mimeType === 'text/plain') {
+              content = decodedContent
+            } else if (part.mimeType === 'text/html') {
+              htmlContent = decodedContent
+            }
+          }
+          
+          // Recursively process multipart messages
+          if (part.parts) {
+            part.parts.forEach(extractContent)
+          }
+        }
+        
+        // Extract content from the payload
+        if (emailData.payload) {
+          extractContent(emailData.payload)
+        }
+        
+        // If no plain text content, try to extract from HTML
+        if (!content && htmlContent) {
+          content = htmlContent.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+        }
+        
         emails.push({
           messageId: emailData.id,
           from: headers.find((h: any) => h.name === 'From')?.value,
+          fromName: headers.find((h: any) => h.name === 'From')?.value?.match(/^(.+?)\s*<.*>$/)?.[1]?.trim(),
           subject: headers.find((h: any) => h.name === 'Subject')?.value,
+          content: content,
+          htmlContent: htmlContent,
+          body: content, // Alias for backwards compatibility
+          htmlBody: htmlContent, // Alias for backwards compatibility
           inReplyTo: headers.find((h: any) => h.name === 'In-Reply-To')?.value,
           references: headers.find((h: any) => h.name === 'References')?.value?.split(' ') || [],
+          headers: Object.fromEntries(headers.map((h: any) => [h.name.toLowerCase(), h.value])),
           receivedAt: new Date(parseInt(emailData.internalDate)).toISOString()
         })
       }
@@ -273,9 +306,18 @@ async function getOutlookEmails(accessToken: string, sinceDate: string) {
     return messages.map((email: any) => ({
       messageId: email.id,
       from: email.from?.emailAddress?.address,
+      fromName: email.from?.emailAddress?.name,
       subject: email.subject,
+      content: email.body?.content || email.bodyPreview || '',
+      htmlContent: email.body?.contentType === 'html' ? email.body?.content : '',
+      body: email.body?.content || email.bodyPreview || '',
+      htmlBody: email.body?.contentType === 'html' ? email.body?.content : '',
       inReplyTo: email.conversationId, // Outlook uses conversation threading
       references: [],
+      headers: {
+        'message-id': email.internetMessageId,
+        'conversation-id': email.conversationId
+      },
       receivedAt: email.receivedDateTime
     }))
   } catch (error) {
