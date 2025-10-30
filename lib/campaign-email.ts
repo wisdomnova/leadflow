@@ -183,7 +183,18 @@ export async function sendCampaignEmail({
             to,
             provider: account.provider
           }
+        }),
+
+      // 5. Update campaign_contacts status to 'sent'
+      campaignId && contactId ? supabase
+        .from('campaign_contacts')
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          last_email_id: result.messageId
         })
+        .eq('campaign_id', campaignId)
+        .eq('contact_id', contactId) : Promise.resolve()
     ])
 
     console.log(`📧 Email sent successfully to ${to} via ${account.provider}`)

@@ -35,7 +35,8 @@ export async function GET(
           status: 'opened',
           opened_at: new Date().toISOString()
         })
-        .eq('id', contactId)
+        .eq('campaign_id', campaignId)
+        .eq('contact_id', contactId)
         .in('status', ['sent', 'delivered']) // Only update if not already clicked/bounced etc
     }
 

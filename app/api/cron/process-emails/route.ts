@@ -94,6 +94,7 @@ function replaceVariables(text: string, variables: any, contact: any, campaignDa
 
 async function processEmailQueue() {
   // Get pending emails that are due to be sent
+  // Only process emails where the campaign_contact is still 'pending' (not sent/delivered/opened etc)
   const { data: queuedEmails, error } = await supabase
     .from('email_queue')
     .select(`
@@ -105,7 +106,8 @@ async function processEmailQueue() {
         first_name,
         last_name,
         company,
-        phone
+        phone,
+        status
       ),
       campaigns!inner(
         from_name,
@@ -113,6 +115,7 @@ async function processEmailQueue() {
       )
     `)
     .eq('status', 'pending')
+    .eq('campaign_contacts.status', 'pending')
     .lte('scheduled_for', new Date().toISOString())
     .order('scheduled_for', { ascending: true })
     .limit(50)
