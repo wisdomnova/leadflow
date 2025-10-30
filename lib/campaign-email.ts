@@ -25,7 +25,8 @@ export async function sendCampaignEmail({
   subject,
   body,
   campaignId,
-  contactId
+  contactId,
+  trackingId
 }: {
   emailAccountId: string
   to: string
@@ -33,6 +34,7 @@ export async function sendCampaignEmail({
   body: string
   campaignId?: string
   contactId?: string
+  trackingId?: string
 }) {
   // Get email account
   const { data: account, error } = await supabase
@@ -119,11 +121,11 @@ export async function sendCampaignEmail({
   // Send email via appropriate provider
   let result
   try {
-    // Generate tracking ID for this email
-    const trackingId = `${campaignId}_${contactId}_${Date.now()}`
+    // Generate tracking ID for this email if not provided
+    const emailTrackingId = trackingId || `${campaignId}_${contactId}_${Date.now()}`
     
     // Add tracking pixels and links to email body
-    const trackedBody = addEmailTracking(body, trackingId)
+    const trackedBody = addEmailTracking(body, emailTrackingId)
 
     if (account.provider === 'google') {
       result = await sendEmailViaGmail(accessToken, to, subject, trackedBody, account.email)
@@ -175,7 +177,7 @@ export async function sendCampaignEmail({
           event_type: 'sent',
           message_id: result.messageId,
           thread_id: result.threadId,
-          tracking_id: trackingId,
+          tracking_id: emailTrackingId,
           metadata: {
             subject,
             to,
@@ -203,6 +205,9 @@ export async function sendCampaignEmail({
 
     // Log failure event
     if (campaignId && contactId) {
+      // Generate tracking ID for error logging if not already set
+      const errorTrackingId = trackingId || `${campaignId}_${contactId}_${Date.now()}`
+      
       await supabase
         .from('email_events')
         .insert({
@@ -211,7 +216,7 @@ export async function sendCampaignEmail({
           email_account_id: emailAccountId,
           organization_id: account.organization_id,
           event_type: 'failed',
-          tracking_id: trackingId,
+          tracking_id: errorTrackingId,
           metadata: {
             subject,
             to,
