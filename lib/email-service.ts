@@ -64,7 +64,7 @@ export class EmailService {
       })
 
       await supabase.from('email_events').insert(insertObj)
-    } catch (error) {
+    } catch (error) { 
       console.error('Failed to log email event:', error)
       // Do not throw - logging failures should not break flow
     }

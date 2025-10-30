@@ -28,7 +28,7 @@ export async function GET(
       // Log click event
       await EmailService.logEmailEvent({
         campaignId: trackingData.campaignId,
-        contactId: trackingData.contactId,
+        contactId: trackingData.contactId, 
         stepNumber: trackingData.stepNumber,
         type: 'click',
         messageId: undefined,

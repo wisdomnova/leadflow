@@ -16,7 +16,7 @@ interface SendEmailParams {
   body: string
   campaignId?: string
   contactId?: string
-  trackingId?: string
+  trackingId?: string 
 }
 
 export async function sendCampaignEmail({
@@ -25,9 +25,15 @@ export async function sendCampaignEmail({
   subject,
   body,
   campaignId,
-  contactId,
-  trackingId
-}: SendEmailParams): Promise<{ messageId: string; threadId?: string }> {
+  contactId
+}: {
+  emailAccountId: string
+  to: string
+  subject: string
+  body: string
+  campaignId?: string
+  contactId?: string
+}) {
   // Get email account
   const { data: account, error } = await supabase
     .from('email_accounts')
@@ -113,10 +119,16 @@ export async function sendCampaignEmail({
   // Send email via appropriate provider
   let result
   try {
+    // Generate tracking ID for this email
+    const trackingId = `${campaignId}_${contactId}_${Date.now()}`
+    
+    // Add tracking pixels and links to email body
+    const trackedBody = addEmailTracking(body, trackingId)
+
     if (account.provider === 'google') {
-      result = await sendEmailViaGmail(accessToken, to, subject, body, account.email)
+      result = await sendEmailViaGmail(accessToken, to, subject, trackedBody, account.email)
     } else {
-      result = await sendEmailViaOutlook(accessToken, to, subject, body, account.email)
+      result = await sendEmailViaOutlook(accessToken, to, subject, trackedBody, account.email)
     }
 
     const today = new Date().toISOString().split('T')[0]
@@ -210,6 +222,57 @@ export async function sendCampaignEmail({
     }
 
     throw error
+  }
+}
+
+function addEmailTracking(htmlBody: string, trackingId: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  
+  // Add tracking pixel at the end of the body
+  const trackingPixel = `<img src="${baseUrl}/api/track/open/${trackingId}" width="1" height="1" style="display:none;" />`
+  
+  // Convert links to tracked links
+  const trackedBody = htmlBody.replace(
+    /<a\s+href="([^"]+)"([^>]*)>/g,
+    `<a href="${baseUrl}/api/track/click/${trackingId}?url=$1"$2>`
+  )
+  
+  return trackedBody + trackingPixel
+}
+
+async function recordEmailEvent({
+  campaignId,
+  contactId,
+  emailAccountId,
+  eventType,
+  messageId,
+  trackingId,
+  metadata = {}
+}: {
+  campaignId: string
+  contactId: string
+  emailAccountId: string
+  eventType: string
+  messageId?: string
+  trackingId?: string
+  metadata?: any
+}) {
+  try {
+    await supabase
+      .from('email_events')
+      .insert([{
+        campaign_id: campaignId,
+        contact_id: contactId,
+        email_account_id: emailAccountId,
+        event_type: eventType,
+        message_id: messageId,
+        tracking_id: trackingId,
+        metadata,
+        created_at: new Date().toISOString()
+      }])
+  } catch (error) {
+    console.error('Failed to record email event:', error)
+    // Don't throw - we don't want tracking failures to break email sending
   }
 }
 

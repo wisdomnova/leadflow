@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    console.log('🔄 Starting scheduled inbox polling...')
     await pollInboxes()
     
     return NextResponse.json({ 
@@ -17,10 +18,10 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     })
   } catch (error: any) {
-    console.error('Inbox polling error:', error)
+    console.error('Inbox polling cron error:', error)
     return NextResponse.json({ 
       error: error.message,
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }
-} 
+}

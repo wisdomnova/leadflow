@@ -93,7 +93,7 @@ function replaceVariables(text: string, variables: any, contact: any, campaignDa
 }
 
 async function processEmailQueue() {
-  // Get pending emails that are due to be sent - include campaign data for from_name
+  // Get pending emails that are due to be sent
   const { data: queuedEmails, error } = await supabase
     .from('email_queue')
     .select(`
@@ -150,19 +150,19 @@ async function processEmailQueue() {
         .update({ status: 'sending' })
         .eq('id', email.id)
 
-      // Replace variables in subject and body - include campaign data
+      // Replace variables in subject and body
       const processedSubject = replaceVariables(email.subject, email.variables, email.campaign_contacts, email.campaigns)
       const processedBody = replaceVariables(email.body, email.variables, email.campaign_contacts, email.campaigns)
 
-      // Send email
+      // Send email with tracking
       const result = await sendCampaignEmail({
         emailAccountId: email.email_account_id,
         to: email.campaign_contacts.email,
         subject: processedSubject,
-        body: processedBody
+        body: processedBody,
+        campaignId: email.campaign_id,
+        contactId: email.contact_id
       });
-
-      console.log(`Sending email to: ${email.campaign_contacts.email}`, `with subject: ${processedSubject}`)
 
       // Update status to sent
       await supabase

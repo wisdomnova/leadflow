@@ -6,7 +6,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  try { 
     const { id: trackingId } = await params
     const trackingData = EmailService.decodeTrackingId(trackingId)
 
