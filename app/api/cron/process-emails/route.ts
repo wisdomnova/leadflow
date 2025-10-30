@@ -178,6 +178,8 @@ async function processEmailQueue() {
         })
         .eq('id', email.id)
 
+        console.log(`Email ID ${email.id} sent successfully`)
+
       console.log(`✅ Sent email to ${email.campaign_contacts.email}`)
 
     } catch (error: any) {
