@@ -102,6 +102,7 @@ async function processEmailQueue() {
       email_accounts (*),
       campaign_contacts!inner(
         id,
+        contact_id,
         email,
         first_name,
         last_name,
@@ -164,7 +165,7 @@ async function processEmailQueue() {
         subject: processedSubject,
         body: processedBody,
         campaignId: email.campaign_id,
-        contactId: email.contact_id
+        contactId: email.campaign_contacts.contact_id
       });
 
       // Update status to sent

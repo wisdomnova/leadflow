@@ -9,7 +9,7 @@ export async function pollInboxes() {
   try {
     console.log('🔄 Starting inbox polling...')
 
-    // Get all active email accounts
+    // Get all active email accounts 
     const { data: accounts, error } = await supabase
       .from('email_accounts')
       .select('*')
@@ -56,7 +56,7 @@ async function pollAccountInbox(account: any) {
 
     console.log(`📨 Processed ${emails.length} emails for ${account.email}`)
   } catch (error) {
-    console.error(`Error polling ${account.email}:`, error)
+    console.error(`Error polling ${account.email}:`, error) 
   }
 }
 

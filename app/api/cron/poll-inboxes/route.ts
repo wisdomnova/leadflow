@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('🔄 Starting scheduled inbox polling...')
+    console.log('🔄 Starting scheduled inbox polling...') 
     await pollInboxes()
     
     return NextResponse.json({ 

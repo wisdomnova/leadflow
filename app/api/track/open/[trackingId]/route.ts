@@ -11,6 +11,13 @@ export async function GET(
     // Parse tracking ID to get campaign and contact info
     const [campaignId, contactId] = trackingId.split('_')
     
+    console.log(`🔍 Open tracking debug:`, {
+      trackingId,
+      campaignId,
+      contactId,
+      fullUrl: request.url
+    })
+    
     if (campaignId && contactId) {
       // Record the open event
       await supabase 
@@ -28,8 +35,10 @@ export async function GET(
           created_at: new Date().toISOString()
         }])
 
+        console.log(`Logged open event for tracking ID: ${trackingId}`)
+
       // Update campaign contact status if this is their first open
-      await supabase
+      const { data: updateResult, error: updateError } = await supabase
         .from('campaign_contacts')
         .update({
           status: 'opened',
@@ -38,6 +47,24 @@ export async function GET(
         .eq('campaign_id', campaignId)
         .eq('contact_id', contactId)
         .in('status', ['sent', 'delivered']) // Only update if not already clicked/bounced etc
+        .select()
+
+      console.log(`📊 Campaign contact update result:`, {
+        campaignId,
+        contactId,
+        updateResult,
+        updateError,
+        rowsUpdated: updateResult?.length || 0
+      })
+
+      // Debug: Check what campaign_contacts exist for this campaign
+      const { data: existingContacts } = await supabase
+        .from('campaign_contacts')
+        .select('id, campaign_id, contact_id, status, email')
+        .eq('campaign_id', campaignId)
+        .limit(5)
+
+      console.log(`🔎 Existing campaign_contacts for campaign ${campaignId}:`, existingContacts)
     }
 
     // Return 1x1 transparent pixel

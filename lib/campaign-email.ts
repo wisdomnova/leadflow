@@ -124,6 +124,14 @@ export async function sendCampaignEmail({
     // Generate tracking ID for this email if not provided
     const emailTrackingId = trackingId || `${campaignId}_${contactId}_${Date.now()}`
     
+    console.log(`📧 Sending email with tracking:`, {
+      to,
+      campaignId,
+      contactId,
+      trackingId: emailTrackingId,
+      emailAccountId
+    })
+    
     // Add tracking pixels and links to email body
     const trackedBody = addEmailTracking(body, emailTrackingId)
 
@@ -194,7 +202,18 @@ export async function sendCampaignEmail({
           last_email_id: result.messageId
         })
         .eq('campaign_id', campaignId)
-        .eq('contact_id', contactId) : Promise.resolve()
+        .eq('contact_id', contactId)
+        .select()
+        .then(result => {
+          console.log(`📊 Updated campaign_contacts status to 'sent':`, {
+            campaignId,
+            contactId,
+            result: result.data,
+            error: result.error,
+            rowsUpdated: result.data?.length || 0
+          })
+          return result
+        }) : Promise.resolve()
     ])
 
     console.log(`📧 Email sent successfully to ${to} via ${account.provider}`)
