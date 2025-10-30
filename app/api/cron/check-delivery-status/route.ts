@@ -1,9 +1,6 @@
 // app/api/cron/check-delivery-status/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { decryptToken } from '@/lib/email-oauth/token-manager'
-import { google } from 'googleapis'
-import axios from 'axios'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,107 +14,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('🔄 Checking delivery status for recent emails...')
+    console.log('🔄 Starting intelligent delivery status check...')
     
-    // Get email events from the last 24 hours that are 'sent' but not yet 'delivered'
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    
-    const { data: recentEmails, error } = await supabase
-      .from('email_events')
-      .select(`
-        *,
-        email_accounts!inner(*)
-      `)
-      .eq('event_type', 'sent')
-      .gte('created_at', twentyFourHoursAgo)
-      .not('message_id', 'is', null)
-      .limit(50)
-
-    if (error) {
-      console.error('Error fetching recent emails:', error)
-      return NextResponse.json({ error: 'Failed to fetch emails' }, { status: 500 })
-    }
-
     let deliveredCount = 0
     let bouncedCount = 0
+    let timeBasedDelivered = 0
 
-    for (const email of recentEmails || []) {
-      try {
-        // Check if we already have a delivery status for this message
-        const { data: existingDelivery } = await supabase
-          .from('email_events')
-          .select('id')
-          .eq('message_id', email.message_id)
-          .in('event_type', ['delivered', 'bounced'])
-          .limit(1)
+    // Step 1: Mark emails as delivered if they have opens/clicks (immediate confirmation)
+    const immediateDeliveries = await markDeliveredFromEngagement()
+    deliveredCount += immediateDeliveries
 
-        if (existingDelivery && existingDelivery.length > 0) {
-          continue // Already processed
-        }
+    // Step 2: Check for bounce notifications in recent emails
+    const bounces = await checkForBounceNotifications()
+    bouncedCount += bounces
 
-        const account = email.email_accounts
-        let deliveryStatus = null
+    // Step 3: Apply time-based delivery assumptions (24+ hours old, no bounces)
+    const timeBasedDeliveries = await markTimeBasedDeliveries()
+    timeBasedDelivered += timeBasedDeliveries
+    deliveredCount += timeBasedDeliveries
 
-        if (account.provider === 'google') {
-          deliveryStatus = await checkGmailDeliveryStatus(account, email.message_id)
-        } else if (account.provider === 'microsoft') {
-          deliveryStatus = await checkOutlookDeliveryStatus(account, email.message_id)
-        }
-
-        if (deliveryStatus) {
-          // Create delivery event
-          await supabase
-            .from('email_events')
-            .insert({
-              campaign_id: email.campaign_id,
-              contact_id: email.contact_id,
-              email_account_id: email.email_account_id,
-              organization_id: email.organization_id,
-              event_type: deliveryStatus.status,
-              message_id: email.message_id,
-              tracking_id: email.tracking_id,
-              metadata: deliveryStatus.metadata || {}
-            })
-
-          // Update campaign_contacts status
-          if (deliveryStatus.status === 'delivered') {
-            await supabase
-              .from('campaign_contacts')
-              .update({
-                status: 'delivered',
-                // Don't overwrite sent_at, but could add delivered_at if column exists
-              })
-              .eq('campaign_id', email.campaign_id)
-              .eq('contact_id', email.contact_id)
-              .in('status', ['sent']) // Only update if currently 'sent'
-              
-            deliveredCount++
-          } else if (deliveryStatus.status === 'bounced') {
-            await supabase
-              .from('campaign_contacts')
-              .update({
-                status: 'bounced',
-                bounced_at: new Date().toISOString()
-              })
-              .eq('campaign_id', email.campaign_id)
-              .eq('contact_id', email.contact_id)
-              .in('status', ['sent']) // Only update if currently 'sent'
-              
-            bouncedCount++
-          }
-        }
-      } catch (error) {
-        console.error(`Error checking delivery status for message ${email.message_id}:`, error)
-      }
-    }
-
-    console.log(`✅ Delivery status check completed: ${deliveredCount} delivered, ${bouncedCount} bounced`)
+    console.log(`✅ Delivery status check completed:`)
+    console.log(`   📧 ${immediateDeliveries} marked delivered from engagement`)  
+    console.log(`   ⏰ ${timeBasedDeliveries} marked delivered by time assumption`)
+    console.log(`   ❌ ${bounces} marked as bounced`)
     
     return NextResponse.json({ 
       success: true, 
-      delivered: deliveredCount,
+      totalDelivered: deliveredCount,
+      immediateDeliveries: immediateDeliveries,
+      timeBasedDeliveries: timeBasedDeliveries,
       bounced: bouncedCount,
-      processed: recentEmails?.length || 0,
       timestamp: new Date().toISOString()
     })
   } catch (error: any) {
@@ -129,90 +55,213 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function checkGmailDeliveryStatus(account: any, messageId: string) {
+// Mark emails as delivered if they have opens or clicks (definitive proof of delivery)
+async function markDeliveredFromEngagement(): Promise<number> {
   try {
-    const accessToken = decryptToken(account.access_token)
-    
-    const oauth2Client = new google.auth.OAuth2()
-    oauth2Client.setCredentials({ access_token: accessToken })
-    
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
-    
-    // Get message details to check if it was delivered or bounced
-    const message = await gmail.users.messages.get({
-      userId: 'me',
-      id: messageId,
-      format: 'metadata',
-      metadataHeaders: ['Message-ID', 'Subject', 'To']
-    })
+    // Find campaign_contacts that are 'sent' but have open/click events
+    const { data: engagedContacts, error } = await supabase
+      .from('campaign_contacts')
+      .select(`
+        campaign_id,
+        contact_id,
+        id
+      `)
+      .eq('status', 'sent')
+      .or('opened_at.not.is.null,clicked_at.not.is.null')
 
-    // Gmail doesn't provide explicit delivery receipts, but we can assume
-    // if the message exists and wasn't returned as bounced, it was delivered
-    // In a real implementation, you might check for bounce messages in the inbox
-    
-    return {
-      status: 'delivered',
-      metadata: {
-        provider: 'gmail',
-        messageId: messageId,
-        checkTime: new Date().toISOString()
-      }
+    if (error) {
+      console.error('Error fetching engaged contacts:', error)
+      return 0
     }
-  } catch (error: any) {
-    // If message not found or error, it might have bounced
-    if (error.code === 404 || error.message?.includes('not found')) {
-      return {
-        status: 'bounced',
-        metadata: {
-          provider: 'gmail',
-          messageId: messageId,
-          error: error.message,
-          checkTime: new Date().toISOString()
-        }
-      }
+
+    let count = 0
+    for (const contact of engagedContacts || []) {
+      // Update to delivered status
+      await supabase
+        .from('campaign_contacts')
+        .update({
+          status: 'delivered'
+        })
+        .eq('id', contact.id)
+
+      // Create delivery event
+      await supabase
+        .from('email_events')
+        .insert({
+          campaign_id: contact.campaign_id,
+          contact_id: contact.contact_id,
+          event_type: 'delivered',
+          metadata: {
+            delivery_method: 'engagement_confirmation',
+            reason: 'Email opened or clicked',
+            timestamp: new Date().toISOString()
+          }
+        })
+
+      count++
     }
-    throw error
+
+    return count
+  } catch (error) {
+    console.error('Error marking delivered from engagement:', error)
+    return 0
   }
 }
 
-async function checkOutlookDeliveryStatus(account: any, messageId: string) {
+// Check inboxes for bounce notifications and delivery failures
+async function checkForBounceNotifications(): Promise<number> {
   try {
-    const accessToken = decryptToken(account.access_token)
-    
-    // Use Microsoft Graph API to check message status
-    const response = await axios.get(
-      `https://graph.microsoft.com/v1.0/me/messages/${messageId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    )
+    // Get recent bounce-related messages from inboxes
+    const { data: bounceMessages, error } = await supabase
+      .from('inbox_messages')
+      .select('*')
+      .or('subject.ilike.%bounce%,subject.ilike.%delivery failure%,subject.ilike.%undelivered%,from_email.ilike.%mailer-daemon%,from_email.ilike.%postmaster%')
+      .gte('received_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
+      .eq('message_type', 'new')
 
-    if (response.data) {
-      return {
-        status: 'delivered',
-        metadata: {
-          provider: 'microsoft',
-          messageId: messageId,
-          checkTime: new Date().toISOString()
+    if (error) {
+      console.error('Error fetching bounce messages:', error)
+      return 0
+    }
+
+    let bounceCount = 0
+    for (const bounceMsg of bounceMessages || []) {
+      // Extract original message info from bounce content
+      const originalEmail = extractOriginalEmailFromBounce(bounceMsg.content)
+      
+      if (originalEmail) {
+        // Find corresponding campaign contact
+        const { data: campaignContact } = await supabase
+          .from('campaign_contacts')
+          .select('id, campaign_id, contact_id')
+          .eq('email', originalEmail)
+          .eq('status', 'sent')
+          .single()
+
+        if (campaignContact) {
+          // Mark as bounced
+          await supabase
+            .from('campaign_contacts')
+            .update({
+              status: 'bounced',
+              bounced_at: new Date().toISOString()
+            })
+            .eq('id', campaignContact.id)
+
+          // Create bounce event
+          await supabase
+            .from('email_events')
+            .insert({
+              campaign_id: campaignContact.campaign_id,
+              contact_id: campaignContact.contact_id,
+              event_type: 'bounced',
+              metadata: {
+                bounce_type: 'hard_bounce',
+                bounce_reason: 'Delivery failure notification received',
+                bounce_message_id: bounceMsg.id,
+                timestamp: new Date().toISOString()
+              }
+            })
+
+          bounceCount++
         }
       }
     }
-  } catch (error: any) {
-    // If message not found, it might have bounced
-    if (error.response?.status === 404) {
-      return {
-        status: 'bounced',
-        metadata: {
-          provider: 'microsoft',
-          messageId: messageId,
-          error: error.message,
-          checkTime: new Date().toISOString()
-        }
-      }
-    }
-    throw error
+
+    return bounceCount
+  } catch (error) {
+    console.error('Error checking bounce notifications:', error)
+    return 0
   }
 }
+
+// Mark emails as delivered after sufficient time with no bounce (24+ hours)
+async function markTimeBasedDeliveries(): Promise<number> {
+  try {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    
+    // Find campaign_contacts that are still 'sent' after 24+ hours
+    const { data: oldSentEmails, error } = await supabase
+      .from('campaign_contacts')
+      .select('id, campaign_id, contact_id, sent_at')
+      .eq('status', 'sent')
+      .lt('sent_at', twentyFourHoursAgo)
+
+    if (error) {
+      console.error('Error fetching old sent emails:', error)
+      return 0
+    }
+
+    let count = 0
+    for (const contact of oldSentEmails || []) {
+      // Check if there's already a delivery or bounce event
+      const { data: existingEvent } = await supabase
+        .from('email_events')
+        .select('id')
+        .eq('campaign_id', contact.campaign_id)
+        .eq('contact_id', contact.contact_id)
+        .in('event_type', ['delivered', 'bounced'])
+        .limit(1)
+
+      if (!existingEvent || existingEvent.length === 0) {
+        // Mark as delivered (time-based assumption)
+        await supabase
+          .from('campaign_contacts')
+          .update({
+            status: 'delivered'
+          })
+          .eq('id', contact.id)
+
+        // Create delivery event
+        await supabase
+          .from('email_events')
+          .insert({
+            campaign_id: contact.campaign_id,
+            contact_id: contact.contact_id,
+            event_type: 'delivered',
+            metadata: {
+              delivery_method: 'time_based_assumption',
+              reason: '24+ hours elapsed without bounce notification',
+              sent_at: contact.sent_at,
+              timestamp: new Date().toISOString()
+            }
+          })
+
+        count++
+      }
+    }
+
+    return count
+  } catch (error) {
+    console.error('Error marking time-based deliveries:', error)
+    return 0
+  }
+}
+
+// Extract original recipient email from bounce message content
+function extractOriginalEmailFromBounce(bounceContent: string): string | null {
+  try {
+    // Common patterns in bounce messages
+    const patterns = [
+      /to:\s*([^\s<]+@[^\s>]+)/i,
+      /recipient:\s*([^\s<]+@[^\s>]+)/i,
+      /original-recipient:\s*([^\s<]+@[^\s>]+)/i,
+      /final-recipient:\s*([^\s<]+@[^\s>]+)/i,
+      /<([^@\s]+@[^@\s>]+)>/,
+      /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/
+    ]
+
+    for (const pattern of patterns) {
+      const match = bounceContent.match(pattern)
+      if (match && match[1]) {
+        return match[1].trim()
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error('Error extracting email from bounce:', error)
+    return null
+  }
+}
+

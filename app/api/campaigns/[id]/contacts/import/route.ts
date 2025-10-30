@@ -1,7 +1,24 @@
 // ./app/api/campaigns/[id]/contacts/import/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import jwt from 'jsonwebtoken'
+
+const supabase = createClient()
+
+interface ImportContact {
+  email: string
+  first_name?: string
+  last_name?: string
+  company?: string
+  phone?: string
+  custom_fields?: Record<string, any>
+}
+
+interface ImportOptions {
+  syncWithExisting: boolean
+  updateExisting: boolean
+  createNewContacts: boolean
+}
 
 export async function POST(
   request: NextRequest,
@@ -17,16 +34,19 @@ export async function POST(
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
     const { id: campaignId } = await params
 
-    // Get form data
-    const formData = await request.formData()
-    const file = formData.get('file') as File
-    const mappingStr = formData.get('mapping') as string
-
-    if (!file || !mappingStr) {
-      return NextResponse.json({ error: 'Missing file or mapping' }, { status: 400 })
+    // Parse request body
+    const body = await request.json()
+    const inputContacts: ImportContact[] = body.contacts || []
+    const importOptions: ImportOptions = {
+      syncWithExisting: true,
+      updateExisting: true,
+      createNewContacts: true,
+      ...body.options
     }
 
-    const mapping = JSON.parse(mappingStr)
+    if (inputContacts.length === 0) {
+      return NextResponse.json({ error: 'No contacts provided' }, { status: 400 })
+    }
 
     // Get user's organization
     const { data: userData, error: userError } = await supabase
@@ -42,7 +62,7 @@ export async function POST(
     // Verify campaign belongs to user's organization
     const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
-      .select('id')
+      .select('id, organization_id')
       .eq('id', campaignId)
       .eq('organization_id', userData.organization_id)
       .single()
@@ -51,97 +71,155 @@ export async function POST(
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
     }
 
-    // Parse CSV
-    const text = await file.text()
-    const lines = text.split('\n').filter(line => line.trim())
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
-    
-    const contacts = []
-    const errors = []
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
-      const row = headers.reduce((obj, header, index) => {
-        obj[header] = values[index] || ''
-        return obj
-      }, {} as any)
-
-      const email = row[mapping.email]?.toLowerCase()
-      const firstName = row[mapping.first_name]
-      const lastName = row[mapping.last_name]
-
-      if (!email || !firstName || !lastName) {
-        errors.push(`Row ${i + 1}: Missing required fields`)
-        continue
-      }
-
-      // Check for valid email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email)) {
-        errors.push(`Row ${i + 1}: Invalid email format`)
-        continue
-      }
-
-      contacts.push({
-        campaign_id: campaignId,
-        email: email,
-        first_name: firstName,
-        last_name: lastName,
-        company: row[mapping.company] || null,
-        phone: row[mapping.phone] || null,
-        status: 'pending',
-        added_at: new Date().toISOString()
-      })
-    }
-
-    if (contacts.length === 0) {
-      return NextResponse.json({ 
-        error: 'No valid contacts found',
-        details: errors 
-      }, { status: 400 })
-    }
-
-    // Insert contacts in batches
-    const batchSize = 100
     let imported = 0
-    let duplicates = 0
+    let updated = 0
+    let skipped = 0
+    const errors: string[] = []
 
-    for (let i = 0; i < contacts.length; i += batchSize) {
-      const batch = contacts.slice(i, i + batchSize)
+    // Process contacts in batches
+    const batchSize = 50
+    for (let i = 0; i < inputContacts.length; i += batchSize) {
+      const batch = inputContacts.slice(i, i + batchSize)
       
-      try {
-        const { data, error } = await supabase
-          .from('campaign_contacts')
-          .insert(batch)
-          .select()
- 
-        if (error) {
-          // Handle unique constraint violations (duplicates)
-          if (error.code === '23505') {
-            duplicates += batch.length
-          } else {
-            throw error
+      for (const contactData of batch) {
+        try {
+          // Validate required fields
+          if (!contactData.email || !contactData.email.trim()) {
+            errors.push(`Row ${i + batch.indexOf(contactData) + 1}: Missing email address`)
+            continue
           }
-        } else {
-          imported += data.length
+
+          const email = contactData.email.toLowerCase().trim()
+
+          // Check if contact already exists in this campaign
+          const { data: existingCampaignContact } = await supabase
+            .from('campaign_contacts')
+            .select('id, email')
+            .eq('campaign_id', campaignId)
+            .eq('email', email)
+            .single()
+
+          if (existingCampaignContact) {
+            if (importOptions.updateExisting) {
+              // Update existing campaign contact
+              const { error: updateError } = await supabase
+                .from('campaign_contacts')
+                .update({
+                  first_name: contactData.first_name || null,
+                  last_name: contactData.last_name || null,
+                  company: contactData.company || null,
+                  phone: contactData.phone || null,
+                  custom_fields: contactData.custom_fields || null,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingCampaignContact.id)
+
+              if (!updateError) {
+                updated++
+              } else {
+                errors.push(`Failed to update ${email}: ${updateError.message}`)
+              }
+            } else {
+              skipped++
+            }
+            continue
+          }
+
+          // If syncWithExisting is enabled, check if contact exists in global contacts
+          let contactId = null
+          if (importOptions.syncWithExisting) {
+            const { data: existingContact } = await supabase
+              .from('contacts')
+              .select('id')
+              .eq('email', email)
+              .eq('organization_id', userData.organization_id)
+              .single()
+
+            if (existingContact) {
+              contactId = existingContact.id
+            }
+          }
+
+          // Create new contact in global contacts if needed
+          if (!contactId && importOptions.createNewContacts) {
+            const { data: newContact, error: contactCreateError } = await supabase
+              .from('contacts')
+              .insert({
+                email,
+                first_name: contactData.first_name || null,
+                last_name: contactData.last_name || null,
+                company: contactData.company || null,
+                phone: contactData.phone || null,
+                custom_fields: contactData.custom_fields || null,
+                organization_id: userData.organization_id,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .select('id')
+              .single()
+
+            if (contactCreateError) {
+              // Contact might already exist, try to get it
+              const { data: existingContact } = await supabase
+                .from('contacts')
+                .select('id')
+                .eq('email', email)
+                .eq('organization_id', userData.organization_id)
+                .single()
+
+              contactId = existingContact?.id
+            } else {
+              contactId = newContact.id
+            }
+          }
+
+          // Add to campaign
+          if (contactId || !importOptions.syncWithExisting) {
+            const { error: campaignContactError } = await supabase
+              .from('campaign_contacts')
+              .insert({
+                campaign_id: campaignId,
+                contact_id: contactId,
+                email,
+                first_name: contactData.first_name || null,
+                last_name: contactData.last_name || null,
+                company: contactData.company || null,
+                phone: contactData.phone || null,
+                custom_fields: contactData.custom_fields || null,
+                status: 'pending',
+                added_at: new Date().toISOString()
+              })
+
+            if (!campaignContactError) {
+              imported++
+            } else {
+              errors.push(`Failed to add ${email} to campaign: ${campaignContactError.message}`)
+            }
+          } else {
+            errors.push(`Contact ${email} not found and createNewContacts is disabled`)
+          }
+
+        } catch (contactError) {
+          console.error('Error processing contact:', contactError)
+          errors.push(`Failed to process contact at row ${i + batch.indexOf(contactData) + 1}`)
         }
-      } catch (batchError) {
-        console.error('Batch insert error:', batchError)
-        errors.push(`Batch ${Math.floor(i / batchSize) + 1}: ${batchError}`)
       }
     }
 
-    return NextResponse.json({
+    return NextResponse.json({ 
+      success: true,
       imported,
-      duplicates,
-      errors: errors.length,
-      details: {
-        errorMessages: errors
-      }
+      updated,
+      skipped,
+      errors,
+      total: inputContacts.length
     })
 
   } catch (error) {
     console.error('Import contacts error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Import failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }

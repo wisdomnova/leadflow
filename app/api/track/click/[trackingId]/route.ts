@@ -35,8 +35,8 @@ export async function GET(
           created_at: new Date().toISOString()
         }])
 
-      // Update campaign contact status
-      await supabase
+            // Update campaign contact status to 'clicked' 
+      const { error: updateError } = await supabase
         .from('campaign_contacts')
         .update({
           status: 'clicked',
@@ -44,7 +44,35 @@ export async function GET(
         })
         .eq('campaign_id', campaignId)
         .eq('contact_id', contactId)
-        .in('status', ['sent', 'delivered', 'opened']) // Don't override bounced/unsubscribed
+        .in('status', ['sent', 'delivered', 'opened']) // Update from sent, delivered, or opened
+
+      // If email wasn't already marked as delivered, create delivery event since clicking confirms delivery
+      if (!updateError) {
+        const { data: existingDelivery } = await supabase
+          .from('email_events')
+          .select('id')
+          .eq('campaign_id', campaignId)
+          .eq('contact_id', contactId)
+          .eq('event_type', 'delivered')
+          .limit(1)
+
+        if (!existingDelivery || existingDelivery.length === 0) {
+          // Create delivery event since clicking confirms delivery
+          await supabase
+            .from('email_events')
+            .insert({
+              campaign_id: campaignId,
+              contact_id: contactId,
+              event_type: 'delivered',
+              tracking_id: trackingId,
+              metadata: {
+                delivery_method: 'click_confirmation',
+                reason: 'Email clicked confirms delivery',
+                timestamp: new Date().toISOString()
+              }
+            })
+        }
+      }
     }
 
     // Redirect to original URL

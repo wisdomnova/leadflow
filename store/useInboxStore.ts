@@ -72,15 +72,25 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     try {
       set({ loading: true })
       
-      const { filter, intentFilter, sentimentFilter, currentPage } = get()
-      const result = await ReplyDetectionService.getInboxMessages(organizationId, {
-        page: 1, // Always start fresh when filters change
-        limit: 50,
+      const { filter, intentFilter, sentimentFilter } = get()
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: '1',
+        limit: '50',
         filter,
-        intentFilter: intentFilter !== 'all' ? intentFilter : undefined,
-        sentimentFilter: sentimentFilter !== 'all' ? sentimentFilter : undefined,
+        ...(intentFilter !== 'all' && { intentFilter }),
+        ...(sentimentFilter !== 'all' && { sentimentFilter }),
         ...options
       })
+
+      const response = await fetch(`/api/inbox/messages?${params}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch messages')
+      }
+      
+      const result = await response.json()
       
       set({
         messages: result.messages,
@@ -98,33 +108,43 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
   loadMore: async (organizationId: string) => {
     try {
-      const { currentPage, hasMore, loading, filter, intentFilter, sentimentFilter, messages } = get()
+      const { filter, intentFilter, sentimentFilter, currentPage, loading, hasMore } = get()
       
       if (loading || !hasMore) return
       
       set({ loading: true })
       
       const nextPage = currentPage + 1
-      const result = await ReplyDetectionService.getInboxMessages(organizationId, {
-        page: nextPage,
-        limit: 50,
+      const params = new URLSearchParams({
+        page: nextPage.toString(),
+        limit: '50',
         filter,
-        intentFilter: intentFilter !== 'all' ? intentFilter : undefined,
-        sentimentFilter: sentimentFilter !== 'all' ? sentimentFilter : undefined
+        ...(intentFilter !== 'all' && { intentFilter }),
+        ...(sentimentFilter !== 'all' && { sentimentFilter })
       })
+
+      const response = await fetch(`/api/inbox/messages?${params}`)
       
-      set({
-        messages: [...messages, ...result.messages],
-        currentPage: nextPage,
+      if (!response.ok) {
+        throw new Error('Failed to load more messages')
+      }
+      
+      const result = await response.json()
+      
+      set(state => ({
+        messages: [...state.messages, ...result.messages],
         hasMore: result.hasMore,
+        currentPage: nextPage,
         loading: false
-      })
+      }))
       
     } catch (error) {
       console.error('Failed to load more messages:', error)
       set({ loading: false })
     }
   },
+
+
 
   fetchThreads: async (organizationId: string, options = {}) => {
     try {
@@ -151,18 +171,32 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     }
   },
 
-  fetchAnalytics: async (organizationId: string, timeframe: 'day' | 'week' | 'month' = 'week') => {
+  fetchAnalytics: async (organizationId: string, timeframe = 'week') => {
     try {
-      const analytics = await ReplyDetectionService.getClassificationAnalytics(organizationId, timeframe)
-      set({ analytics })
+      const response = await fetch(`/api/inbox/analytics?timeframe=${timeframe}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics')
+      }
+      
+      const result = await response.json()
+      set({ analytics: result.analytics })
     } catch (error) {
-      console.error('Failed to fetch analytics:', error)
+      console.error('Failed to fetch inbox analytics:', error)
     }
   },
 
   markAsRead: async (messageIds: string[], organizationId: string) => {
     try {
-      await ReplyDetectionService.markAsRead(messageIds, organizationId)
+      const response = await fetch('/api/inbox/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageIds, action: 'mark_read' })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to mark messages as read')
+      }
       
       // Update local state
       set(state => ({
@@ -178,67 +212,44 @@ export const useInboxStore = create<InboxState>((set, get) => ({
 
   archiveMessages: async (messageIds: string[], organizationId: string) => {
     try {
-      await ReplyDetectionService.archiveMessages(messageIds, organizationId)
+      const response = await fetch('/api/inbox/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageIds, action: 'archive' })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to archive messages')
+      }
       
       // Remove from current view if not showing archived
       const { filter } = get()
       if (filter !== 'archived') {
         set(state => ({
-          messages: state.messages.filter(msg => !messageIds.includes(msg.id)),
-          total: Math.max(0, state.total - messageIds.length)
+          messages: state.messages.filter(msg => !messageIds.includes(msg.id))
         }))
       }
       
     } catch (error) {
       console.error('Failed to archive messages:', error)
     }
-  },
-
-  reclassifyMessage: async (messageId: string, organizationId: string) => {
+  },  reclassifyMessage: async (messageId: string, organizationId: string) => {
     try {
-      await ReplyDetectionService.reclassifyMessage(messageId, organizationId)
+      const response = await fetch('/api/inbox/reclassify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId })
+      })
       
-      // Refresh the specific message to get updated classification
-      const { messages } = get()
-      const messageIndex = messages.findIndex(msg => msg.id === messageId)
-      
-      if (messageIndex !== -1) {
-        // Fetch updated message with new classification
-        const { data: updatedMessage } = await supabase
-          .from('inbox_messages')
-          .select(`
-            *,
-            campaigns:campaign_id(id, name),
-            contacts:contact_id(id, email, first_name, last_name, company),
-            message_classifications(
-              intent,
-              sentiment,
-              confidence,
-              reasoning,
-              suggested_response,
-              priority,
-              tags,
-              requires_human_attention,
-              next_action,
-              ai_model,
-              processing_time_ms
-            )
-          `)
-          .eq('id', messageId)
-          .single()
-
-        if (updatedMessage) {
-          set(state => ({
-            messages: state.messages.map((msg, index) => 
-              index === messageIndex ? updatedMessage : msg
-            )
-          }))
-        }
+      if (!response.ok) {
+        throw new Error('Failed to reclassify message')
       }
+      
+      // Refresh messages to get updated classification
+      await get().fetchMessages(organizationId)
       
     } catch (error) {
       console.error('Failed to reclassify message:', error)
-      throw error
     }
   },
 

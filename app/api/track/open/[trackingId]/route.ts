@@ -37,8 +37,8 @@ export async function GET(
 
         console.log(`Logged open event for tracking ID: ${trackingId}`)
 
-      // Update campaign contact status if this is their first open
-      const { data: updateResult, error: updateError } = await supabase
+            // Update campaign contact status to 'opened' (and mark as delivered if not already)
+      const { error: updateError } = await supabase
         .from('campaign_contacts')
         .update({
           status: 'opened',
@@ -46,15 +46,49 @@ export async function GET(
         })
         .eq('campaign_id', campaignId)
         .eq('contact_id', contactId)
-        .in('status', ['sent', 'delivered']) // Only update if not already clicked/bounced etc
-        .select()
+        .in('status', ['sent', 'delivered']) // Only update if sent or delivered
+
+      // If email was still 'sent', also create a delivery event since opening confirms delivery
+      const { data: contactStatus } = await supabase
+        .from('campaign_contacts')
+        .select('status')
+        .eq('campaign_id', campaignId)
+        .eq('contact_id', contactId)
+        .single()
+
+      if (contactStatus?.status === 'opened') {
+        // Check if we need to create a delivery event (if it was previously 'sent')
+        const { data: existingDelivery } = await supabase
+          .from('email_events')
+          .select('id')
+          .eq('campaign_id', campaignId)
+          .eq('contact_id', contactId)
+          .eq('event_type', 'delivered')
+          .limit(1)
+
+        if (!existingDelivery || existingDelivery.length === 0) {
+          // Create delivery event since opening confirms delivery
+          await supabase
+            .from('email_events')
+            .insert({
+              campaign_id: campaignId,
+              contact_id: contactId,
+              event_type: 'delivered',
+              tracking_id: trackingId,
+              metadata: {
+                delivery_method: 'open_confirmation',
+                reason: 'Email opened confirms delivery',
+                timestamp: new Date().toISOString()
+              }
+            })
+        }
+      }
 
       console.log(`📊 Campaign contact update result:`, {
         campaignId,
         contactId,
-        updateResult,
         updateError,
-        rowsUpdated: updateResult?.length || 0
+        status: updateError ? 'failed' : 'success'
       })
 
       // Debug: Check what campaign_contacts exist for this campaign

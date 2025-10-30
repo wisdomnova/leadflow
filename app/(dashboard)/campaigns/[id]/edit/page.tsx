@@ -16,6 +16,8 @@ import {
   Send, 
   CheckCircle, 
   Pause, 
+  Play,
+  RotateCcw,
   Mail,
   Users,
   Target,
@@ -61,6 +63,50 @@ export default function EditCampaignPage() {
     from_email: ''
   })
   const [saving, setSaving] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const handleCampaignAction = async (action: 'launch' | 'pause' | 'resume' | 'stop') => {
+    if (actionLoading) return
+
+    setActionLoading(true)
+    
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/${action}`, {
+        method: 'POST'
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || `Failed to ${action} campaign`)
+      }
+      
+      const result = await response.json()
+      
+      // Show appropriate success message
+      if (action === 'launch') {
+        alert(`🚀 Campaign launched! ${result.contactsScheduled || 'Contacts'} scheduled for sending.`)
+      } else if (action === 'pause') {
+        alert('⏸️ Campaign paused. Email sending has been stopped.')
+      } else if (action === 'resume') {
+        alert('▶️ Campaign resumed. Email sending will continue.')
+      } else if (action === 'stop') {
+        alert('🛑 Campaign stopped permanently.')
+      }
+      
+      // Refresh campaign data to show updated status
+      await fetchCampaigns()
+      const updatedCampaign = campaigns.find(c => c.id === campaignId)
+      if (updatedCampaign) {
+        setCampaign(updatedCampaign)
+      }
+      
+    } catch (error) {
+      console.error(`Failed to ${action} campaign:`, error)
+      alert(error instanceof Error ? error.message : `Failed to ${action} campaign`)
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (campaigns.length === 0) {
@@ -128,10 +174,11 @@ export default function EditCampaignPage() {
           description: 'Campaign is ready to be launched'
         }
       case 'sending':
+      case 'running':
         return {
           color: 'bg-green-100 text-green-800 border-green-200',
           icon: <Activity className="h-4 w-4" />,
-          label: 'Sending',
+          label: status === 'running' ? 'Running' : 'Sending',
           description: 'Emails are being sent'
         }
       case 'paused':
@@ -259,6 +306,81 @@ export default function EditCampaignPage() {
             </div>
             
             <div className="text-right">
+              <div className="flex items-center space-x-3 mb-3">
+                {/* Campaign Control Buttons */}
+                {(campaign.status === 'draft' || campaign.status === 'ready') && (
+                  <button
+                    onClick={() => handleCampaignAction('launch')}
+                    disabled={actionLoading}
+                    className="inline-flex items-center px-4 py-2 text-white rounded-xl hover:shadow-md disabled:opacity-50 text-sm font-medium transition-all"
+                    style={{ backgroundColor: '#25b43d' }}
+                  >
+                    {actionLoading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <Play className="h-4 w-4 mr-2" />
+                    )}
+                    Launch Campaign
+                  </button>
+                )}
+
+                {(campaign.status === 'sending' || campaign.status === 'active' || campaign.status === 'running') && (
+                  <button
+                    onClick={() => handleCampaignAction('pause')}
+                    disabled={actionLoading}
+                    className="inline-flex items-center px-4 py-2 border text-sm font-medium rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-all"
+                    style={{ 
+                      borderColor: '#6366f1',
+                      color: '#6366f1',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    {actionLoading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 mr-2" style={{ borderColor: '#6366f1' }}></div>
+                    ) : (
+                      <Pause className="h-4 w-4 mr-2" />
+                    )}
+                    Pause
+                  </button>
+                )}
+
+                {campaign.status === 'paused' && (
+                  <button
+                    onClick={() => handleCampaignAction('resume')}
+                    disabled={actionLoading}
+                    className="inline-flex items-center px-4 py-2 text-white rounded-xl hover:shadow-md disabled:opacity-50 text-sm font-medium transition-all"
+                    style={{ backgroundColor: '#25b43d' }}
+                  >
+                    {actionLoading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                    )}
+                    Resume
+                  </button>
+                )}
+
+                {(campaign.status === 'sending' || campaign.status === 'active' || campaign.status === 'running' || campaign.status === 'paused') && (
+                  <button
+                    onClick={() => handleCampaignAction('stop')}
+                    disabled={actionLoading}
+                    className="inline-flex items-center px-4 py-2 border rounded-xl hover:bg-red-50 disabled:opacity-50 text-sm font-medium transition-all"
+                    style={{ 
+                      borderColor: '#dc2626',
+                      color: '#dc2626',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    {actionLoading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 mr-2" style={{ borderColor: '#dc2626' }}></div>
+                    ) : (
+                      <Square className="h-4 w-4 mr-2" />
+                    )}
+                    Stop
+                  </button>
+                )}
+              </div>
+
               <span className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium border ${statusConfig.color}`}>
                 {statusConfig.icon}
                 <span className="ml-2">{statusConfig.label}</span>

@@ -105,7 +105,7 @@ export class EmailScheduler {
       const { error: campaignUpdateError } = await supabase
         .from('campaigns')
         .update({ 
-          status: 'active',
+          status: 'running',
           launched_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -177,11 +177,11 @@ export class EmailScheduler {
         throw contactsError
       }
 
-      // Update campaign status
+      // Update campaign status - resume to 'running' to match the UI expectations
       const { error: updateError } = await supabase
         .from('campaigns') 
         .update({ 
-          status: 'active',
+          status: 'running',
           resumed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -212,7 +212,7 @@ export class EmailScheduler {
         throw new Error('Campaign not found')
       }
 
-      if (!['sending', 'active', 'paused', 'scheduled'].includes(campaign.status)) {
+      if (!['sending', 'active', 'running', 'paused', 'scheduled'].includes(campaign.status)) {
         throw new Error('Campaign cannot be stopped in current status')
       }
 

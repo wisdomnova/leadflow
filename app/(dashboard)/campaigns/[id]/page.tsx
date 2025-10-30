@@ -38,6 +38,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import CampaignContactSelector from '@/components/campaigns/CampaignContactSelector'
 
 interface Contact {
   id: string
@@ -123,11 +124,12 @@ const CampaignStatusCard = ({
           description: 'Campaign is ready to be launched'
         }
       case 'sending':
-      case 'active': // Add this line
+      case 'active':
+      case 'running':
         return {
           color: 'bg-green-100 text-green-800 border-green-200',
           icon: <Activity className="h-4 w-4" />,
-          label: 'Sending',
+          label: status === 'running' ? 'Running' : 'Sending',
           description: 'Emails are being sent'
         }
       case 'paused':
@@ -184,7 +186,7 @@ const CampaignStatusCard = ({
             <Users className="h-4 w-4 mr-2" />
             <span className="font-medium">{contactCount}</span>
             <span className="ml-1">{contactCount === 1 ? 'contact' : 'contacts'}</span>
-            {['sending', 'active', 'scheduled'].includes(campaign.status) && (
+            {['sending', 'active', 'running', 'scheduled'].includes(campaign.status) && (
               <>
                 <div className="mx-3 w-1 h-1 bg-gray-400 rounded-full"></div>
                 <Activity className="h-4 w-4 mr-1 text-green-500" />
@@ -212,7 +214,7 @@ const CampaignStatusCard = ({
           </button>
         )}
 
-        {(campaign.status === 'sending' || campaign.status === 'active' || campaign.status === 'scheduled') && (
+        {(campaign.status === 'sending' || campaign.status === 'active' || campaign.status === 'running' || campaign.status === 'scheduled') && (
           <>
             <button
               onClick={() => handleAction('pause')}
@@ -418,15 +420,7 @@ export default function CampaignDetailPage() {
   const [contactsLoading, setContactsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [showAddContactModal, setShowAddContactModal] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
-  const [newContact, setNewContact] = useState({
-    email: '',
-    first_name: '',
-    last_name: '',
-    company: '',
-    phone: ''
-  })
+  const [showContactSelector, setShowContactSelector] = useState(false)
 
   useEffect(() => {
     if (campaigns.length === 0) {
@@ -464,31 +458,8 @@ export default function CampaignDetailPage() {
     }
   }
 
-  const handleAddContact = async () => {
-    if (!newContact.email || !newContact.first_name || !newContact.last_name) {
-      alert('Please fill in all required fields')
-      return
-    }
-
-    try {
-      const response = await fetch(`/api/campaigns/${campaignId}/contacts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newContact)
-      })
-
-      if (response.ok) {
-        await fetchCampaignContacts()
-        setShowAddContactModal(false)
-        setNewContact({ email: '', first_name: '', last_name: '', company: '', phone: '' })
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to add contact')
-      }
-    } catch (error) {
-      console.error('Failed to add contact:', error)
-      alert('Failed to add contact')
-    }
+  const handleContactManagement = () => {
+    setShowContactSelector(true)
   }
 
   const handleRemoveContact = async (contactId: string) => {
@@ -676,18 +647,11 @@ export default function CampaignDetailPage() {
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
-                          onClick={() => setShowImportModal(true)}
-                          className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                          onClick={handleContactManagement}
+                          className="inline-flex items-center px-6 py-3 text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 hover:shadow-lg transition-all duration-200"
                         >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Import CSV
-                        </button>
-                        <button
-                          onClick={() => setShowAddContactModal(true)}
-                          className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Contact
+                          <Users className="h-4 w-4 mr-2" />
+                          Manage Contacts
                         </button>
                       </div>
                     </div>
@@ -742,20 +706,13 @@ export default function CampaignDetailPage() {
                           }
                         </p>
                         {contacts.length === 0 && (
-                          <div className="flex justify-center space-x-3">
+                          <div className="flex justify-center">
                             <button
-                              onClick={() => setShowAddContactModal(true)}
-                              className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                              onClick={handleContactManagement}
+                              className="inline-flex items-center px-8 py-3 text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 hover:shadow-lg transition-all duration-200"
                             >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Contact
-                            </button>
-                            <button
-                              onClick={() => setShowImportModal(true)}
-                              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                            >
-                              <Upload className="h-4 w-4 mr-2" />
-                              Import CSV
+                              <Users className="h-4 w-4 mr-2" />
+                              Add Your First Contacts
                             </button>
                           </div>
                         )}
@@ -816,8 +773,21 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
-      {/* Add Contact Modal - Implementation needed */}
-      {/* CSV Import Modal - Implementation needed */}
+      {/* Contact Management Modal */}
+      {showContactSelector && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <CampaignContactSelector
+              campaignId={campaignId}
+              mode="select"
+              onClose={() => {
+                setShowContactSelector(false)
+                fetchCampaignContacts() // Refresh contacts when closing
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

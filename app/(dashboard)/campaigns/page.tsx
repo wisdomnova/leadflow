@@ -55,6 +55,7 @@ const STATUS_OPTIONS = [
   { value: 'all', label: 'All Status', icon: Filter },
   { value: 'draft', label: 'Draft', icon: () => <div className="h-3 w-3 rounded-full bg-gray-400" /> },
   { value: 'ready', label: 'Ready', icon: () => <div className="h-3 w-3 rounded-full" style={{ backgroundColor: THEME_COLORS.primary }} /> },
+  { value: 'running', label: 'Running', icon: () => <div className="h-3 w-3 rounded-full animate-pulse" style={{ backgroundColor: THEME_COLORS.success }} /> },
   { value: 'active', label: 'Active', icon: () => <div className="h-3 w-3 rounded-full" style={{ backgroundColor: THEME_COLORS.success }} /> },
   { value: 'sending', label: 'Sending', icon: () => <div className="h-3 w-3 rounded-full animate-pulse" style={{ backgroundColor: THEME_COLORS.success }} /> },
   { value: 'paused', label: 'Paused', icon: () => <div className="h-3 w-3 rounded-full" style={{ backgroundColor: THEME_COLORS.secondary }} /> },
@@ -166,6 +167,7 @@ type CampaignStatus =
   | 'draft'
   | 'ready'
   | 'active'
+  | 'running'
   | 'sending'
   | 'paused'
   | 'completed'
@@ -223,11 +225,12 @@ const CampaignCard = ({
         }
       case 'sending':
       case 'active':
+      case 'running':
         return {
           color: 'text-white',
           bg: THEME_COLORS.success,
           icon: <Activity className="h-3 w-3" />,
-          label: 'Sending'
+          label: status === 'running' ? 'Running' : 'Sending'
         }
       case 'paused':
         return {
@@ -347,7 +350,7 @@ const CampaignCard = ({
                     </>
                   )}
                   
-                  {['sending', 'paused'].includes(campaign.status) && (
+                  {['sending', 'active', 'running', 'paused'].includes(campaign.status) && (
                     <>
                       <div className="border-t border-gray-100 my-1"></div>
                       <div className="px-4 py-2 text-xs text-gray-500 bg-gray-50 rounded-lg mx-2">
@@ -405,7 +408,7 @@ const CampaignCard = ({
               </button>
             )}
 
-            {(campaign.status === 'sending' || campaign.status === 'active') && (
+            {(campaign.status === 'sending' || campaign.status === 'active' || campaign.status === 'running') && (
               <button
                 onClick={() => onAction('pause')}
                 disabled={actionLoading}
@@ -438,6 +441,26 @@ const CampaignCard = ({
                   <RotateCcw className="h-3 w-3 mr-1.5" />
                 )}
                 Resume
+              </button>
+            )}
+
+            {(campaign.status === 'sending' || campaign.status === 'active' || campaign.status === 'running' || campaign.status === 'paused') && (
+              <button
+                onClick={() => onAction('stop')}
+                disabled={actionLoading}
+                className="inline-flex items-center px-3 py-1.5 border rounded-xl hover:bg-red-50 disabled:opacity-50 text-xs font-medium transition-all"
+                style={{ 
+                  borderColor: THEME_COLORS.warning,
+                  color: THEME_COLORS.warning,
+                  backgroundColor: 'white'
+                }}
+              >
+                {actionLoading ? (
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 mr-1.5" style={{ borderColor: THEME_COLORS.warning }}></div>
+                ) : (
+                  <Square className="h-3 w-3 mr-1.5" />
+                )}
+                Stop
               </button>
             )}
 
@@ -619,6 +642,7 @@ export default function CampaignsPage() {
       draft: { color: THEME_COLORS.secondary, label: 'Draft' },
       ready: { color: THEME_COLORS.primary, label: 'Ready' },
       active: { color: THEME_COLORS.success, label: 'Active' },
+      running: { color: THEME_COLORS.success, label: 'Running' },
       sending: { color: THEME_COLORS.success, label: 'Sending' },
       paused: { color: THEME_COLORS.secondary, label: 'Paused' },
       completed: { color: THEME_COLORS.accent, label: 'Completed' },
@@ -645,7 +669,7 @@ export default function CampaignsPage() {
     },
     {
       label: 'Active Campaigns',
-      value: allCampaigns.filter(c => ['sending', 'active', 'scheduled'].includes(c.status)).length,
+      value: allCampaigns.filter(c => ['sending', 'active', 'running', 'scheduled'].includes(c.status)).length,
       icon: Activity,
       color: THEME_COLORS.success
     },
@@ -1005,7 +1029,7 @@ export default function CampaignsPage() {
                                     </button>
                                   )}
 
-                                  {(['sending', 'active'].includes(campaignStatus)) && (
+                                  {(['sending', 'active', 'running'].includes(campaignStatus)) && (
                                     <button
                                       onClick={() => handleCampaignAction(campaign.id, 'pause')}
                                       disabled={actionLoading[campaign.id]}
@@ -1035,6 +1059,25 @@ export default function CampaignsPage() {
                                         <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                       ) : (
                                         <RotateCcw className="h-3 w-3" />
+                                      )}
+                                    </button>
+                                  )}
+
+                                  {(['sending', 'active', 'running', 'paused'].includes(campaignStatus)) && (
+                                    <button
+                                      onClick={() => handleCampaignAction(campaign.id, 'stop')}
+                                      disabled={actionLoading[campaign.id]}
+                                      className="inline-flex items-center px-3 py-1.5 border rounded-xl hover:bg-red-50 disabled:opacity-50 text-xs font-medium transition-all"
+                                      style={{ 
+                                        borderColor: THEME_COLORS.warning,
+                                        color: THEME_COLORS.warning,
+                                        backgroundColor: 'white'
+                                      }}
+                                    >
+                                      {actionLoading[campaign.id] ? (
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2" style={{ borderColor: THEME_COLORS.warning }}></div>
+                                      ) : (
+                                        <Square className="h-3 w-3" />
                                       )}
                                     </button>
                                   )}
@@ -1095,6 +1138,25 @@ export default function CampaignsPage() {
                                             <Copy className="h-4 w-4 mr-3" />
                                             Duplicate
                                           </button>
+                                          
+                                          {['sending', 'active', 'running', 'paused'].includes(campaign.status) && (
+                                            <>
+                                              <div className="border-t border-gray-100 my-1"></div>
+                                              <button
+                                                onClick={() => {
+                                                  handleCampaignAction(campaign.id, 'stop')
+                                                  const newActionLoading = { ...actionLoading }
+                                                  delete newActionLoading[`dropdown_${campaign.id}`]
+                                                  setActionLoading(newActionLoading)
+                                                }}
+                                                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 flex items-center transition-colors"
+                                                style={{ color: THEME_COLORS.warning }}
+                                              >
+                                                <Square className="h-4 w-4 mr-3" />
+                                                Stop Campaign
+                                              </button>
+                                            </>
+                                          )}
                                           
                                           {['draft', 'ready', 'completed', 'stopped'].includes(campaign.status) && (
                                             <>

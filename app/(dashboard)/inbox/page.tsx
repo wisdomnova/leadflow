@@ -12,7 +12,7 @@ import {
   Search,
   Filter,
   Archive,
-  Star,
+  Star, 
   StarOff,
   MoreHorizontal,
   Reply,
