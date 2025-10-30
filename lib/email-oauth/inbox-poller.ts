@@ -1,8 +1,8 @@
 // lib/email-oauth/inbox-poller.ts
 import { supabase } from '@/lib/supabase'
-import { decryptToken } from './token-manager'
-import { fetchGmailMessages } from './google-oauth'
-import { fetchOutlookMessages } from './microsoft-oauth'
+import { decryptToken, encryptToken } from './token-manager'
+import { fetchGmailMessages, refreshGoogleToken } from './google-oauth'
+import { fetchOutlookMessages, refreshMicrosoftToken } from './microsoft-oauth'
 import { classifyReplyWithAI } from '@/lib/ai/reply-classifier'
 
 export async function pollInboxes() {
@@ -36,7 +36,49 @@ export async function pollInboxes() {
 
 async function pollAccountInbox(account: any) {
   try {
-    const accessToken = decryptToken(account.access_token)
+    let accessToken = decryptToken(account.access_token)
+    
+    // Check if token is expired and refresh if needed
+    const now = new Date()
+    const expiresAt = new Date(account.expires_at)
+    
+    if (expiresAt <= now) {
+      console.log(`🔄 Token expired for ${account.email}, refreshing...`)
+      try {
+        const refreshToken = decryptToken(account.refresh_token)
+        let refreshResult
+        
+        if (account.provider === 'google') {
+          refreshResult = await refreshGoogleToken(refreshToken)
+        } else if (account.provider === 'microsoft') {
+          refreshResult = await refreshMicrosoftToken(refreshToken)
+        } else {
+          throw new Error(`Unsupported provider: ${account.provider}`)
+        }
+        
+        // Update the account with new tokens
+        const { error: updateError } = await supabase
+          .from('email_accounts')
+          .update({
+            access_token: encryptToken(refreshResult.accessToken),
+            refresh_token: refreshResult.refreshToken ? encryptToken(refreshResult.refreshToken) : account.refresh_token,
+            expires_at: refreshResult.expiresAt.toISOString(),
+            updated_at: now.toISOString()
+          })
+          .eq('id', account.id)
+        
+        if (updateError) {
+          console.error(`Failed to update tokens for ${account.email}:`, updateError)
+          return
+        }
+        
+        accessToken = refreshResult.accessToken
+        console.log(`✅ Token refreshed for ${account.email}`)
+      } catch (refreshError) {
+        console.error(`Failed to refresh token for ${account.email}:`, refreshError)
+        return
+      }
+    }
     
     // Get recent emails from the last hour
     const sinceDate = new Date(Date.now() - 60 * 60 * 1000).toISOString()
@@ -44,7 +86,7 @@ async function pollAccountInbox(account: any) {
     let emails: any[] = []
     
     if (account.provider === 'google') {
-      emails = await getGmailEmails(accessToken, sinceDate)
+      emails = await getGmailEmails(accessToken, sinceDate, account)
     } else if (account.provider === 'microsoft') {
       emails = await getOutlookEmails(accessToken, sinceDate)
     }
@@ -128,7 +170,7 @@ async function processIncomingEmail(email: any, account: any) {
   }
 }
 
-async function getGmailEmails(accessToken: string, sinceDate: string) {
+async function getGmailEmails(accessToken: string, sinceDate: string, account?: any) {
   try {
     const response = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=after:${Math.floor(new Date(sinceDate).getTime() / 1000)}`,
@@ -140,6 +182,36 @@ async function getGmailEmails(accessToken: string, sinceDate: string) {
     )
 
     if (!response.ok) {
+      if (response.status === 401 && account) {
+        console.log(`🔄 Gmail API returned 401, attempting token refresh for ${account.email}`)
+        try {
+          const refreshToken = decryptToken(account.refresh_token)
+          const refreshResult = await refreshGoogleToken(refreshToken)
+          
+          // Update the account with new tokens
+          const { error: updateError } = await supabase
+            .from('email_accounts')
+            .update({
+              access_token: encryptToken(refreshResult.accessToken),
+              refresh_token: refreshResult.refreshToken ? encryptToken(refreshResult.refreshToken) : account.refresh_token,
+              expires_at: refreshResult.expiresAt.toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', account.id)
+          
+          if (updateError) {
+            console.error(`Failed to update tokens after 401 for ${account.email}:`, updateError)
+            throw new Error(`Gmail API error: ${response.status}`)
+          }
+          
+          // Retry with new token
+          console.log(`✅ Token refreshed after 401, retrying Gmail API for ${account.email}`)
+          return await getGmailEmails(refreshResult.accessToken, sinceDate)
+        } catch (refreshError) {
+          console.error(`Failed to refresh token after 401 for ${account.email}:`, refreshError)
+          throw new Error(`Gmail API error: ${response.status}`)
+        }
+      }
       throw new Error(`Gmail API error: ${response.status}`)
     }
 

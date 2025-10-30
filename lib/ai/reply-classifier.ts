@@ -2,9 +2,19 @@
 import OpenAI from 'openai'
 import { supabase } from '@/lib/supabase'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, 
-})
+// Only create OpenAI client on server-side
+const getOpenAIClient = () => {
+  if (typeof window !== 'undefined') {
+    throw new Error('OpenAI client cannot be used on client-side')
+  }
+  
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is not set')
+  }
+  
+  return new OpenAI({ apiKey })
+}
 
 interface ReplyClassification {
   category: 'interested' | 'not_interested' | 'question' | 'out_of_office' | 'bounce' | 'neutral'
@@ -41,6 +51,13 @@ export class ReplyClassifierService {
     }
   ): Promise<AIClassification> {
     try {
+      // Ensure this runs only on server-side
+      if (typeof window !== 'undefined') {
+        throw new Error('AI classification must run on server-side')
+      }
+
+      const openai = getOpenAIClient()
+      
       const contextPrompt = campaignContext 
         ? `Original campaign: "${campaignContext.campaignName}" (${campaignContext.campaignType})\nOriginal message: ${campaignContext.originalMessage.substring(0, 500)}...\n\n`
         : ''

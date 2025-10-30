@@ -1,7 +1,49 @@
 // store/useInboxStore.ts
 import { create } from 'zustand'
-import { ReplyDetectionService, InboxMessage, EmailThread } from '@/lib/reply-detection'
 import { supabase } from '@/lib/supabase'
+
+// Define interfaces locally to avoid importing server-side code
+export interface InboxMessage {
+  id: string
+  organization_id: string
+  campaign_id?: string
+  contact_id?: string
+  message_id?: string
+  thread_id?: string
+  subject: string
+  content: string
+  html_content?: string
+  from_email: string 
+  from_name?: string
+  to_email: string
+  to_name?: string
+  direction: 'inbound' | 'outbound'
+  message_type: 'reply' | 'forward' | 'new'
+  classification?: string
+  sentiment_score?: number
+  confidence_score?: number
+  tags?: string[]
+  is_read: boolean
+  is_archived: boolean
+  is_starred: boolean
+  received_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface EmailThread {
+  id: string
+  organization_id: string
+  campaign_id?: string
+  contact_id?: string
+  thread_id: string
+  subject: string
+  last_message_at: string
+  last_message_from: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
 
 interface InboxState {
   messages: (InboxMessage & { message_classifications?: any })[]
@@ -150,12 +192,19 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     try {
       set({ loading: true })
       
-      const { currentPage } = get()
-      const result = await ReplyDetectionService.getEmailThreads(organizationId, {
-        page: 1, // Always start fresh
-        limit: 20,
+      const params = new URLSearchParams({
+        page: '1',
+        limit: '20',
         ...options
       })
+
+      const response = await fetch(`/api/inbox/threads?${params}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch threads')
+      }
+      
+      const result = await response.json()
       
       set({
         threads: result.threads,
