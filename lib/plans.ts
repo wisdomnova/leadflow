@@ -9,7 +9,8 @@ export interface Plan {
   popular?: boolean
   badge?: string
   stripeProductId?: string
-  stripePriceId?: string | null
+  stripePriceIdMonthly?: string
+  stripePriceIdYearly?: string
 }
 
 export const PLANS: Plan[] = [
@@ -26,8 +27,9 @@ export const PLANS: Plan[] = [
       'Limited campaigns',
       'Email support',
     ],
-    stripeProductId: 'prod_trial_demo_001',
-    stripePriceId: undefined,
+    stripeProductId: 'prod_TdQCRzBFbuvHTu',
+    stripePriceIdMonthly: undefined,
+    stripePriceIdYearly: undefined,
   },
   {
     id: 'starter',
@@ -45,8 +47,9 @@ export const PLANS: Plan[] = [
       'Advanced analytics dashboard',
       'Email & chat support',
     ],
-    stripeProductId: 'prod_starter_demo_002',
-    stripePriceId: 'price_starter_demo_002',
+    stripeProductId: 'prod_TdQCRzBFbuvHTu',
+    stripePriceIdMonthly: 'price_1Sg9MBA7EYxH7wgxGptKpuHu',
+    stripePriceIdYearly: 'price_1Sg9PNA7EYxH7wgxuDYOLXyQ',
   },
   {
     id: 'growth',
@@ -66,8 +69,9 @@ export const PLANS: Plan[] = [
     ],
     popular: true,
     badge: 'Most Popular',
-    stripeProductId: 'prod_growth_demo_003',
-    stripePriceId: 'price_growth_demo_003',
+    stripeProductId: 'prod_TdQDStBMM7UG04',
+    stripePriceIdMonthly: 'price_1Sg9MzA7EYxH7wgx8gXPbni7',
+    stripePriceIdYearly: 'price_1Sg9PmA7EYxH7wgxYjp7vTBw',
   },
   {
     id: 'pro',
@@ -88,7 +92,8 @@ export const PLANS: Plan[] = [
       'Priority 24/7 support',
       'Custom integrations',
     ],
-    stripeProductId: 'prod_pro_demo_004',
-    stripePriceId: 'price_pro_demo_004',
+    stripeProductId: 'prod_TdQDe5lTzymPYg',
+    stripePriceIdMonthly: 'price_1Sg9NMA7EYxH7wgxF6JEmjMa',
+    stripePriceIdYearly: 'price_1Sg9QAA7EYxH7wgxCe6Fo37k',
   },
 ]

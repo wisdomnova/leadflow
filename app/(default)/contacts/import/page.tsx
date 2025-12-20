@@ -1,17 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
+
+interface ImportResult {
+  success: boolean
+  message: string
+  total: number
+  imported: number
+  skipped: number
+  errors?: string[]
+}
 
 export default function ImportContactsPage() {
   const [activeTab, setActiveTab] = useState<'import' | 'manual'>('import')
   const [dragActive, setDragActive] = useState(false)
-
-  const recentImports = [
-    { count: 450, time: 'Today at 2:45 PM', status: 'Success' },
-    { count: 1200, time: 'Yesterday at 11:30 AM', status: 'Success' },
-    { count: 89, time: '3 days ago', status: 'Partial' },
-  ]
+  const [uploading, setUploading] = useState(false)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [error, setError] = useState('')
+  const [manualForm, setManualForm] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    company: '',
+    phone: '',
+    tags: '',
+  })
+  const [submittingManual, setSubmittingManual] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -23,13 +39,118 @@ export default function ImportContactsPage() {
     }
   }
 
+  const handleFileUpload = async (file: File) => {
+    if (!file.name.endsWith('.csv')) {
+      setError('Please upload a CSV file')
+      return
+    }
+
+    try {
+      setUploading(true)
+      setError('')
+      setResult(null)
+
+      const token = localStorage.getItem('token')
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/contacts/import', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Import failed')
+        return
+      }
+
+      setResult(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Import failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      console.log('File dropped:', e.dataTransfer.files[0])
+      handleFileUpload(e.dataTransfer.files[0])
+    }
+  }
+
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileUpload(e.target.files[0])
+    }
+  }
+
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!manualForm.email) {
+      setError('Email is required')
+      return
+    }
+
+    try {
+      setSubmittingManual(true)
+      setError('')
+
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: manualForm.email,
+          firstName: manualForm.firstName || undefined,
+          lastName: manualForm.lastName || undefined,
+          company: manualForm.company || undefined,
+          phone: manualForm.phone || undefined,
+          tags: manualForm.tags ? manualForm.tags.split(',').map((t) => t.trim()) : [],
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error || 'Failed to add contact')
+        return
+      }
+
+      // Reset form
+      setManualForm({
+        email: '',
+        firstName: '',
+        lastName: '',
+        company: '',
+        phone: '',
+        tags: '',
+      })
+
+      setResult({
+        success: true,
+        message: 'Contact added successfully',
+        total: 1,
+        imported: 1,
+        skipped: 0,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add contact')
+    } finally {
+      setSubmittingManual(false)
     }
   }
 
@@ -41,9 +162,38 @@ export default function ImportContactsPage() {
           <Link href="/contacts" className="text-sm text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 mb-2 inline-block">
             ← Back to Contacts
           </Link>
-          <h1 className="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">All Contacts</h1>
+          <h1 className="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Import Contacts</h1>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {result && (
+        <div className={`mb-6 p-4 rounded-lg ${
+          result.success
+            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+            : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200'
+        }`}>
+          <p className="font-medium">{result.message}</p>
+          <p className="text-sm mt-1">
+            Total: {result.total} | Imported: {result.imported} | Skipped: {result.skipped}
+          </p>
+          {result.errors && result.errors.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {result.errors.slice(0, 5).map((err, idx) => (
+                <p key={idx} className="text-xs">
+                  {err}
+                </p>
+              ))}
+              {result.errors.length > 5 && <p className="text-xs">...and {result.errors.length - 5} more errors</p>}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-0 mb-6 border-b border-gray-200 dark:border-gray-700">
@@ -96,15 +246,21 @@ export default function ImportContactsPage() {
                 </svg>
                 <p className="text-gray-900 dark:text-white font-medium mb-1">Drag and drop your CSV file here</p>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">or</p>
-                <button className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium text-sm transition-colors">
-                  Browse Files
+                <button
+                  type="button"
+                  onClick={handleBrowseClick}
+                  disabled={uploading}
+                  className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploading ? 'Uploading...' : 'Browse Files'}
                 </button>
-              </div>
-
-              <div className="mt-4 text-center">
-                <button className="text-sm text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 font-medium">
-                  Download Sample CSV Template
-                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
               </div>
             </div>
           )}
@@ -112,50 +268,85 @@ export default function ImportContactsPage() {
           {activeTab === 'manual' && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Add New Contact</h2>
-              <form className="space-y-4">
+              <form className="space-y-4" onSubmit={handleManualSubmit}>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Email <span className="text-red-500">*</span>
                     </label>
-                    <input type="email" placeholder="john@example.com" className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <input
+                      type="email"
+                      placeholder="john@example.com"
+                      value={manualForm.email}
+                      onChange={(e) => setManualForm({ ...manualForm, email: e.target.value })}
+                      className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">First Name</label>
-                    <input type="text" placeholder="John" className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <input
+                      type="text"
+                      placeholder="John"
+                      value={manualForm.firstName}
+                      onChange={(e) => setManualForm({ ...manualForm, firstName: e.target.value })}
+                      className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Last Name</label>
-                    <input type="text" placeholder="Smith" className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <input
+                      type="text"
+                      placeholder="Smith"
+                      value={manualForm.lastName}
+                      onChange={(e) => setManualForm({ ...manualForm, lastName: e.target.value })}
+                      className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Company</label>
-                    <input type="text" placeholder="Acme Corp" className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <input
+                      type="text"
+                      placeholder="Acme Corp"
+                      value={manualForm.company}
+                      onChange={(e) => setManualForm({ ...manualForm, company: e.target.value })}
+                      className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Phone</label>
-                    <input type="tel" placeholder="+1 (555) 000-0000" className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <input
+                      type="tel"
+                      placeholder="+1 (555) 000-0000"
+                      value={manualForm.phone}
+                      onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })}
+                      className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Website</label>
-                    <input type="url" placeholder="https://example.com" className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tags</label>
+                    <input
+                      type="text"
+                      placeholder="Enterprise, Hot Lead"
+                      value={manualForm.tags}
+                      onChange={(e) => setManualForm({ ...manualForm, tags: e.target.value })}
+                      className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tags</label>
-                  <input type="text" placeholder="Enterprise, Hot Lead" className="form-input w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button type="submit" className="px-6 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium text-sm transition-colors">
-                    Add Contact
+                  <button
+                    type="submit"
+                    disabled={submittingManual}
+                    className="px-6 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submittingManual ? 'Adding...' : 'Add Contact'}
                   </button>
                   <Link href="/contacts" className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 font-medium text-sm transition-colors">
                     Cancel
@@ -186,47 +377,49 @@ export default function ImportContactsPage() {
               <li className="text-sm text-gray-700 dark:text-gray-300">
                 <span className="font-medium">Phone (optional)</span> - Phone number
               </li>
-              <li className="text-sm text-gray-700 dark:text-gray-300">
-                <span className="font-medium">Website (optional)</span> - Company website
-              </li>
-              <li className="text-sm text-gray-700 dark:text-gray-300">
-                <span className="font-medium">Tags (optional)</span> - Comma-separated tags
-              </li>
             </ul>
 
             <h4 className="font-medium text-gray-900 dark:text-white mb-2">Example CSV Format:</h4>
             <div className="bg-gray-50 dark:bg-gray-900 rounded p-4 overflow-x-auto">
               <code className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre">
-{`Email,First Name,Last Name,Company,Tags
-john@example.com,John,Smith,Acme Corp,"Enterprise,Hot Lead"
-sarah@company.com,Sarah,Johnson,TechCo,"SMB"`}
+{`Email,First Name,Last Name,Company
+john@example.com,John,Smith,Acme Corp
+sarah@company.com,Sarah,Johnson,TechCo`}
               </code>
             </div>
           </div>
         </div>
 
-        {/* Sidebar - Recent Imports */}
+        {/* Sidebar - Tips */}
         <div className="col-span-12 lg:col-span-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Recent Imports</h3>
-            <div className="space-y-4">
-              {recentImports.map((importItem, idx) => (
-                <div key={idx} className="pb-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0 last:pb-0">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white text-sm">{importItem.count.toLocaleString()} contacts imported</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{importItem.time}</p>
-                    </div>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      importItem.status === 'Success'
-                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                        : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200'
-                    }`}>
-                      {importItem.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Import Tips</h3>
+              <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                <li className="flex gap-2">
+                  <span className="text-violet-600 dark:text-violet-400 font-bold">1.</span>
+                  <span>CSV files must have an "email" column</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-violet-600 dark:text-violet-400 font-bold">2.</span>
+                  <span>Maximum 10,000 contacts per upload</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-violet-600 dark:text-violet-400 font-bold">3.</span>
+                  <span>Duplicates are automatically skipped</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-violet-600 dark:text-violet-400 font-bold">4.</span>
+                  <span>Invalid emails are skipped</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-800 rounded-lg p-4">
+              <h4 className="font-medium text-violet-900 dark:text-violet-200 mb-2">Bulk Operations</h4>
+              <p className="text-sm text-violet-800 dark:text-violet-300 mb-3">
+                Import your contacts first, then you can add tags, update status, and manage them all at once.
+              </p>
             </div>
           </div>
         </div>

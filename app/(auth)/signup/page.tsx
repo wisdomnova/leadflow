@@ -10,6 +10,7 @@ import { PLANS } from '@/lib/plans'
 export default function SignUp() {
   const router = useRouter()
   const [selectedPlan, setSelectedPlan] = useState('trial')
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
   const [companyName, setCompanyName] = useState('')
@@ -45,6 +46,7 @@ export default function SignUp() {
     }
 
     try {
+      // Step 1: Create user account
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
@@ -68,11 +70,40 @@ export default function SignUp() {
         return
       }
 
-      // Store JWT token
-      localStorage.setItem('token', data.token)
-      
-      // Redirect to email setup instead of dashboard
-      router.push('/email-setup')
+      const userId = data.userId
+
+      // Step 2: If trial plan, skip Stripe and go to email setup
+      if (selectedPlan === 'trial') {
+        localStorage.setItem('auth_token', data.token)
+        router.push('/auth/email-setup')
+        return
+      }
+
+      // Step 3: For paid plans, redirect to Stripe checkout
+      const checkoutResponse = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          planId: selectedPlan,
+          billingCycle,
+        }),
+      })
+
+      const checkoutData = await checkoutResponse.json()
+
+      if (!checkoutResponse.ok) {
+        setError(checkoutData.error || 'Failed to create checkout session')
+        setLoading(false)
+        return
+      }
+
+      // Redirect to Stripe checkout
+      if (checkoutData.sessionUrl) {
+        window.location.href = checkoutData.sessionUrl
+      }
     } catch (err) {
       setError('An error occurred. Please try again.')
       setLoading(false)
@@ -166,6 +197,33 @@ export default function SignUp() {
                       ))}
                     </select>
                   </div>
+                  {selectedPlan !== 'trial' && (
+                    <div>
+                      <label className="block text-sm font-medium mb-3">Billing Cycle</label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center">
+                          <input 
+                            type="radio" 
+                            className="form-radio"
+                            value="monthly"
+                            checked={billingCycle === 'monthly'}
+                            onChange={(e) => setBillingCycle(e.target.value as 'monthly' | 'yearly')}
+                          />
+                          <span className="ml-2 text-sm">Monthly</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input 
+                            type="radio" 
+                            className="form-radio"
+                            value="yearly"
+                            checked={billingCycle === 'yearly'}
+                            onChange={(e) => setBillingCycle(e.target.value as 'monthly' | 'yearly')}
+                          />
+                          <span className="ml-2 text-sm">Yearly <span className="text-green-600 text-xs font-semibold ml-1">(Save 20%)</span></span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium mb-1" htmlFor="password">Password <span className="text-red-500">*</span></label>
                     <input 

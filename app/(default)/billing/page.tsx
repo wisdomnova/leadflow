@@ -1,16 +1,109 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function BillingPage() {
+  const router = useRouter()
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly')
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [subscription, setSubscription] = useState<any>(null)
+  const [paymentMethodsList, setPaymentMethodsList] = useState<any[]>([])
+  const [invoicesList, setInvoicesList] = useState<any[]>([])
+  const [billingInfo, setBillingInfo] = useState<any>(null)
+  const [upgrading, setUpgrading] = useState<string | null>(null)
 
-  const currentPlan = {
-    name: 'Growth',
+  useEffect(() => {
+    fetchBillingData()
+  }, [])
+
+  const fetchBillingData = async () => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        router.push('/auth/signin')
+        return
+      }
+
+      const [subRes, pmRes, invRes, infoRes] = await Promise.all([
+        fetch('/api/billing/subscription', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch('/api/billing/payment-methods', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch('/api/billing/invoices', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch('/api/billing/info', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ])
+
+      if (subRes.ok) {
+        const subData = await subRes.json()
+        setSubscription(subData)
+      }
+      if (pmRes.ok) {
+        const pmData = await pmRes.json()
+        setPaymentMethodsList(pmData.paymentMethods || [])
+      }
+      if (invRes.ok) {
+        const invData = await invRes.json()
+        setInvoicesList(invData.invoices || [])
+      }
+      if (infoRes.ok) {
+        const infoData = await infoRes.json()
+        setBillingInfo(infoData.billingInfo)
+      }
+    } catch (error) {
+      console.error('Error fetching billing data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpgradePlan = async (planId: string) => {
+    try {
+      setUpgrading(planId)
+      const token = localStorage.getItem('auth_token')
+      
+      const res = await fetch('/api/billing/upgrade-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          planId,
+          billingCycle,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.sessionUrl) {
+        if (data.free) {
+          // Free plan - redirect directly
+          router.push(data.sessionUrl)
+        } else {
+          // Redirect to Stripe checkout
+          window.location.href = data.sessionUrl
+        }
+      }
+    } catch (error) {
+      console.error('Error upgrading plan:', error)
+    } finally {
+      setUpgrading(null)
+    }
+  }
+
+  const currentPlan = subscription?.currentPlan || {
+    name: 'Trial',
     status: 'Active',
-    cost: 99,
-    nextBillingDate: 'December 5, 2025',
+    cost: 0,
+    nextBillingDate: 'N/A',
   }
 
   const plans = [
@@ -76,37 +169,16 @@ export default function BillingPage() {
     },
   ]
 
-  const paymentMethods = [
-    {
-      id: 1,
-      type: 'Visa',
-      last4: '4242',
-      expires: '12/2026',
-      isDefault: true,
-    },
-    {
-      id: 2,
-      type: 'Mastercard',
-      last4: '5555',
-      expires: '08/2025',
-      isDefault: false,
-    },
-  ]
+  const paymentMethods = paymentMethodsList || []
 
-  const billingInfo = {
-    companyName: 'Acme Corporation',
-    email: 'john@acmecorp.com',
-    address: '123 Business St\nSan Francisco, CA 94105\nUnited States',
-    taxId: '12-3456789',
+  const billingInfoData = billingInfo || {
+    companyName: 'Loading...',
+    email: 'Loading...',
+    address: 'Loading...',
+    taxId: 'Loading...',
   }
 
-  const invoices = [
-    { id: 'INV-2025-011', date: 'Nov 5, 2025', amount: 199.00, status: 'Paid' },
-    { id: 'INV-2025-010', date: 'Oct 5, 2025', amount: 199.00, status: 'Paid' },
-    { id: 'INV-2025-009', date: 'Sep 5, 2025', amount: 199.00, status: 'Paid' },
-    { id: 'INV-2025-008', date: 'Aug 5, 2025', amount: 199.00, status: 'Paid' },
-    { id: 'INV-2025-007', date: 'Jul 5, 2025', amount: 199.00, status: 'Paid' },
-  ]
+  const invoices = invoicesList || []
 
   const currentPrice = billingCycle === 'monthly' ? currentPlan.cost : Math.round(currentPlan.cost * 12 * 0.8)
 
@@ -136,7 +208,7 @@ export default function BillingPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Plan</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{currentPlan.name}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{currentPlan?.name || 'Loading...'}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Monthly Cost</p>
@@ -144,7 +216,7 @@ export default function BillingPage() {
           </div>
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Next Billing Date</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{currentPlan.nextBillingDate}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{subscription?.subscription.currentPeriodEnd ? new Date(subscription.subscription.currentPeriodEnd).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}</p>
           </div>
         </div>
       </div>
@@ -225,12 +297,15 @@ export default function BillingPage() {
                   ))}
                 </ul>
 
-                <button className={`w-full py-2 rounded-lg font-medium text-sm transition-colors ${
-                  plan.isCurrent
-                    ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 cursor-default'
-                    : 'bg-violet-600 text-white hover:bg-violet-700'
-                }`}>
-                  {plan.action}
+                <button 
+                  onClick={() => !plan.isCurrent && handleUpgradePlan(plan.id)}
+                  disabled={plan.isCurrent || upgrading === plan.id}
+                  className={`w-full py-2 rounded-lg font-medium text-sm transition-colors ${
+                    plan.isCurrent
+                      ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 cursor-default'
+                      : 'bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                  }`}>
+                  {upgrading === plan.id ? 'Processing...' : plan.action}
                 </button>
               </div>
             </div>
@@ -288,20 +363,20 @@ export default function BillingPage() {
 
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Company Name</p>
-                <p className="font-medium text-gray-900 dark:text-white">{billingInfo.companyName}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Company Name</p>
+                <p className="font-medium text-gray-900 dark:text-white">{billingInfoData.companyName}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Billing Email</p>
-                <p className="font-medium text-gray-900 dark:text-white">{billingInfo.email}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Billing Email</p>
+                <p className="font-medium text-gray-900 dark:text-white">{billingInfoData.email}</p>
               </div>
               <div className="col-span-2">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Address</p>
-                <p className="font-medium text-gray-900 dark:text-white whitespace-pre-line">{billingInfo.address}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Address</p>
+                <p className="font-medium text-gray-900 dark:text-white whitespace-pre-line">{billingInfoData.address}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Tax ID</p>
-                <p className="font-medium text-gray-900 dark:text-white">{billingInfo.taxId}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Tax ID</p>
+                <p className="font-medium text-gray-900 dark:text-white">{billingInfoData.taxId}</p>
               </div>
             </div>
           </div>
@@ -345,8 +420,11 @@ export default function BillingPage() {
                     </span>
                   </td>
                   <td className="py-4 px-4 text-sm">
-                    <button className="text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 font-medium">
-                      Download
+                    <button 
+                      onClick={() => invoice.invoiceUrl && window.open(invoice.invoiceUrl, '_blank')}
+                      disabled={!invoice.invoiceUrl}
+                      className="text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                      {invoice.invoiceUrl ? 'Download' : 'N/A'}
                     </button>
                   </td>
                 </tr>
