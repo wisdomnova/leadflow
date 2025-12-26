@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { PLANS } from '@/lib/plans'
+import { calculateAffiliateTier } from '@/lib/affiliate-utils'
+import { getOrCreateAffiliateCoupon } from '@/lib/stripe-affiliate-utils'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-11-17.clover',
@@ -15,7 +17,7 @@ const supabase = createClient(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, planId, billingCycle = 'monthly' } = body
+    const { userId, planId, billingCycle = 'monthly', referralCode } = body
 
     if (!userId || !planId) {
       return NextResponse.json(
@@ -111,26 +113,84 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Handle referral code if provided
+    let couponId: string | undefined
+    let affiliateId: string | undefined
+
+    if (referralCode) {
+      // Find affiliate by referral code
+      const { data: affiliate, error: affiliateError } = await supabase
+        .from('users')
+        .select('id, affiliate_tier')
+        .eq('referral_code', referralCode)
+        .single()
+
+      if (affiliate && affiliate.id !== userId) {
+        // Valid affiliate referral
+        affiliateId = affiliate.id
+
+        // Link user to affiliate
+        await supabase
+          .from('users')
+          .update({ referred_by: affiliateId })
+          .eq('id', userId)
+
+        // Get affiliate tier and discount
+        const { data: tierData } = await supabase
+          .from('affiliate_tiers')
+          .select('discount_percentage, stripe_coupon_id')
+          .eq('user_id', affiliateId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (tierData?.discount_percentage) {
+          // Use existing coupon or create new one
+          couponId =
+            tierData.stripe_coupon_id ||
+            (await getOrCreateAffiliateCoupon(tierData.discount_percentage, affiliate.affiliate_tier))
+
+          // Record referral
+          await supabase.from('affiliate_referrals').insert({
+            affiliate_id: affiliateId,
+            referred_user_id: userId,
+            status: 'pending',
+          })
+        }
+      }
+    }
+
+    // Build line items with optional coupon
+    const lineItems: any[] = [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+    ]
+
     // Create checkout session
-    const session = await stripe.checkout.sessions.create({
+    const sessionConfig: any = {
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/auth/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/auth/payment-cancelled`,
       metadata: {
         userId: userId,
         planId: planId,
         billingCycle: billingCycle,
+        affiliateId: affiliateId || '',
       },
       client_reference_id: userId,
-    })
+    }
+
+    // Add coupon if available
+    if (couponId) {
+      sessionConfig.discounts = [{ coupon: couponId }]
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig)
 
     // Update user payment status to processing
     const { error: processingError } = await supabase
@@ -152,6 +212,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       sessionUrl: session.url,
       sessionId: session.id,
+      discountApplied: !!couponId,
     })
   } catch (error) {
     console.error('Stripe checkout error:', error)

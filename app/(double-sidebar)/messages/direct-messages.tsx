@@ -1,103 +1,85 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import { useFlyoutContext } from '@/app/flyout-context'
-import Image from 'next/image'
-import UserImage01 from '@/public/images/user-32-01.jpg'
-import UserImage02 from '@/public/images/user-32-02.jpg'
-import UserImage03 from '@/public/images/user-32-03.jpg'
-import UserImage04 from '@/public/images/user-32-04.jpg'
-import UserImage05 from '@/public/images/user-32-05.jpg'
-import UserImage06 from '@/public/images/user-32-06.jpg'
+
+interface CampaignReply {
+  id: string
+  contact_email: string
+  contact_name: string
+  campaign_name: string
+  reply_count: number
+  last_reply?: string
+}
 
 export default function DirectMessages() {
   const { setFlyoutOpen } = useFlyoutContext()
+  const [token, setToken] = useState<string | null>(null)
+  const [replies, setReplies] = useState<CampaignReply[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const t = localStorage.getItem('auth_token') || localStorage.getItem('token')
+    setToken(t)
+  }, [])
+
+  useEffect(() => {
+    if (!token) return
+    loadReplies()
+  }, [token])
+
+  async function loadReplies() {
+    try {
+      const res = await fetch('/api/campaigns/replies', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const json = await res.json()
+      setReplies(json.replies || [])
+      if (json.replies?.length > 0) {
+        setSelectedId(json.replies[0].id)
+      }
+    } catch (error) {
+      console.error('Failed to load campaign replies:', error)
+    }
+  }
 
   return (
     <div className="mt-4">
-      <div className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-3">Direct messages</div>
+      <div className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-3">Campaign Replies</div>
       <ul className="mb-6">
-        <li className="-mx-2">
-          <button className="flex items-center justify-between w-full p-2 rounded-lg bg-linear-to-r from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]" onClick={() => setFlyoutOpen(false)}>
-            <div className="flex items-center truncate">
-              <Image className="w-8 h-8 rounded-full mr-2" src={UserImage01} width={32} height={32} alt="User 01" />
-              <div className="truncate">
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">Dominik Lamakani</span>
-              </div>
-            </div>
-            <div className="flex items-center ml-2">
-              <div className="text-xs inline-flex font-medium bg-violet-400 text-white rounded-full text-center leading-5 px-2">2</div>
-            </div>
-          </button>
-        </li>
-        <li className="-mx-2">
-          <button className="flex items-center justify-between w-full p-2 rounded-sm" onClick={() => setFlyoutOpen(false)}>
-            <div className="flex items-center truncate">
-              <Image className="w-8 h-8 rounded-full mr-2" src={UserImage02} width={32} height={32} alt="User 02" />
-              <div className="truncate">
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">Tisha Yanchev</span>
-              </div>
-            </div>
-            <div className="flex items-center ml-2">
-              <div className="text-xs inline-flex font-medium bg-violet-400 text-white rounded-full text-center leading-5 px-2">4</div>
-            </div>
-          </button>
-        </li>
-        <li className="-mx-2">
-          <button className="flex items-center justify-between w-full p-2 rounded-sm" onClick={() => setFlyoutOpen(false)}>
-            <div className="flex items-center truncate">
-              <Image className="w-8 h-8 rounded-full mr-2" src={UserImage03} width={32} height={32} alt="User 03" />
-              <div className="truncate">
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">Jerzy Wierzy</span>
-              </div>
-            </div>
-            <div className="flex items-center ml-2">
-              <Image className="rounded-full shrink-0" src={UserImage03} width="20" height="20" alt="User 03" />
-            </div>
-          </button>
-        </li>
-        <li className="-mx-2">
-          <button className="flex items-center justify-between w-full p-2 rounded-sm" onClick={() => setFlyoutOpen(false)}>
-            <div className="flex items-center truncate">
-              <Image className="w-8 h-8 rounded-full mr-2" src={UserImage04} width={32} height={32} alt="User 04" />
-              <div className="truncate">
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">Adrian Przetocki</span>
-              </div>
-            </div>
-            <div className="flex items-center ml-2">
-              <svg className="w-3 h-3 shrink-0 fill-current text-gray-400" viewBox="0 0 12 12">
-                <path d="M10.28 2.28L3.989 8.575 1.695 6.28A1 1 0 00.28 7.695l3 3a1 1 0 001.414 0l7-7A1 1 0 0010.28 2.28z" />
-              </svg>
-            </div>
-          </button>
-        </li>
-        <li className="-mx-2">
-          <button className="flex items-center justify-between w-full p-2 rounded-sm" onClick={() => setFlyoutOpen(false)}>
-            <div className="flex items-center truncate">
-              <Image className="w-8 h-8 rounded-full mr-2" src={UserImage05} width={32} height={32} alt="User 05" />
-              <div className="truncate">
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">Simona Lürwer</span>
-              </div>
-            </div>
-            <div className="flex items-center ml-2">
-              <svg className="w-3 h-3 shrink-0 fill-current text-gray-400" viewBox="0 0 12 12">
-                <path d="M10.28 2.28L3.989 8.575 1.695 6.28A1 1 0 00.28 7.695l3 3a1 1 0 001.414 0l7-7A1 1 0 0010.28 2.28z" />
-              </svg>
-            </div>
-          </button>
-        </li>
-        <li className="-mx-2">
-          <button className="flex items-center justify-between w-full p-2 rounded-sm" onClick={() => setFlyoutOpen(false)}>
-            <div className="flex items-center truncate">
-              <Image className="w-8 h-8 rounded-full mr-2" src={UserImage06} width={32} height={32} alt="User 06" />
-              <div className="truncate">
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">Mary Roszczewski</span>
-              </div>
-            </div>
-            <div className="flex items-center ml-2">
-              <svg className="w-3 h-3 shrink-0 fill-current text-gray-400" viewBox="0 0 12 12">
-                <path d="M10.28 2.28L3.989 8.575 1.695 6.28A1 1 0 00.28 7.695l3 3a1 1 0 001.414 0l7-7A1 1 0 0010.28 2.28z" />
-              </svg>
-            </div>
-          </button>
-        </li>
+        {replies.length === 0 ? (
+          <li className="text-xs text-gray-500 px-2 py-3">No replies yet</li>
+        ) : (
+          replies.map((reply) => (
+            <li key={reply.id} className="-mx-2">
+              <button
+                className={`flex items-center justify-between w-full p-2 rounded-sm ${
+                  selectedId === reply.id
+                    ? 'bg-linear-to-r from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+                onClick={() => {
+                  setSelectedId(reply.id)
+                  setFlyoutOpen(false)
+                }}
+              >
+                <div className="truncate">
+                  <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                    {reply.contact_name || reply.contact_email}
+                  </div>
+                  <div className="text-xs text-gray-500 truncate">{reply.campaign_name}</div>
+                </div>
+                {reply.reply_count > 0 && (
+                  <div className="flex items-center ml-2">
+                    <div className="text-xs inline-flex font-medium bg-violet-400 text-white rounded-full text-center leading-5 px-2">
+                      {reply.reply_count}
+                    </div>
+                  </div>
+                )}
+              </button>
+            </li>
+          ))
+        )}
       </ul>
     </div>
   )

@@ -197,6 +197,21 @@ export default function SignUp() {
                       ))}
                     </select>
                   </div>
+                  {/* Plan Features */}
+                  {PLANS.find(p => p.id === selectedPlan) && (
+                    <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-violet-900 dark:text-violet-100 mb-2">{PLANS.find(p => p.id === selectedPlan)?.name} Plan Includes:</p>
+                      <ul className="text-xs text-violet-800 dark:text-violet-200 space-y-1">
+                        {PLANS.find(p => p.id === selectedPlan)?.features?.slice(0, 3)?.map((feature, i) => (
+                          <li key={i} className="flex items-center">
+                            <span className="mr-2">✓</span>
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {selectedPlan !== 'trial' && (
                     <div>
                       <label className="block text-sm font-medium mb-3">Billing Cycle</label>

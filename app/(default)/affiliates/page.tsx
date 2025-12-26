@@ -1,314 +1,369 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
+interface AffiliateDashboard {
+  referralCode: string
+  currentTier: string
+  activeReferrals: number
+  discountPercentage: number
+  monthlySavings: number
+  affiliateStatus: string
+  referralsSummary: {
+    total: number
+    active: number
+    pending: number
+    churned: number
+  }
+  nextTierThreshold: {
+    nextTier: string
+    referralsNeeded: number
+  }
+}
+
+interface AffiliateStats {
+  referrals: Array<{
+    id: string
+    email: string
+    name: string
+    signupDate: string
+    status: string
+    qualificationDate: string
+  }>
+  stats: {
+    total: number
+    active: number
+    pending: number
+    churned: number
+  }
+  pagination: {
+    page: number
+    limit: number
+    pages: number
+    total: number
+  }
+}
+
 export default function AffiliatesPage() {
+  const [dashboard, setDashboard] = useState<AffiliateDashboard | null>(null)
+  const [stats, setStats] = useState<AffiliateStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
-  const referralLink = 'https://leadflow.com/ref/john123'
+  useEffect(() => {
+    fetchData()
+  }, [currentPage])
 
-  const stats = [
-    { label: 'Total Earnings', value: '$2,847', icon: 'earnings' },
-    { label: 'Referrals', value: '23', icon: 'referrals' },
-    { label: 'Active Subscriptions', value: '18', icon: 'check' },
-    { label: 'Commission Rate', value: '15%', icon: 'chart' },
-  ]
+  async function fetchData() {
+    try {
+      setLoading(true)
+      const token = localStorage.getItem('auth_token')
 
-  const renderIcon = (iconType: string) => {
-    const iconProps = 'w-8 h-8 text-violet-600 dark:text-violet-400'
-    switch (iconType) {
-      case 'earnings':
-        return (
-          <svg className={iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        )
-      case 'referrals':
-        return (
-          <svg className={iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 12H9m6 0a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        )
-      case 'check':
-        return (
-          <svg className={iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        )
-      case 'chart':
-        return (
-          <svg className={iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        )
-      default:
-        return null
+      if (!token) {
+        setError('Not authenticated')
+        return
+      }
+
+      // Fetch dashboard
+      const dashRes = await fetch('/api/affiliates/dashboard', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!dashRes.ok) {
+        throw new Error('Failed to fetch dashboard')
+      }
+
+      const dashData = await dashRes.json()
+      setDashboard(dashData)
+
+      // Fetch stats
+      const statsRes = await fetch(`/api/affiliates/stats?page=${currentPage}&limit=10`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!statsRes.ok) {
+        throw new Error('Failed to fetch stats')
+      }
+
+      const statsData = await statsRes.json()
+      setStats(statsData)
+
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const renderResourceIcon = (iconType: string) => {
-    const iconProps = 'w-6 h-6 text-violet-600 dark:text-violet-400'
-    switch (iconType) {
-      case 'image':
-        return (
-          <svg className={iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        )
-      case 'email':
-        return (
-          <svg className={iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        )
-      case 'share':
-        return (
-          <svg className={iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C9.589 12.938 10 12.502 10 12c0-.502-.411-.938-1.316-1.342m0 2.684a3 3 0 110-2.684m9.108-3.342c.589.591 1.5 1.485 1.5 3.342 0 1.857-.911 2.751-1.5 3.342m0-6.684a9 9 0 110 6.684M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        )
-      default:
-        return null
+  function copyToClipboard() {
+    if (dashboard?.referralCode) {
+      navigator.clipboard.writeText(dashboard.referralCode)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
-  const recentReferrals = [
-    {
-      name: 'Sarah Johnson',
-      date: 'Nov 2, 2025',
-      plan: 'Professional',
-      status: 'Active',
-      earnings: 29.85,
-    },
-    {
-      name: 'Michael Chen',
-      date: 'Oct 28, 2025',
-      plan: 'Professional',
-      status: 'Active',
-      earnings: 29.85,
-    },
-    {
-      name: 'Emily Davis',
-      date: 'Oct 25, 2025',
-      plan: 'Business',
-      status: 'Active',
-      earnings: 89.85,
-    },
-    {
-      name: 'David Brown',
-      date: 'Oct 20, 2025',
-      plan: 'Business',
-      status: 'Active',
-      earnings: 89.85,
-    },
-    {
-      name: 'Lisa Wang',
-      date: 'Oct 15, 2025',
-      plan: 'Professional',
-      status: 'Trial',
-      earnings: 0.00,
-    },
-  ]
-
-  const payouts = [
-    {
-      amount: 847.50,
-      date: 'Oct 1, 2025',
-      method: 'PayPal',
-      status: 'Paid',
-    },
-    {
-      amount: 612.30,
-      date: 'Sep 1, 2025',
-      method: 'PayPal',
-      status: 'Paid',
-    },
-    {
-      amount: 523.80,
-      date: 'Aug 1, 2025',
-      method: 'Bank Transfer',
-      status: 'Paid',
-    },
-  ]
-
-  const marketingResources = [
-    {
-      title: 'Banner Images',
-      description: 'Download promotional banners',
-      icon: 'image',
-      action: 'Download',
-    },
-    {
-      title: 'Email Templates',
-      description: 'Ready-to-use email copy',
-      icon: 'email',
-      action: 'Download',
-    },
-    {
-      title: 'Social Media Kit',
-      description: 'Graphics for social platforms',
-      icon: 'share',
-      action: 'Download',
-    },
-  ]
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(referralLink)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const tierColors: Record<string, { bg: string; text: string; border: string }> = {
+    starter: { bg: 'bg-blue-50', text: 'text-blue-900', border: 'border-blue-200' },
+    tier1: { bg: 'bg-purple-50', text: 'text-purple-900', border: 'border-purple-200' },
+    tier2: { bg: 'bg-indigo-50', text: 'text-indigo-900', border: 'border-indigo-200' },
+    tier3: { bg: 'bg-violet-50', text: 'text-violet-900', border: 'border-violet-200' },
   }
+
+  const tierDescriptions: Record<string, string> = {
+    starter: 'Entry tier - 100% discount on Starter plan',
+    tier1: '1-5 referrals - 50% discount on Starter',
+    tier2: '6-10 referrals - FREE Starter plan',
+    tier3: '11+ referrals - FREE Professional plan',
+  }
+
+  const tierBadges: Record<string, { color: string; label: string }> = {
+    active: { color: 'bg-green-100 text-green-800', label: 'Active' },
+    pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+    churned: { color: 'bg-red-100 text-red-800', label: 'Churned' },
+  }
+
+  if (loading) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-[96rem] mx-auto">
+        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-[96rem] mx-auto">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <p className="text-red-800 dark:text-red-200">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!dashboard) {
+    return null
+  }
+
+  const colors = tierColors[dashboard.currentTier] || tierColors.starter
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-[96rem] mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Affiliate Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">Track your referrals and earnings</p>
-        </div>
-        <button className="px-6 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium text-sm transition-colors">
-          View Resources
-        </button>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          Affiliate Program
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Earn discounts by referring others. Share your unique code and watch your savings grow.
+        </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat, idx) => (
-          <div key={idx} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{stat.label}</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
-              </div>
-              <div className="opacity-80">
-                {renderIcon(stat.icon)}
-              </div>
-            </div>
+      {/* Current Tier Card */}
+      <div className={`border rounded-lg p-6 mb-8 ${colors.bg} ${colors.border}`}>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Tier</p>
+            <h2 className={`text-2xl font-bold capitalize ${colors.text}`}>
+              {dashboard.currentTier === 'tier1'
+                ? 'Tier 1'
+                : dashboard.currentTier === 'tier2'
+                  ? 'Tier 2'
+                  : dashboard.currentTier === 'tier3'
+                    ? 'Tier 3'
+                    : dashboard.currentTier}
+            </h2>
           </div>
-        ))}
+          <div className="text-right">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Monthly Savings</p>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+              ${dashboard.monthlySavings.toFixed(2)}
+            </p>
+          </div>
+        </div>
+        <p className="text-sm text-gray-600">{tierDescriptions[dashboard.currentTier]}</p>
+
+        {dashboard.nextTierThreshold.referralsNeeded > 0 && (
+          <div className="mt-4 pt-4 border-t border-current border-opacity-20">
+            <p className="text-sm font-medium">
+              {dashboard.nextTierThreshold.referralsNeeded} more referrals to reach{' '}
+              <span className="capitalize font-bold">
+                {dashboard.nextTierThreshold.nextTier === 'tier1'
+                  ? 'Tier 1'
+                  : dashboard.nextTierThreshold.nextTier === 'tier2'
+                    ? 'Tier 2'
+                    : 'Tier 3'}
+              </span>
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Referral Link Section */}
-      <div className="mb-8 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border border-violet-200 dark:border-violet-800 rounded-lg p-6">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Your Referral Link</h2>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={referralLink}
-            readOnly
-            className="flex-1 px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white font-mono text-sm"
-          />
+      {/* Referral Code Card */}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-8">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Your Referral Code</h3>
+        <div className="flex items-center gap-3">
+          <code className="flex-1 bg-gray-100 dark:bg-gray-700 px-4 py-3 rounded-lg font-mono text-gray-900 dark:text-white break-all">
+            {dashboard.referralCode}
+          </code>
           <button
-            onClick={handleCopyLink}
-            className={`px-6 py-3 rounded-lg font-medium text-sm transition-colors ${
+            onClick={copyToClipboard}
+            className={`px-4 py-3 rounded-lg font-medium transition-colors whitespace-nowrap ${
               copied
                 ? 'bg-green-600 text-white'
                 : 'bg-violet-600 text-white hover:bg-violet-700'
             }`}
           >
-            {copied ? 'Copied!' : 'Copy Link'}
+            {copied ? 'Copied!' : 'Copy'}
           </button>
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+          Share this code with potential users. They'll get a discount, and you'll earn rewards.
+        </p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Referrals</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+            {dashboard.referralsSummary.total}
+          </p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Active</p>
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+            {dashboard.referralsSummary.active}
+          </p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Pending (30 days)</p>
+          <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+            {dashboard.referralsSummary.pending}
+          </p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Churned</p>
+          <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+            {dashboard.referralsSummary.churned}
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Referrals and Payouts */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Recent Referrals */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Recent Referrals</h2>
+      {/* Referrals Table */}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Recent Referrals</h3>
+        </div>
 
+        {stats?.referrals && stats.referrals.length > 0 ? (
+          <>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">User</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Plan</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Status</th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Earnings</th>
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                      Signup Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                      Status
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
-                  {recentReferrals.map((referral, idx) => (
-                    <tr key={idx} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="py-4 px-4">
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">{referral.name}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">{referral.date}</p>
-                        </div>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {stats.referrals.map((referral) => (
+                    <tr key={referral.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                        {referral.email}
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-400">{referral.plan}</td>
-                      <td className="py-4 px-4 text-sm">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          referral.status === 'Active'
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
-                        }`}>
-                          {referral.status}
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                        {referral.name}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                        {new Date(referral.signupDate).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                            tierBadges[referral.status]?.color || 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {tierBadges[referral.status]?.label || referral.status}
                         </span>
-                      </td>
-                      <td className="py-4 px-4 text-right font-medium text-gray-900 dark:text-white">
-                        ${referral.earnings.toFixed(2)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
 
-          {/* Payout History */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Payout History</h2>
-
-            <div className="space-y-4 mb-6">
-              {payouts.map((payout, idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg flex items-center justify-center">
-                      <span className="text-lg font-bold text-green-600 dark:text-green-400">$</span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">${payout.amount.toFixed(2)}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">{payout.date} • {payout.method}</p>
-                    </div>
-                  </div>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                    {payout.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <button className="w-full py-2 text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 font-medium text-sm transition-colors">
-              View All Payouts
-            </button>
-          </div>
-        </div>
-
-        {/* Marketing Resources */}
-        <div className="lg:col-span-1">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Marketing Resources</h2>
-
-            <div className="space-y-4">
-              {marketingResources.map((resource, idx) => (
-                <div key={idx} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-violet-300 dark:hover:border-violet-700 transition-colors">
-                  <div className="flex items-start gap-3 mb-3">
-                    {renderResourceIcon(resource.icon)}
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{resource.title}</h3>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{resource.description}</p>
-                    </div>
-                  </div>
-                  <button className="w-full py-2 px-3 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded hover:bg-gray-200 dark:hover:bg-gray-600 font-medium text-xs transition-colors">
-                    {resource.action}
+            {/* Pagination */}
+            {stats.pagination.pages > 1 && (
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Showing {(currentPage - 1) * stats.pagination.limit + 1}-
+                  {Math.min(currentPage * stats.pagination.limit, stats.pagination.total)} of{' '}
+                  {stats.pagination.total} referrals
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-900 dark:text-white disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(stats.pagination.pages, currentPage + 1))}
+                    disabled={currentPage === stats.pagination.pages}
+                    className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-900 dark:text-white disabled:opacity-50"
+                  >
+                    Next
                   </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="px-6 py-12 text-center">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">No referrals yet</p>
+            <p className="text-sm text-gray-500 dark:text-gray-500">
+              Share your code with others to start earning discounts
+            </p>
           </div>
+        )}
+      </div>
+
+      {/* Info Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+          <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-2">How It Works</h3>
+          <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+            <li>✓ Share your unique referral code</li>
+            <li>✓ User signs up and completes first payment</li>
+            <li>✓ After 30 days of active subscription, you earn the discount</li>
+            <li>✓ Discount applies automatically to your next billing cycle</li>
+          </ul>
+        </div>
+
+        <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-6">
+          <h3 className="font-bold text-violet-900 dark:text-violet-100 mb-2">Important</h3>
+          <ul className="text-sm text-violet-800 dark:text-violet-200 space-y-2">
+            <li>• Only active, paid subscriptions count</li>
+            <li>• Discounts are soft-downgraded if referrals drop</li>
+            <li>• Changes apply on your next billing cycle</li>
+            <li>• No cash payouts, discount-based rewards only</li>
+          </ul>
         </div>
       </div>
     </div>

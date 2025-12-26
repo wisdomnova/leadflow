@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
+import { updateAffiliateTier, countActiveReferrals, updateReferralStatus } from '@/lib/affiliate-utils'
+import { updateSubscriptionDiscount } from '@/lib/stripe-affiliate-utils'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-11-17.clover',
@@ -64,6 +66,22 @@ export async function POST(request: NextRequest) {
             console.error('Error updating user after checkout:', updateError)
           } else {
             console.log(`Payment completed for user ${userId}`)
+
+            // If referred by affiliate, mark referral as active after 30 days
+            const { data: user } = await supabase
+              .from('users')
+              .select('referred_by')
+              .eq('id', userId)
+              .single()
+
+            if (user?.referred_by) {
+              // Update referral status to pending (will become active after 30 days)
+              await supabase
+                .from('affiliate_referrals')
+                .update({ subscription_id: subscription, status: 'pending' })
+                .eq('affiliate_id', user.referred_by)
+                .eq('referred_user_id', userId)
+            }
           }
         }
         break
@@ -100,7 +118,7 @@ export async function POST(request: NextRequest) {
         if (customerId) {
           const { data: user, error: userError } = await supabase
             .from('users')
-            .select('id')
+            .select('id, is_affiliate')
             .eq('stripe_customer_id', customerId)
             .single()
 
@@ -115,6 +133,19 @@ export async function POST(request: NextRequest) {
               .eq('id', user.id)
 
             console.log(`Subscription updated for user ${user.id}`)
+
+            // If user is an affiliate, recalculate tier
+            if (user.is_affiliate) {
+              const tierInfo = await updateAffiliateTier(user.id)
+              console.log(
+                `Affiliate tier updated for ${user.id}: ${tierInfo?.tier} (${tierInfo?.activeCount} referrals)`
+              )
+
+              // Apply new discount to their subscription if they have one
+              if (tierInfo && subscription.id) {
+                await updateSubscriptionDiscount(subscription.id, tierInfo.discountPercentage, tierInfo.tier)
+              }
+            }
           }
         }
         break
@@ -127,7 +158,7 @@ export async function POST(request: NextRequest) {
         if (customerId) {
           const { data: user, error: userError } = await supabase
             .from('users')
-            .select('id')
+            .select('id, is_affiliate')
             .eq('stripe_customer_id', customerId)
             .single()
 
@@ -141,6 +172,35 @@ export async function POST(request: NextRequest) {
               .eq('id', user.id)
 
             console.log(`Subscription cancelled for user ${user.id}`)
+
+            // If user is referred by an affiliate, mark referral as churned
+            const { data: referredUser } = await supabase
+              .from('users')
+              .select('referred_by')
+              .eq('id', user.id)
+              .single()
+
+            if (referredUser?.referred_by) {
+              await supabase
+                .from('affiliate_referrals')
+                .update({ status: 'churned' })
+                .eq('affiliate_id', referredUser.referred_by)
+                .eq('referred_user_id', user.id)
+
+              // Recalculate affiliate tier since they lost a referral
+              const tierInfo = await updateAffiliateTier(referredUser.referred_by)
+              console.log(
+                `Referral churned for affiliate ${referredUser.referred_by}, new tier: ${tierInfo?.tier}`
+              )
+            }
+
+            // If user is an affiliate, recalculate their tier
+            if (user.is_affiliate) {
+              const tierInfo = await updateAffiliateTier(user.id)
+              console.log(
+                `Affiliate tier updated for ${user.id}: ${tierInfo?.tier} (${tierInfo?.activeCount} referrals)`
+              )
+            }
           }
         }
         break
