@@ -87,6 +87,47 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Create default workspace for user
+    const { data: workspace, error: workspaceError } = await supabase
+      .from('workspaces')
+      .insert([
+        {
+          owner_id: newUser.id,
+          name: companyName || 'My Workspace',
+          slug: (companyName || 'workspace').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          description: `Workspace for ${fullName}`,
+        },
+      ])
+      .select()
+      .single()
+
+    if (workspaceError) {
+      console.error('Failed to create workspace:', workspaceError)
+      return NextResponse.json(
+        { error: 'Failed to setup workspace' },
+        { status: 500 }
+      )
+    }
+
+    // Add user as owner to workspace
+    const { error: memberError } = await supabase
+      .from('workspace_members')
+      .insert([
+        {
+          workspace_id: workspace.id,
+          user_id: newUser.id,
+          role: 'owner',
+        },
+      ])
+
+    if (memberError) {
+      console.error('Failed to add user to workspace:', memberError)
+      return NextResponse.json(
+        { error: 'Failed to setup workspace membership' },
+        { status: 500 }
+      )
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       {
@@ -109,6 +150,7 @@ export async function POST(request: NextRequest) {
           role: newUser.role,
           planId: newUser.plan_id,
         },
+        workspaceId: workspace.id,
       },
       { status: 201 }
     )
