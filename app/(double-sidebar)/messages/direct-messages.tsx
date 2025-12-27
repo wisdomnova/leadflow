@@ -12,11 +12,15 @@ interface CampaignReply {
   last_reply?: string
 }
 
-export default function DirectMessages() {
+interface Props {
+  selectedReplyId: string | null
+  onSelectReply: (id: string | null) => void
+}
+
+export default function DirectMessages({ selectedReplyId, onSelectReply }: Props) {
   const { setFlyoutOpen } = useFlyoutContext()
   const [token, setToken] = useState<string | null>(null)
   const [replies, setReplies] = useState<CampaignReply[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   useEffect(() => {
     const t = localStorage.getItem('auth_token') || localStorage.getItem('token')
@@ -34,9 +38,12 @@ export default function DirectMessages() {
         headers: { Authorization: `Bearer ${token}` }
       })
       const json = await res.json()
-      setReplies(json.replies || [])
-      if (json.replies?.length > 0) {
-        setSelectedId(json.replies[0].id)
+      const next = json.replies || []
+      setReplies(next)
+      if (next.length === 0) {
+        onSelectReply(null)
+      } else if (!selectedReplyId) {
+        onSelectReply(next[0].id)
       }
     } catch (error) {
       console.error('Failed to load campaign replies:', error)
@@ -54,12 +61,12 @@ export default function DirectMessages() {
             <li key={reply.id} className="-mx-2">
               <button
                 className={`flex items-center justify-between w-full p-2 rounded-sm ${
-                  selectedId === reply.id
+                  selectedReplyId === reply.id
                     ? 'bg-linear-to-r from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'
                     : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
                 onClick={() => {
-                  setSelectedId(reply.id)
+                  onSelectReply(reply.id)
                   setFlyoutOpen(false)
                 }}
               >

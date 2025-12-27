@@ -4,11 +4,11 @@ import MessagesHeader from './messages-header'
 import MessagesChat from './messages-chat'
 import MessagesFooter from './messages-footer'
 
-export default function MessagesBody() {
+export default function MessagesBody({ selectedReplyId }: { selectedReplyId: string | null }) {
   return (
     <div className="grow flex flex-col md:translate-x-0 transition-transform duration-300 ease-in-out">
       <MessagesHeader />
-      <MessagesChat />
+      <MessagesChat selectedReplyId={selectedReplyId} />
       <MessagesFooter />
     </div>
   )

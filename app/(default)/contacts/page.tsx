@@ -175,6 +175,17 @@ export default function ContactsPage() {
         </div>
       </div>
 
+      {!loading && contacts.length === 0 && (
+        <div className="border border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-10 text-center">
+          <p className="text-gray-800 dark:text-gray-100 font-medium mb-2">No contacts yet</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Import or add contacts to start sending campaigns. Once contacts are added, stats and lists will appear here.</p>
+          <div className="flex justify-center gap-3">
+            <Link href="/contacts/import" className="btn bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-700">Import Contacts</Link>
+            <Link href="/contacts/import" className="btn bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-white">Add Manually</Link>
+          </div>
+        </div>
+      )}
+
       {/* Controls */}
       <div className="mb-6 flex flex-col sm:flex-row gap-3">
         <div className="flex-1">

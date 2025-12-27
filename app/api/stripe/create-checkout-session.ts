@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { PLANS } from '@/lib/plans'
 import { calculateAffiliateTier } from '@/lib/affiliate-utils'
 import { getOrCreateAffiliateCoupon } from '@/lib/stripe-affiliate-utils'
+import { rateLimit } from '@/lib/rate-limit'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-11-17.clover',
@@ -16,6 +17,11 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const rl = rateLimit({ key: `checkout:${ip}`, limit: 10, windowMs: 60_000 })
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
     const body = await request.json()
     const { userId, planId, billingCycle = 'monthly', referralCode } = body
 

@@ -1,11 +1,15 @@
 'use client'
 
 import { useFlyoutContext } from '@/app/flyout-context'
-import ChannelMenu from '@/components/channel-menu'
 import DirectMessages from './direct-messages'
 import Channels from './channels'
 
-export default function MessagesSidebar() {
+interface Props {
+  selectedReplyId: string | null
+  onSelectReply: (id: string | null) => void
+}
+
+export default function MessagesSidebar({ selectedReplyId, onSelectReply }: Props) {
   const { flyoutOpen } = useFlyoutContext()
 
   return (
@@ -16,20 +20,13 @@ export default function MessagesSidebar() {
       }`}
     >
       <div className="sticky top-16 bg-white dark:bg-[#151D2C] overflow-x-hidden overflow-y-auto no-scrollbar shrink-0 border-r border-gray-200 dark:border-gray-700/60 md:w-[18rem] xl:w-[20rem] h-[calc(100dvh-64px)]">
-        {/* #Marketing group */}
+        {/* Inbox */}
         <div>
           {/* Group header */}
           <div className="sticky top-0 z-10">
             <div className="flex items-center bg-white dark:bg-[#151D2C] border-b border-gray-200 dark:border-gray-700/60 px-5 h-16">
               <div className="w-full flex items-center justify-between">
-                {/* Channel menu */}
-                <ChannelMenu />
-                {/* Edit button */}
-                <button className="p-1.5 shrink-0 rounded-lg border border-gray-200 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600 shadow-sm ml-2">
-                  <svg className="fill-current text-gray-400 dark:text-gray-500" width="16" height="16" viewBox="0 0 16 16">
-                    <path d="M11.7.3c-.4-.4-1-.4-1.4 0l-10 10c-.2.2-.3.4-.3.7v4c0 .6.4 1 1 1h4c.3 0 .5-.1.7-.3l10-10c.4-.4.4-1 0-1.4l-4-4zM4.6 14H2v-2.6l6-6L10.6 8l-6 6zM12 6.6L9.4 4 11 2.4 13.6 5 12 6.6z" />
-                  </svg>
-                </button>
+                <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">Campaign Replies</div>
               </div>
             </div>
           </div>
@@ -55,7 +52,7 @@ export default function MessagesSidebar() {
               </button>
             </form>
             {/* Direct messages */}
-            <DirectMessages />
+            <DirectMessages selectedReplyId={selectedReplyId} onSelectReply={onSelectReply} />
             {/* Channels */}
             <Channels />
           </div>

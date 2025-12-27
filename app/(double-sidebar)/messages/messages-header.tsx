@@ -1,7 +1,4 @@
 import { useFlyoutContext } from '@/app/flyout-context'
-import Image from 'next/image'
-import User01 from '@/public/images/user-32-01.jpg'
-import User02 from '@/public/images/user-32-07.jpg'
 
 export default function MessagesHeader() {
   const { flyoutOpen, setFlyoutOpen } = useFlyoutContext()
@@ -9,9 +6,7 @@ export default function MessagesHeader() {
   return (
     <div className="sticky top-16">
       <div className="flex items-center justify-between before:absolute before:inset-0 before:backdrop-blur-md before:bg-gray-50/90 dark:before:bg-[#151D2C]/90 before:-z-10 border-b border-gray-200 dark:border-gray-700/60 px-4 sm:px-6 md:px-5 h-16">
-        {/* People */}
         <div className="flex items-center">
-          {/* Close button */}
           <button
             className="md:hidden text-gray-400 hover:text-gray-500 mr-4"
             onClick={() => setFlyoutOpen(!flyoutOpen)}
@@ -23,15 +18,7 @@ export default function MessagesHeader() {
               <path d="M10.7 18.7l1.4-1.4L7.8 13H20v-2H7.8l4.3-4.3-1.4-1.4L4 12z" />
             </svg>
           </button>
-          {/* People list */}
-          <div className="flex -space-x-3 -ml-px">
-            <a className="block" href="#0">
-              <Image className="rounded-full border-2 border-white dark:border-gray-800 box-content" src={User01} width={32} height={32} alt="User 01" />
-            </a>
-            <a className="block" href="#0">
-              <Image className="rounded-full border-2 border-white dark:border-gray-800 box-content" src={User02} width={32} height={32} alt="User 04" />
-            </a>
-          </div>
+          <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">Inbox</div>
         </div>
         {/* Buttons on the right side */}
         <div className="flex">

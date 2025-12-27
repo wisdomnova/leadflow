@@ -31,9 +31,9 @@ export default function SettingsSidebar() {
           <li className="mr-0.5 md:mr-0 md:mb-0.5">
             <Link href="/settings/apps" className={`flex items-center px-2.5 py-2 rounded-lg whitespace-nowrap ${pathname.includes('/settings/apps') && 'bg-linear-to-r from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'}`}>
               <svg className={`shrink-0 fill-current mr-2 ${pathname.includes('/settings/apps') ? 'text-violet-500 dark:text-violet-400' : 'text-gray-400 dark:text-gray-500'}`} width="16" height="16" viewBox="0 0 16 16">
-                <path d="M8 3.414V6a1 1 0 1 1-2 0V1a1 1 0 0 1 1-1h5a1 1 0 0 1 0 2H9.414l6.293 6.293a1 1 0 1 1-1.414 1.414L8 3.414Zm0 9.172V10a1 1 0 1 1 2 0v5a1 1 0 0 1-1 1H4a1 1 0 0 1 0-2h2.586L.293 7.707a1 1 0 0 1 1.414-1.414L8 12.586Z" />
+                <path d="M8 1a1 1 0 0 1 1 1v3h3a1 1 0 1 1 0 2H9v3a1 1 0 1 1-2 0V7H4a1 1 0 1 1 0-2h3V2a1 1 0 0 1 1-1Z" />
               </svg>
-              <span className={`text-sm font-medium ${pathname.includes('/settings/apps') ? 'text-violet-500 dark:text-violet-400' : 'text-gray-600 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200'}`}>Connected Apps</span>
+              <span className={`text-sm font-medium ${pathname.includes('/settings/apps') ? 'text-violet-500 dark:text-violet-400' : 'text-gray-600 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200'}`}>Email Provider</span>
             </Link>
           </li>
           <li className="mr-0.5 md:mr-0 md:mb-0.5">
@@ -56,14 +56,14 @@ export default function SettingsSidebar() {
       </div>
       {/* Group 2 */}
       <div>
-        <div className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-3">Experience</div>
+        <div className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-3">Support</div>
         <ul className="flex flex-nowrap md:block mr-3 md:mr-0">
           <li className="mr-0.5 md:mr-0 md:mb-0.5">
             <Link href="/settings/feedback" className={`flex items-center px-2.5 py-2 rounded-lg whitespace-nowrap ${pathname.includes('/settings/feedback') && 'bg-linear-to-r from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]'}`}>
               <svg className={`shrink-0 fill-current mr-2 ${pathname.includes('/settings/feedback') ? 'text-violet-500 dark:text-violet-400' : 'text-gray-400 dark:text-gray-500'}`} width="16" height="16" viewBox="0 0 16 16">
-                <path d="M14.3.3c.4-.4 1-.4 1.4 0 .4.4.4 1 0 1.4l-8 8c-.2.2-.4.3-.7.3-.3 0-.5-.1-.7-.3-.4-.4-.4-1 0-1.4l8-8zM15 7c.6 0 1 .4 1 1 0 4.4-3.6 8-8 8s-8-3.6-8-8 3.6-8 8-8c.6 0 1 .4 1 1s-.4 1-1 1C4.7 2 2 4.7 2 8s2.7 6 6 6 6-2.7 6-6c0-.6.4-1 1-1z" />
+                <path d="M2 2a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h1.586a1 1 0 0 1 .707.293l1.828 1.828C7.923 15.638 9 15.175 9 14.243V13a1 1 0 0 1 1-1h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2Z" />
               </svg>
-              <span className={`text-sm font-medium ${pathname.includes('/settings/feedback') ? 'text-violet-500 dark:text-violet-400' : 'text-gray-600 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200'}`}>Give Feedback</span>
+              <span className={`text-sm font-medium ${pathname.includes('/settings/feedback') ? 'text-violet-500 dark:text-violet-400' : 'text-gray-600 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200'}`}>Feedback</span>
             </Link>
           </li>
         </ul>

@@ -23,10 +23,10 @@ export default function BasicExamples() {
             {/* Modal content */}
             <div className="px-5 pt-4 pb-1">
               <div className="text-sm">
-                <div className="font-medium text-gray-800 dark:text-gray-100 mb-2">Let's Talk Paragraph</div>
+                <div className="font-medium text-gray-800 dark:text-gray-100 mb-2">Confirm send</div>
                 <div className="space-y-2">
-                  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                  <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+                  <p>Confirm you want to launch this campaign to the selected audience. Warmup caps, provider limits, and unsubscribe checks will be enforced automatically.</p>
+                  <p>If you need to edit recipients or content, close this dialog and adjust the campaign before sending.</p>
                 </div>
               </div>
             </div>
@@ -49,14 +49,14 @@ export default function BasicExamples() {
             {/* Modal content */}
             <div className="px-5 py-4">
               <div className="text-sm">
-                <div className="font-medium text-gray-800 dark:text-gray-100 mb-2">Let's Talk Paragraph</div>
+                <div className="font-medium text-gray-800 dark:text-gray-100 mb-2">Review changes</div>
                 <div className="space-y-2">
-                  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                  <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-                  <p>Ullamcorper malesuada proin libero nunc consequat interdum varius sit. Nec sagittis aliquam malesuada bibendum arcu vitae elementum curabitur vitae. Mattis enim ut tellus elementum el fringilla est ullamcorper eget nulla. Enim eu turpis egestas pretium aenean pharetra magna. Aliquam id diam maecenas ultricies mi eget us mauris vitae ultricies leo integer t malesuada fames ac turpis egestas maecenas pharetra volutpat lacus laoreet non.</p>
-                  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                  <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-                  <p>Ullamcorper malesuada proin libero nunc consequat interdum varius sit. Nec sagittis aliquam malesuada bibendum arcu vitae elementum curabitur vitae. Mattis enim ut tellus elementum el fringilla est ullamcorper eget nulla. Enim eu turpis egestas pretium aenean pharetra magna. Aliquam id diam maecenas ultricies mi eget us mauris vitae ultricies leo integer t malesuada fames ac turpis egestas maecenas pharetra volutpat lacus laoreet non.</p>
+                  <p>Scroll to review what will change: updated subject line, new from address, and a refreshed unsubscribe footer.</p>
+                  <p>We’ll run a final lint for merge tags and links before sending. If anything fails validation, this modal will surface the exact field to fix.</p>
+                  <p>Attachments are not supported; include links instead to avoid spam filters.</p>
+                  <p>Warmup and provider limits still apply. If the batch is larger than your remaining quota, we will queue and resume after reset.</p>
+                  <p>Need to pause? Close and use the campaign status menu to stop sending.</p>
+                  <p>Questions? Open Help from the header to contact support.</p>
                 </div>
               </div>
             </div>
@@ -80,8 +80,8 @@ export default function BasicExamples() {
             {/* Modal content */}
             <div className="text-sm mb-5">
               <div className="space-y-2">
-                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+                <p>We use cookies to keep you signed in, remember workspace context, and measure deliverability. Analytics cookies are limited to product usage and never shared.</p>
+                <p>You can disable non-essential cookies in Settings → Privacy. Essential cookies are required for authentication and billing.</p>
               </div>
             </div>
             {/* Modal footer */}

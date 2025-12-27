@@ -1,0 +1,5 @@
+Contact: security@yourdomain.com
+Policy: https://your-app-url/security
+Acknowledgments: https://your-app-url/security#acknowledgments
+Encryption: https://your-app-url/pgp.txt
+Preferred-Languages: en

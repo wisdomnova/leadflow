@@ -1,88 +1,246 @@
 'use client'
 
-import { useState } from 'react'
-import Image from 'next/image'
-import AccountImage from '@/public/images/user-avatar-80.png'
+import { useEffect, useMemo, useState } from 'react'
+
+type Profile = {
+  fullName: string
+  companyName: string
+  email: string
+  role?: string | null
+  createdAt?: string | null
+  lastLogin?: string | null
+}
 
 export default function AccountPanel() {
+  const [profile, setProfile] = useState<Profile>({
+    fullName: '',
+    companyName: '',
+    email: '',
+    role: '',
+    createdAt: '',
+    lastLogin: '',
+  })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
 
-  const [sync, setSync] = useState<boolean>(false)
+  const initials = useMemo(() => {
+    if (!profile.fullName) return '👤'
+    const parts = profile.fullName.trim().split(' ')
+    return parts
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase())
+      .join('')
+  }, [profile.fullName])
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return '—'
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime())
+      ? '—'
+      : parsed.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setLoading(true)
+        const token = localStorage.getItem('auth_token')
+        if (!token) {
+          setError('You need to sign in to view account details.')
+          return
+        }
+
+        const res = await fetch('/api/settings/profile', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        if (!res.ok) {
+          setError('Unable to load your profile right now.')
+          return
+        }
+
+        const data = await res.json()
+        if (data?.user) {
+          setProfile({
+            fullName: data.user.fullName || '',
+            companyName: data.user.companyName || '',
+            email: data.user.email || '',
+            role: data.user.role,
+            createdAt: data.user.createdAt,
+            lastLogin: data.user.lastLogin,
+          })
+        }
+      } catch (err) {
+        console.error('Profile load failed', err)
+        setError('Unable to load your profile right now.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [])
+
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      setError(null)
+      setSaved(false)
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        setError('You need to sign in to update your account.')
+        return
+      }
+
+      const res = await fetch('/api/settings/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          fullName: profile.fullName,
+          companyName: profile.companyName,
+        }),
+      })
+
+      if (!res.ok) {
+        setError('We could not save your changes. Please try again.')
+        return
+      }
+
+      const data = await res.json()
+      if (data?.user) {
+        setProfile((prev) => ({ ...prev, ...{
+          fullName: data.user.fullName || prev.fullName,
+          companyName: data.user.companyName || prev.companyName,
+        } }))
+        setSaved(true)
+      }
+    } catch (err) {
+      console.error('Profile save failed', err)
+      setError('We could not save your changes. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="grow">
-      {/* Panel body */}
       <div className="p-6 space-y-6">
-        <h2 className="text-2xl text-gray-800 dark:text-gray-100 font-bold mb-5">My Account</h2>
-        {/* Picture */}
-        <section>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h2 className="text-2xl text-gray-800 dark:text-gray-100 font-bold">My Account</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Manage your profile and company details.</p>
+          </div>
           <div className="flex items-center">
-            <div className="mr-4">
-              <Image className="w-20 h-20 rounded-full" src={AccountImage} width={80} height={80} alt="User upload" />
+            <div className="w-12 h-12 rounded-full bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-100 flex items-center justify-center text-sm font-semibold mr-3">
+              {initials}
             </div>
-            <button className="btn-sm dark:bg-gray-800 border-gray-200 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600 text-gray-800 dark:text-gray-300">Change</button>
-          </div>
-        </section>
-        {/* Business Profile */}
-        <section>
-          <h2 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">Business Profile</h2>
-          <div className="text-sm">Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit.</div>
-          <div className="sm:flex sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 mt-5">
-            <div className="sm:w-1/3">
-              <label className="block text-sm font-medium mb-1" htmlFor="name">Business Name</label>
-              <input id="name" className="form-input w-full" type="text" />
-            </div>
-            <div className="sm:w-1/3">
-              <label className="block text-sm font-medium mb-1" htmlFor="business-id">Business ID</label>
-              <input id="business-id" className="form-input w-full" type="text" />
-            </div>
-            <div className="sm:w-1/3">
-              <label className="block text-sm font-medium mb-1" htmlFor="location">Location</label>
-              <input id="location" className="form-input w-full" type="text" />
+            <div>
+              <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">{profile.fullName || '—'}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{profile.email || '—'}</div>
             </div>
           </div>
-        </section>
-        {/* Email */}
-        <section>
-          <h2 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">Email</h2>
-          <div className="text-sm">Excepteur sint occaecat cupidatat non proident sunt in culpa qui officia.</div>
-          <div className="flex flex-wrap mt-5">
-            <div className="mr-2">
-              <label className="sr-only" htmlFor="email">Business email</label>
-              <input id="email" className="form-input" type="email" />
-            </div>
-            <button className="btn dark:bg-gray-800 border-gray-200 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600 text-gray-800 dark:text-gray-300">Change</button>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded">
+            {error}
           </div>
-        </section>
-        {/* Password */}
-        <section>
-          <h2 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">Password</h2>
-          <div className="text-sm">You can set a permanent password if you don't want to use temporary login codes.</div>
-          <div className="mt-5">
-            <button className="btn dark:bg-gray-800 border-gray-200 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600 text-gray-800 dark:text-gray-300">Set New Password</button>
+        )}
+
+        {saved && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-200 px-4 py-3 rounded">
+            Changes saved.
           </div>
-        </section>
-        {/* Smart Sync */}
-        <section>
-          <h2 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold mb-1">Smart Sync update for Mac</h2>
-          <div className="text-sm">With this update, online-only files will no longer appear to take up hard drive space.</div>
-          <div className="flex items-center mt-5">
-            <div className="form-switch">
-              <input type="checkbox" id="toggle" className="sr-only" checked={sync} onChange={() => setSync(!sync)} />
-              <label htmlFor="toggle">
-                <span className="bg-white shadow-sm" aria-hidden="true"></span>
-                <span className="sr-only">Enable smart sync</span>
-              </label>
-            </div>
-            <div className="text-sm text-gray-400 dark:text-gray-500 italic ml-2">{sync ? 'On' : 'Off'}</div>
-          </div>
-        </section>
+        )}
+
+        {loading ? (
+          <div className="text-sm text-gray-500 dark:text-gray-400">Loading profile...</div>
+        ) : (
+          <>
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-1" htmlFor="full-name">Full name</label>
+                <input
+                  id="full-name"
+                  className="form-input w-full"
+                  type="text"
+                  value={profile.fullName}
+                  onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
+                  placeholder="Your name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1" htmlFor="company-name">Company</label>
+                <input
+                  id="company-name"
+                  className="form-input w-full"
+                  type="text"
+                  value={profile.companyName}
+                  onChange={(e) => setProfile({ ...profile, companyName: e.target.value })}
+                  placeholder="Company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1" htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  className="form-input w-full bg-gray-50 dark:bg-gray-800/50"
+                  type="email"
+                  value={profile.email}
+                  readOnly
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Contact support to change your login email.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="text-gray-500 dark:text-gray-400">Role</div>
+                  <div className="font-medium text-gray-800 dark:text-gray-100">{profile.role || '—'}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 dark:text-gray-400">Workspace created</div>
+                  <div className="font-medium text-gray-800 dark:text-gray-100">{formatDate(profile.createdAt)}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 dark:text-gray-400">Last login</div>
+                  <div className="font-medium text-gray-800 dark:text-gray-100">{formatDate(profile.lastLogin)}</div>
+                </div>
+              </div>
+            </section>
+
+            <section className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700/60 p-4">
+              <div>
+                <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">Password</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Reset your password securely.</div>
+              </div>
+              <a className="btn-sm border-gray-200 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600 shadow-sm" href="/auth/reset-password">Reset</a>
+            </section>
+          </>
+        )}
       </div>
-      {/* Panel footer */}
+
       <footer>
         <div className="flex flex-col px-6 py-5 border-t border-gray-200 dark:border-gray-700/60">
           <div className="flex self-end">
-            <button className="btn dark:bg-gray-800 border-gray-200 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600 text-gray-800 dark:text-gray-300">Cancel</button>
-            <button className="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-white ml-3">Save Changes</button>
+            <button
+              className="btn dark:bg-gray-800 border-gray-200 dark:border-gray-700/60 hover:border-gray-300 dark:hover:border-gray-600 text-gray-800 dark:text-gray-300"
+              onClick={() => setProfile({ ...profile })}
+              disabled={loading || saving}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-white ml-3 disabled:opacity-60"
+              onClick={handleSave}
+              disabled={loading || saving}
+            >
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
           </div>
         </div>
       </footer>

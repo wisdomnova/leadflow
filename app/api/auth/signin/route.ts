@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
       .update({ last_login: new Date().toISOString() })
       .eq('id', user.id)
 
-    return NextResponse.json(
+    // Set HTTP-only cookie for auth while returning token for backwards compatibility
+    const res = NextResponse.json(
       {
         success: true,
         token,
@@ -84,6 +85,17 @@ export async function POST(request: NextRequest) {
       },
       { status: 200 }
     )
+
+    const isProd = process.env.NODE_ENV === 'production'
+    res.cookies.set('auth_token', token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    })
+
+    return res
   } catch (error) {
     console.error('Sign in error:', error)
     return NextResponse.json(

@@ -1,17 +1,17 @@
-export const metadata = {
-  title: 'Messages - Mosaic',
-  description: 'Page description',
-}
+"use client"
 
 import { FlyoutProvider } from '@/app/flyout-context'
+import { useState } from 'react'
 import MessagesSidebar from './messages-sidebar'
 import MessagesBody from './messages-body'
 
 function MessagesContent() {
+  const [selectedReplyId, setSelectedReplyId] = useState<string | null>(null)
+
   return (
     <div className="relative flex h-full">
-      <MessagesSidebar />
-      <MessagesBody />
+      <MessagesSidebar selectedReplyId={selectedReplyId} onSelectReply={setSelectedReplyId} />
+      <MessagesBody selectedReplyId={selectedReplyId} />
     </div>
   )
 }

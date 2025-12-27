@@ -14,12 +14,11 @@ interface EmailReply {
   sentiment?: number
 }
 
-export default function MessagesChat() {
+export default function MessagesChat({ selectedReplyId }: { selectedReplyId: string | null }) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { flyoutOpen } = useFlyoutContext()
   const [token, setToken] = useState<string | null>(null)
   const [replies, setReplies] = useState<EmailReply[]>([])
-  const [selectedReplyId, setSelectedReplyId] = useState<string | null>(null)
 
   useEffect(() => {
     const t = localStorage.getItem('auth_token') || localStorage.getItem('token')
@@ -28,16 +27,16 @@ export default function MessagesChat() {
 
   useEffect(() => {
     if (!token || !selectedReplyId) return
-    loadReplies()
+    loadReplies(selectedReplyId)
   }, [token, selectedReplyId])
 
   useEffect(() => {
     !flyoutOpen && messagesEndRef.current?.scrollIntoView()
   }, [flyoutOpen, replies])
 
-  async function loadReplies() {
+  async function loadReplies(replyId: string) {
     try {
-      const res = await fetch(`/api/campaigns/replies/${selectedReplyId}`, {
+      const res = await fetch(`/api/campaigns/replies/${replyId}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       const json = await res.json()

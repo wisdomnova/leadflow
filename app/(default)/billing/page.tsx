@@ -23,6 +23,7 @@ export default function BillingPage() {
       const token = localStorage.getItem('auth_token')
       if (!token) {
         router.push('/auth/signin')
+        setLoading(false)
         return
       }
 
@@ -189,6 +190,13 @@ export default function BillingPage() {
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Billing & Subscription</h1>
         <p className="text-gray-600 dark:text-gray-400">Manage your plan, payment methods, and invoices</p>
       </div>
+
+      {!loading && !subscription && paymentMethodsList.length === 0 && invoicesList.length === 0 && (
+        <div className="mb-8 bg-white dark:bg-gray-800 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-6">
+          <p className="text-gray-800 dark:text-gray-100 font-medium mb-2">No billing data yet</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Choose a plan to add billing details and view invoices here.</p>
+        </div>
+      )}
 
       {/* Current Plan Section */}
       <div className="mb-8 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border border-violet-200 dark:border-violet-800 rounded-lg p-6">

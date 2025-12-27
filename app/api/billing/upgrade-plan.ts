@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const rl = rateLimit({ key: `upgrade:${ip}`, limit: 10, windowMs: 60_000 })
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
     const token = request.headers.get('authorization')?.replace('Bearer ', '')
     
     if (!token) {
@@ -22,6 +28,11 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { planId, billingCycle = 'monthly' } = body
+
+    const validCycles = ['monthly', 'yearly']
+    if (!validCycles.includes(billingCycle)) {
+      return NextResponse.json({ error: 'Invalid billing cycle' }, { status: 400 })
+    }
 
     if (!planId) {
       return NextResponse.json(

@@ -62,16 +62,16 @@ export default function Faqs() {
                     <path className="text-violet-500" d="M15 1H7c-.6 0-1 .4-1 1v11c0 .7-.2 1.4-.6 2H13c1.7 0 3-1.3 3-3V2c0-.6-.4-1-1-1z" />
                   </svg>
                 </div>
-                <h3 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold">How can the widget to my website?</h3>
+                <h3 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold">How do I connect my email provider?</h3>
               </header>
               <div className="pl-7">
-                <div className="mb-2">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam, quis nostrud exercitation ullamco.</div>
+                <div className="mb-2">Go to Settings → Email Provider and choose SES. Add the access key, secret, and region for the verified identity you want to send from. We validate credentials before saving; once verified you can start campaigns immediately.</div>
                 <ul className="flex flex-wrap">
                   <li className="flex items-center after:block after:content-['·'] last:after:content-[''] after:text-sm after:text-gray-400 dark:after:text-gray-600 after:px-2">
-                    <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">General</a>
+                    <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">Email</a>
                   </li>
                   <li className="flex items-center after:block after:content-['·'] last:after:content-[''] after:text-sm after:text-gray-400 dark:after:text-gray-600 after:px-2">
-                    <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">Marketing</a>
+                    <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">Setup</a>
                   </li>
                 </ul>
               </div>
@@ -85,16 +85,16 @@ export default function Faqs() {
                     <path className="text-violet-500" d="M15 1H7c-.6 0-1 .4-1 1v11c0 .7-.2 1.4-.6 2H13c1.7 0 3-1.3 3-3V2c0-.6-.4-1-1-1z" />
                   </svg>
                 </div>
-                <h3 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold">What would happen if I choose not to pay after the usage?</h3>
+                <h3 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold">What happens if I exceed my plan limits?</h3>
               </header>
               <div className="pl-7">
-                <div className="mb-2">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam, quis nostrud exercitation ullamco.</div>
+                <div className="mb-2">We stop new sends once you hit your email or user limits to prevent overages. Upgrade your plan in Settings → Plans or contact billing to request a temporary increase.</div>
                 <ul className="flex flex-wrap">
                   <li className="flex items-center after:block after:content-['·'] last:after:content-[''] after:text-sm after:text-gray-400 dark:after:text-gray-600 after:px-2">
                     <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">Development</a>
                   </li>
                   <li className="flex items-center after:block after:content-['·'] last:after:content-[''] after:text-sm after:text-gray-400 dark:after:text-gray-600 after:px-2">
-                    <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">Acessibility</a>
+                    <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">Accessibility</a>
                   </li>
                 </ul>
               </div>
@@ -111,7 +111,7 @@ export default function Faqs() {
                 <h3 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold">What limitations do trial accounts have?</h3>
               </header>
               <div className="pl-7">
-                <div className="mb-2">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam, quis nostrud exercitation ullamco.</div>
+                <div className="mb-2">Trials include one workspace, up to 200 contacts, and 200 warmup-limited sends. Import, templates, and automations are available; webhooks and custom domains require a paid plan.</div>
                 <ul className="flex flex-wrap">
                   <li className="flex items-center after:block after:content-['·'] last:after:content-[''] after:text-sm after:text-gray-400 dark:after:text-gray-600 after:px-2">
                     <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">Development</a>
@@ -131,10 +131,10 @@ export default function Faqs() {
                     <path className="text-violet-500" d="M15 1H7c-.6 0-1 .4-1 1v11c0 .7-.2 1.4-.6 2H13c1.7 0 3-1.3 3-3V2c0-.6-.4-1-1-1z" />
                   </svg>
                 </div>
-                <h3 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold">Is there any difference between Standard and Plus licenses?</h3>
+                <h3 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold">How are Standard and Plus different?</h3>
               </header>
               <div className="pl-7">
-                <div className="mb-2">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam, quis nostrud exercitation ullamco.</div>
+                <div className="mb-2">Standard includes single-seat access, basic analytics, and warmup. Plus adds multi-seat workspaces, sequences, reply classification, and higher send limits. Both include the customer portal for billing.</div>
                 <ul className="flex flex-wrap">
                   <li className="flex items-center after:block after:content-['·'] last:after:content-[''] after:text-sm after:text-gray-400 dark:after:text-gray-600 after:px-2">
                     <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">Development</a>
@@ -157,7 +157,7 @@ export default function Faqs() {
                 <h3 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold">Is my personal information protected?</h3>
               </header>
               <div className="pl-7">
-                <div className="mb-2">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam, quis nostrud exercitation ullamco.</div>
+                <div className="mb-2">We store credentials encrypted at rest, scope access per workspace, and log all admin actions. Email content and events are retained per your data retention settings; delete a workspace to purge associated data.</div>
                 <ul className="flex flex-wrap">
                   <li className="flex items-center after:block after:content-['·'] last:after:content-[''] after:text-sm after:text-gray-400 dark:after:text-gray-600 after:px-2">
                     <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">General</a>
@@ -177,10 +177,10 @@ export default function Faqs() {
                     <path className="text-violet-500" d="M15 1H7c-.6 0-1 .4-1 1v11c0 .7-.2 1.4-.6 2H13c1.7 0 3-1.3 3-3V2c0-.6-.4-1-1-1z" />
                   </svg>
                 </div>
-                <h3 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold">What can I create with with this product?</h3>
+                <h3 className="text-xl leading-snug text-gray-800 dark:text-gray-100 font-bold">What can I create with this product?</h3>
               </header>
               <div className="pl-7">
-                <div className="mb-2">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam, quis nostrud exercitation ullamco.</div>
+                <div className="mb-2">You can build cold outreach campaigns, multi-step sequences, and transactional updates. Import contacts, apply tags, and use merge fields like firstName and company to personalize each send.</div>
                 <ul className="flex flex-wrap">
                   <li className="flex items-center after:block after:content-['·'] last:after:content-[''] after:text-sm after:text-gray-400 dark:after:text-gray-600 after:px-2">
                     <a className="text-sm font-medium text-violet-500 hover:text-violet-600 dark:hover:text-violet-400" href="#0">Marketing</a>

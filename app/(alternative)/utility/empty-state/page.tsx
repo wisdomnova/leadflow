@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Empty State - Mosaic',
-  description: 'Page description',
+  description: 'Empty state for billing events',
 }
 
 export default function EmptyState() {
@@ -12,14 +12,14 @@ export default function EmptyState() {
 
         {/* Left: Title */}
         <div className="mb-4 sm:mb-0">
-          <h1 className="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Empty State</h1>
+          <h1 className="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">No billing events yet</h1>
         </div>
 
         {/* Right: Actions */}
         <div className="grid grid-flow-col sm:auto-cols-max justify-start sm:justify-end gap-2">
 
           {/* Add event button */}
-          <button className="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-white">Add Event</button>
+          <button className="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-white">Add invoice</button>
 
         </div>
 
@@ -36,9 +36,9 @@ export default function EmptyState() {
                 <path className="text-gray-400 dark:text-gray-500" d="M11 12.294v11l8.486-4.714a1 1 0 00.514-.874V7.295l-9 4.999z" />
               </svg>
             </div>
-            <h2 className="text-2xl text-gray-800 dark:text-gray-100 font-bold mb-2">Pay your bills in just a few clicks</h2>
-            <div className="mb-6">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</div>
-            <button className="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-white">Add Event</button>
+            <h2 className="text-2xl text-gray-800 dark:text-gray-100 font-bold mb-2">Add your first invoice</h2>
+            <div className="mb-6">Invoices, credits, and refunds will appear here once you start billing customers. Connect Stripe and create your first invoice to populate this view.</div>
+            <button className="btn bg-gray-900 text-gray-100 hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-800 dark:hover:bg-white">Create invoice</button>
           </div>
 
         </div>

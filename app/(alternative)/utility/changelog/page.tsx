@@ -82,8 +82,8 @@ export default function Roadmap() {
                     </div>
                   </header>
                   <div className="space-y-3">
-                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-                    <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident.</p>
+                    <p>Production send queue is live with SES dispatch, warmup enforcement, and failure telemetry. Campaign sends now require verified identities, signed unsubscribe links, and retry caps to prevent double-sends.</p>
+                    <p>Security hardening shipped: CSP, strict transport headers, robots/sitemap, and JWT cookies for session continuity across tabs.</p>
                   </div>
                 </div>
               </div>
@@ -113,8 +113,8 @@ export default function Roadmap() {
                     </div>
                   </header>
                   <div className="space-y-3">
-                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-                    <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident.</p>
+                    <p>Notification preferences now reflect shipped channels: campaign replies, inbox messages, send status, warmup health, workspace invites, and product updates.</p>
+                    <p>Header dropdowns updated to remove placeholder notifications and link directly to preferences until in-app alerts arrive.</p>
                   </div>
                 </div>
               </div>
@@ -144,13 +144,13 @@ export default function Roadmap() {
                     </div>
                   </header>
                   <div className="space-y-3">
-                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-                    <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident.</p>
+                    <p>Fixed contact import edge cases, enforced campaign ownership in reply APIs, and tightened status transitions to prevent re-sending completed campaigns.</p>
+                    <p>Warmup cron now seeds daily limits reliably and guards against overages when schedules are missing.</p>
                     <ul className="list-disc list-inside space-y-1">
-                      <li>E-commerce: Better lorem ipsum generator.</li>
-                      <li>Booking: Lorem ipsum post generator.</li>
-                      <li>Retail: Better lorem ipsum generator.</li>
-                      <li>Services: Better lorem ipsum generator.</li>
+                      <li>Billing: Customer portal link shown only when Stripe config is present.</li>
+                      <li>Auth: Session cookie set on sign-in for seamless SSR and API calls.</li>
+                      <li>Notifications: Empty-state dropdown replaces dummy announcements.</li>
+                      <li>Settings: Sidebar trimmed to live features only.</li>
                     </ul>
                   </div>
                 </div>
@@ -181,8 +181,8 @@ export default function Roadmap() {
                     </div>
                   </header>
                   <div className="space-y-3">
-                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-                    <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident.</p>
+                    <p>Thank you to early teams who validated warmup caps, billing flows, and campaign editor edge cases. Your feedback directly shaped the production cut.</p>
+                    <p>We’re now collecting live deliverability telemetry to inform the next round of improvements.</p>
                   </div>
                 </div>
               </div>

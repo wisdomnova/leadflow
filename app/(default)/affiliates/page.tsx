@@ -145,8 +145,19 @@ export default function AffiliatesPage() {
     )
   }
 
-  if (!dashboard) {
-    return null
+  if (!dashboard || !stats || (stats.stats?.total ?? 0) === 0) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-[96rem] mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Affiliate Program</h1>
+          <p className="text-gray-600 dark:text-gray-400">Earn discounts by referring others. Share your unique code and watch your savings grow.</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
+          <p className="text-gray-700 dark:text-gray-200 font-medium mb-2">No referrals yet</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Share your referral link to see performance here. Once you get signups, this dashboard will populate automatically.</p>
+        </div>
+      </div>
+    )
   }
 
   const colors = tierColors[dashboard.currentTier] || tierColors.starter
