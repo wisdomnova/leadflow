@@ -88,20 +88,23 @@ export async function POST(req: Request) {
         to: email,
         subject: 'Verify your LeadFlow account',
         html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #101828;">
-            <h1 style="font-size: 24px; font-weight: 800; margin-bottom: 16px;">Welcome to LeadFlow, ${fullName}!</h1>
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; border: 1px solid #f0f0f0; border-radius: 24px; background-color: #ffffff;">
+            <div style="margin-bottom: 32px;">
+              <img src="https://www.tryleadflow.ai/_next/image?url=%2Fleadflow-black.png&w=256&q=75" alt="Leadflow" style="height: 32px; width: auto;" />
+            </div>
+            <h1 style="font-size: 24px; font-weight: 800; margin-bottom: 16px;">Welcome to Leadflow, ${fullName}!</h1>
             <p style="font-size: 16px; line-height: 1.6; color: #475467; margin-bottom: 24px;">
               Thanks for signing up. Please verify your email address to get started with scaling your outreach.
             </p>
-            <a href="${verificationUrl}" style="display: inline-block; background-color: #101828; color: white; padding: 14px 28px; border-radius: 12px; font-weight: 700; text-decoration: none; margin-bottom: 24px;">
+            <a href="${verificationUrl}" style="display: inline-block; background-color: #745DF3; color: white; padding: 14px 28px; border-radius: 12px; font-weight: 700; text-decoration: none; margin-bottom: 24px; box-shadow: 0 10px 15px -3px rgba(116, 93, 243, 0.2);">
               Verify Email Address
             </a>
             <p style="font-size: 14px; color: #475467;">
               If you didn't create an account, you can safely ignore this email.
             </p>
-            <hr style="border: 0; border-top: 1px solid #eaecf0; margin: 32px 0;" />
+            <hr style="border: 0; border-top: 1px solid #f2f4f7; margin: 32px 0;" />
             <p style="font-size: 12px; color: #667085;">
-              © 2026 LeadFlow. All rights reserved.
+              © 2026 Leadflow. All rights reserved.
             </p>
           </div>
         `

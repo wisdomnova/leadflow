@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth-utils';
+import { getAdminClient } from '@/lib/supabase';
 
 export async function GET() {
   const context = await getSessionContext();
@@ -8,8 +9,9 @@ export async function GET() {
   }
 
   try {
+    const adminSupabase = getAdminClient();
     // 1. Get stats from organizations and referrals
-    const { data: org } = await context.supabase
+    const { data: org } = await adminSupabase
       .from('organizations')
       .select('affiliate_link_code, current_discount_percent, is_affiliate_eligible')
       .eq('id', context.orgId)

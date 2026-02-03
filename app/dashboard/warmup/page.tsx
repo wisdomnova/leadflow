@@ -138,7 +138,7 @@ export default function WarmupPage() {
   };
 
   const filteredAccounts = accounts.filter(acc => 
-    acc.email.toLowerCase().includes(searchQuery.toLowerCase())
+    acc.warmup_enabled && acc.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const stats = [
@@ -477,7 +477,10 @@ export default function WarmupPage() {
                           </div>
                           <span className="text-sm font-bold">Blacklist Status</span>
                         </div>
-                        <span className={`text-[10px] font-black uppercase ${auditState === 'scanning' ? 'text-orange-400' : 'text-emerald-400'}`}>
+                        <span className={`text-[10px] font-black uppercase ${
+                          auditState === 'scanning' ? 'text-orange-400' : 
+                          dashboardStats.avgHealth > 90 ? 'text-emerald-400' : 'text-orange-400'
+                        }`}>
                           {auditState === 'scanning' ? 'Checking...' : dashboardStats.avgHealth > 90 ? 'All Clear' : 'Review Needed'}
                         </span>
                       </div>
@@ -489,7 +492,10 @@ export default function WarmupPage() {
                           </div>
                           <span className="text-sm font-bold">DNS Configuration</span>
                         </div>
-                        <span className={`text-[10px] font-black uppercase ${auditState === 'scanning' ? 'text-orange-400' : dashboardStats.dnsHealthy ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <span className={`text-[10px] font-black uppercase ${
+                          auditState === 'scanning' ? 'text-orange-400' : 
+                          dashboardStats.dnsHealthy ? 'text-emerald-400' : 'text-red-400'
+                        }`}>
                           {auditState === 'scanning' ? 'Verifying...' : dashboardStats.dnsHealthy ? 'Optimized' : 'Needs Setup'}
                         </span>
                       </div>

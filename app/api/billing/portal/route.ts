@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth-utils';
 import { stripe } from '@/lib/stripe-billing';
+import { getAdminClient } from '@/lib/supabase';
 
 export async function POST() {
   const context = await getSessionContext();
@@ -9,7 +10,8 @@ export async function POST() {
   }
 
   try {
-    const { data: org } = await context.supabase
+    const adminSupabase = getAdminClient();
+    const { data: org } = await adminSupabase
       .from('organizations')
       .select('stripe_customer_id')
       .eq('id', context.orgId)

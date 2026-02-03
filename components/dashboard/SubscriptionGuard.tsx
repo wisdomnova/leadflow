@@ -6,7 +6,7 @@ import { AlertCircle, Lock, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SubscriptionGuard({ children }: { children: React.ReactNode }) {
-  const [status, setStatus] = useState<'loading' | 'active' | 'inactive'>('loading');
+  const [status, setStatus] = useState<'loading' | 'active' | 'trialing' | 'inactive'>('loading');
   const router = useRouter();
 
   useEffect(() => {
@@ -14,8 +14,8 @@ export default function SubscriptionGuard({ children }: { children: React.ReactN
       try {
         const res = await fetch('/api/billing/subscription');
         const data = await res.json();
-        if (data.status === 'active') {
-          setStatus('active');
+        if (data.status === 'active' || data.status === 'trialing') {
+          setStatus(data.status);
         } else {
           setStatus('inactive');
         }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth-utils';
 import { stripe, getOrCreateOrgCoupon } from '@/lib/stripe-billing';
+import { getAdminClient } from '@/lib/supabase';
 
 export async function POST(req: Request) {
   const context = await getSessionContext();
@@ -33,7 +34,8 @@ export async function POST(req: Request) {
     }
 
     // 2. Check for affiliate discount
-    const { data: org } = await context.supabase
+    const adminSupabase = getAdminClient();
+    const { data: org } = await adminSupabase
       .from('organizations')
       .select('current_discount_percent, stripe_customer_id')
       .eq('id', context.orgId)
@@ -54,8 +56,8 @@ export async function POST(req: Request) {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing/failed`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription/failed`,
       discounts,
       metadata: {
         org_id: context.orgId,

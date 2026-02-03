@@ -15,7 +15,7 @@ export async function getSessionContext() {
     userId: payload.userId,
     orgId: payload.orgId,
     email: payload.email,
-    role: payload.role,
+    role: (payload as any).app_role || payload.role,
     supabase: createAuthClient(token),
   };
 }

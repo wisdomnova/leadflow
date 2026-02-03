@@ -48,10 +48,28 @@ export default function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('SDR');
   const [isInviting, setIsInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>('SDR'); // Current logged in user's role
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', role: '' });
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
 
   useEffect(() => {
     fetchMembers();
+    fetchCurrentUser();
   }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch('/api/user/profile');
+      if (res.ok) {
+        const data = await res.json();
+        setUserRole(data.user.role);
+      }
+    } catch (err) {
+      console.error("Error fetching current user:", err);
+    }
+  };
 
   const fetchMembers = async () => {
     try {
@@ -93,6 +111,7 @@ export default function TeamPage() {
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsInviting(true);
+    setInviteError(null);
     
     try {
       const res = await fetch('/api/team', {
@@ -108,9 +127,13 @@ export default function TeamPage() {
         await fetchMembers();
         setIsInviteModalOpen(false);
         setInviteEmail('');
+      } else {
+        const data = await res.json();
+        setInviteError(data.error || "Failed to send invitation");
       }
     } catch (err) {
       console.error("Failed to invite:", err);
+      setInviteError("A network error occurred. Please try again.");
     } finally {
       setIsInviting(false);
     }
@@ -123,10 +146,63 @@ export default function TeamPage() {
         if (res.ok) {
           setMembers(members.filter(m => m.id !== id));
           if (selectedMember?.id === id) setShowMemberDetails(false);
+        } else {
+          const data = await res.json();
+          alert(data.error || 'Failed to delete member');
         }
       } catch (err) {
         console.error("Failed to delete member:", err);
       }
+    }
+  };
+
+  const handleUpdateMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/team', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedMember.id,
+          full_name: editForm.name,
+          role: editForm.role
+        })
+      });
+
+      if (res.ok) {
+        await fetchMembers();
+        setIsEditing(false);
+        setSelectedMember({
+          ...selectedMember,
+          name: editForm.name,
+          role: editForm.role
+        });
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to update member');
+      }
+    } catch (err) {
+      console.error("Failed to update member:", err);
+    }
+  };
+
+  const toggleAutoJoin = async () => {
+    setIsUpdatingSettings(true);
+    try {
+      const newVal = !statsData?.org?.autoJoinEnabled;
+      const res = await fetch('/api/team/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoJoinEnabled: newVal })
+      });
+
+      if (res.ok) {
+        await fetchMembers();
+      }
+    } catch (err) {
+      console.error("Failed to update auto-join:", err);
+    } finally {
+      setIsUpdatingSettings(false);
     }
   };
 
@@ -153,25 +229,27 @@ export default function TeamPage() {
                   <Settings className="w-4 h-4 text-[#745DF3]" />
                   Team Settings
                 </button>
-                <button 
-                  onClick={() => setIsInviteModalOpen(true)}
-                  className="flex items-center gap-2 px-5 py-3 bg-[#101828] rounded-2xl text-sm font-bold text-white hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/10 group"
-                >
-                  <UserPlus className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  Invite Member
-                </button>
+                {userRole === 'admin' && (
+                  <button 
+                    onClick={() => setIsInviteModalOpen(true)}
+                    className="flex items-center gap-2 px-5 py-3 bg-[#101828] rounded-2xl text-sm font-bold text-white hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/10 group"
+                  >
+                    <UserPlus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    Invite Member
+                  </button>
+                )}
               </div>
             </div>
 
             {loading ? (
-              <div className="h-64 flex flex-col items-center justify-center bg-white rounded-[2.5rem] border border-gray-100  text-gray-400 gap-4">
-                <Loader2 className="w-8 h-8 animate-spin text-[#745DF3]" />
-                <p className="font-bold text-sm">Loading team data...</p>
+              <div className="flex flex-col items-center justify-center py-20">
+                <Loader2 className="w-10 h-10 text-[#745DF3] animate-spin mb-4" />
+                <p className="text-gray-400 font-medium">Loading organization data...</p>
               </div>
             ) : (
               <>
-                {/* Stat Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {teamStats.map((stat, i) => (
                     <motion.div
                       key={stat.name}
@@ -437,22 +515,22 @@ export default function TeamPage() {
                         <span className="px-3 py-1 bg-[#745DF3] rounded-lg text-[10px] font-black uppercase tracking-widest mb-6 inline-block">Top Performer</span>
                         <div className="flex items-center gap-4 mb-6">
                           <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-xl font-black">
-                            {members[0]?.avatar || 'LF'}
+                            {filteredMembers[0]?.avatar || 'LF'}
                           </div>
                           <div>
-                            <h4 className="text-xl font-black tracking-tight text-white">{members[0]?.name || 'LeadFlow User'}</h4>
-                            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">{members[0]?.role || 'Team Member'}</p>
+                            <h4 className="text-xl font-black tracking-tight text-white">{filteredMembers[0]?.name || 'Leadflow User'}</h4>
+                            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">{filteredMembers[0]?.role || 'Team Member'}</p>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 mt-8">
                           <div className="bg-white/5 rounded-2xl p-4">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 leading-tight">Efficiency</p>
-                            <p className="text-lg font-black tracking-tight text-white">{members[0]?.performance || 0}%</p>
+                            <p className="text-lg font-black tracking-tight text-white">{filteredMembers[0]?.performance || 0}%</p>
                           </div>
                           <div className="bg-white/5 rounded-2xl p-4">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 leading-tight">Reply Rate</p>
-                            <p className="text-lg font-black tracking-tight text-white">{members[0]?.replyRate || '0%'}</p>
+                            <p className="text-lg font-black tracking-tight text-white">{filteredMembers[0]?.replyRate || '0%'}</p>
                           </div>
                         </div>
                       </div>
@@ -525,20 +603,22 @@ export default function TeamPage() {
                 </div>
                 <div className="space-y-6">
                   <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Workspace URL</h4>
+                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Workspace Share Link</h4>
                     <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-400">
-                        app.tryleadflow.ai/{statsData?.org?.slug || 'workspace'}
+                      <div className="flex-1 bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {typeof window !== 'undefined' ? `${window.location.origin}/join/${statsData?.org?.slug}?t=${statsData?.org?.joinToken}` : `loading...`}
                       </div>
                       <button 
                         onClick={() => {
-                          navigator.clipboard.writeText(`app.tryleadflow.ai/${statsData?.org?.slug}`);
+                          const url = `${window.location.origin}/join/${statsData?.org?.slug}?t=${statsData?.org?.joinToken}`;
+                          navigator.clipboard.writeText(url);
                         }}
-                        className="px-4 py-3 bg-[#101828] text-white rounded-xl text-xs font-black hover:bg-[#745DF3] transition-colors"
+                        className="px-4 py-3 bg-[#101828] text-white rounded-xl text-xs font-black hover:bg-[#745DF3] transition-colors shrink-0"
                       >
                         Copy
                       </button>
                     </div>
+                    <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase">Anyone with this link can {statsData?.org?.autoJoinEnabled ? 'join' : 'request access'}</p>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-6 bg-white border border-gray-100 rounded-2xl">
@@ -551,11 +631,27 @@ export default function TeamPage() {
                     <div className="p-6 bg-white border border-gray-100 rounded-2xl">
                       <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Auto-Join</h4>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold text-gray-600">Off</span>
-                        <div className="w-10 h-5 bg-gray-100 rounded-full relative cursor-pointer">
-                          <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full shadow-sm" />
-                        </div>
+                        <span className={`text-sm font-bold ${statsData?.org?.autoJoinEnabled ? 'text-[#745DF3]' : 'text-gray-500'}`}>
+                          {statsData?.org?.autoJoinEnabled ? 'On' : 'Off'}
+                        </span>
+                        <button 
+                          disabled={isUpdatingSettings}
+                          onClick={toggleAutoJoin}
+                          className={`w-12 h-6 rounded-full relative transition-colors ${statsData?.org?.autoJoinEnabled ? 'bg-[#745DF3]' : 'bg-gray-100'} ${isUpdatingSettings ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <motion.div 
+                            animate={{ x: statsData?.org?.autoJoinEnabled ? 24 : 4 }}
+                            className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm flex items-center justify-center" 
+                          >
+                            {isUpdatingSettings && <Loader2 className="w-2.5 h-2.5 text-[#745DF3] animate-spin" />}
+                          </motion.div>
+                        </button>
                       </div>
+                      <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase leading-relaxed">
+                        {statsData?.org?.autoJoinEnabled 
+                          ? 'New members join instantly via link'
+                          : 'Admins must approve link requests'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -694,6 +790,13 @@ export default function TeamPage() {
                     </div>
                   </div>
 
+                  {inviteError && (
+                    <div className="p-4 bg-red-50 rounded-2xl border border-red-100 flex items-center gap-3 text-red-600 animate-shake">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <p className="text-xs font-bold">{inviteError}</p>
+                    </div>
+                  )}
+
                   <button 
                     disabled={isInviting || !inviteEmail}
                     className="w-full py-4 bg-[#101828] text-white rounded-2xl text-sm font-black hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/10 flex items-center justify-center gap-2 disabled:opacity-50"
@@ -746,77 +849,165 @@ export default function TeamPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">
-                {/* Profile Header */}
-                <div className="flex flex-col items-center text-center space-y-4">
-                  <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-[#745DF3] to-[#9281f7] flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-[#745DF3]/20">
-                    {selectedMember.avatar}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-[#101828] tracking-tight">{selectedMember.name}</h3>
-                    <p className="text-gray-500 font-bold">{selectedMember.role}</p>
-                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Online
+                {isEditing ? (
+                  <form onSubmit={handleUpdateMember} className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="w-full px-4 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-[#745DF3]/20 transition-all"
+                      />
                     </div>
-                  </div>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { label: 'Efficiency', value: `${selectedMember.performance}%`, icon: Zap },
-                    { label: 'Campaigns', value: selectedMember.activeCampaigns, icon: Target },
-                    { label: 'Open Rate', value: selectedMember.openRate, icon: TrendingUp },
-                    { label: 'Reply Rate', value: selectedMember.replyRate, icon: BarChart3 },
-                  ].map((stat) => (
-                    <div key={stat.label} className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                      <div className="flex items-center gap-2 mb-2">
-                        <stat.icon className="w-3.5 h-3.5 text-[#745DF3]" />
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stat.label}</span>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Role</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {['SDR', 'Account Executive', 'Manager', 'Admin'].map((role) => (
+                          <button
+                            key={role}
+                            type="button"
+                            onClick={() => setEditForm({ ...editForm, role })}
+                            className={`py-3 px-4 rounded-2xl text-xs font-bold border transition-all ${
+                              editForm.role === role 
+                                ? 'bg-[#745DF3] border-[#745DF3] text-white' 
+                                : 'bg-white border-gray-100 text-gray-500 hover:border-[#745DF3]/30'
+                            }`}
+                          >
+                            {role}
+                          </button>
+                        ))}
                       </div>
-                      <p className="text-xl font-black text-[#101828]">{stat.value}</p>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex gap-3 pt-4">
+                      <button 
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className="flex-1 py-4 bg-gray-50 text-gray-400 rounded-2xl text-sm font-black hover:bg-gray-100 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        type="submit"
+                        className="flex-1 py-4 bg-[#101828] text-white rounded-2xl text-sm font-black hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/10"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    {/* Profile Header */}
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-[#745DF3] to-[#9281f7] flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-[#745DF3]/20">
+                        {selectedMember.avatar}
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-black text-[#101828] tracking-tight">{selectedMember.name}</h3>
+                        <p className="text-gray-500 font-bold">{selectedMember.role}</p>
+                        <div className="mt-2 inline-flex">
+                          {selectedMember.status === 'Active' ? (
+                            <div className="items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest flex">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Authorized
+                            </div>
+                          ) : (
+                            <div className="items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest flex">
+                              <Clock className="w-2.5 h-2.5" />
+                              Pending Invite
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-                {/* Info List */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm font-bold text-[#101828]">{selectedMember.email}</span>
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {[
+                        { label: 'Efficiency', value: `${selectedMember.performance}%`, icon: Zap },
+                        { label: 'Campaigns', value: selectedMember.activeCampaigns, icon: Target },
+                        { label: 'Open Rate', value: selectedMember.openRate, icon: TrendingUp },
+                        { label: 'Reply Rate', value: selectedMember.replyRate, icon: BarChart3 },
+                      ].map((stat) => (
+                        <div key={stat.label} className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                          <div className="flex items-center gap-2 mb-2">
+                            <stat.icon className="w-3.5 h-3.5 text-[#745DF3]" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stat.label}</span>
+                          </div>
+                          <p className="text-xl font-black text-[#101828]">{stat.value}</p>
+                        </div>
+                      ))}
                     </div>
-                    <button className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest">Copy</button>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <ShieldCheck className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm font-bold text-[#101828]">Permissions</span>
-                    </div>
-                    <span className="text-xs font-bold text-gray-500">{selectedMember.role === 'Admin' ? 'Full Access' : 'Standard Access'}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <Clock className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm font-bold text-[#101828]">Joined</span>
-                    </div>
-                    <span className="text-xs font-bold text-gray-500">{selectedMember.joinedDate}</span>
-                  </div>
-                </div>
 
-                {/* Actions */}
-                <div className="pt-4 space-y-3">
-                  <button className="w-full py-4 bg-[#745DF3] text-white rounded-2xl text-sm font-black hover:bg-[#745DF3]/90 transition-all shadow-xl shadow-[#745DF3]/10">
-                    Edit Member Details
-                  </button>
-                  <button 
-                    onClick={() => deleteMember(selectedMember.id)}
-                    className="w-full py-4 bg-white text-rose-500 border border-rose-100 rounded-2xl text-sm font-black hover:bg-rose-50 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Remove from Team
-                  </button>
-                </div>
+                    {/* Info List */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl">
+                        <div className="flex items-center gap-3">
+                          <Mail className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm font-bold text-[#101828]">{selectedMember.email}</span>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedMember.email);
+                            alert('Email copied to clipboard');
+                          }}
+                          className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest hover:underline"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl">
+                        <div className="flex items-center gap-3">
+                          <ShieldCheck className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm font-bold text-[#101828]">Permissions</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-500">{selectedMember.role === 'Admin' ? 'Full Access' : 'Standard Access'}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl">
+                        <div className="flex items-center gap-3">
+                          <Clock className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm font-bold text-[#101828]">Joined</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-500">{selectedMember.joinedDate}</span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-4 space-y-3">
+                      {selectedMember.role === 'Admin' ? (
+                        <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Administrative Protection</p>
+                          <p className="text-xs font-bold text-gray-500 mt-1 px-4">Admin accounts cannot be edited or removed from the dashboard for security reasons.</p>
+                        </div>
+                      ) : userRole !== 'admin' ? (
+                        <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">View Only Mode</p>
+                          <p className="text-xs font-bold text-gray-500 mt-1 px-4">Only administrators have permission to manage team members.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => {
+                              setEditForm({ name: selectedMember.name, role: selectedMember.role });
+                              setIsEditing(true);
+                            }}
+                            className="w-full py-4 bg-[#745DF3] text-white rounded-2xl text-sm font-black hover:bg-[#745DF3]/90 transition-all shadow-xl shadow-[#745DF3]/10"
+                          >
+                            Edit Member Details
+                          </button>
+                          <button 
+                            onClick={() => deleteMember(selectedMember.id)}
+                            className="w-full py-4 bg-white text-rose-500 border border-rose-100 rounded-2xl text-sm font-black hover:bg-rose-50 transition-all flex items-center justify-center gap-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Remove from Team
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </motion.div>
           </div>

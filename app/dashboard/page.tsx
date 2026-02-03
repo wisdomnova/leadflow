@@ -43,6 +43,7 @@ import {
 } from 'recharts';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
+import MissingAccountModal from '@/components/dashboard/MissingAccountModal';
 import { TrialBanner } from '@/components/dashboard/TrialStatus';
 import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
 
@@ -72,27 +73,6 @@ const getEventIcon = (type: string) => {
   return Activity;
 };
 
-const connectedServices = [
-  { 
-    id: 'gmail', 
-    name: 'Email Provider', 
-    email: 'Status: Healthy', 
-    status: 'Connected', 
-    icon: Mail, 
-    color: 'emerald',
-    lastSync: 'Now'
-  },
-  { 
-    id: 'stripe', 
-    name: 'Stripe Billing', 
-    email: 'Active Subscription', 
-    status: 'Healthy', 
-    icon: ShieldCheck, 
-    color: 'emerald',
-    lastSync: 'Syncing'
-  },
-];
-
 export default function DashboardPage() {
   const router = useRouter();
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
@@ -105,10 +85,85 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState<any[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
+  const [trialDays, setTrialDays] = useState<number>(14);
+  const [hasAccounts, setHasAccounts] = useState(false);
+  const [isMissingAccountModalOpen, setIsMissingAccountModalOpen] = useState(false);
+  const [services, setServices] = useState<any[]>([
+    { 
+      id: 'gmail', 
+      name: 'Email Provider', 
+      email: 'Loading status...', 
+      status: 'Connecting', 
+      icon: Mail, 
+      color: 'blue',
+      lastSync: '---'
+    },
+    { 
+      id: 'stripe', 
+      name: 'Stripe Billing', 
+      email: 'Checking billing...', 
+      status: 'Checking', 
+      icon: ShieldCheck, 
+      color: 'blue',
+      lastSync: '---'
+    },
+  ]);
 
   useEffect(() => {
-    Promise.all([fetchStats(), fetchProfile(), fetchActivities()]).finally(() => setLoading(false));
+    Promise.all([
+      fetchStats(), 
+      fetchProfile(), 
+      fetchActivities(),
+      fetchServices()
+    ]).finally(() => setLoading(false));
   }, []);
+
+  const fetchServices = async () => {
+    try {
+      const [accRes, subRes] = await Promise.all([
+        fetch('/api/accounts'),
+        fetch('/api/billing/subscription')
+      ]);
+      
+      if (accRes.ok && subRes.ok) {
+        const accounts = await accRes.json();
+        const subData = await subRes.json();
+
+        setHasAccounts(Array.isArray(accounts) && accounts.length > 0);
+
+        // Calculate trial days if trialing
+        if (subData.trial_ends_at) {
+          const ends = new Date(subData.trial_ends_at);
+          const now = new Date();
+          const diff = Math.ceil((ends.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          setTrialDays(diff > 0 ? diff : 0);
+        }
+
+        setServices([
+          {
+            id: 'email',
+            name: 'Email Provider',
+            email: accounts.length > 0 ? `${accounts.length} Active Accounts` : 'Click to connect your first mailbox',
+            status: accounts.length > 0 ? 'Connected' : 'Setup Required',
+            icon: Mail,
+            color: accounts.length > 0 ? 'emerald' : 'blue',
+            lastSync: accounts.length > 0 ? 'Now' : 'Never'
+          },
+          {
+            id: 'stripe',
+            name: 'Stripe Billing',
+            email: (subData.status === 'active' || subData.status === 'trialing') ? 'Active Subscription' : 'Subscription Required',
+            status: (subData.status === 'active' || subData.status === 'trialing') ? 'Healthy' : 'Inactive',
+            icon: ShieldCheck,
+            color: (subData.status === 'active' || subData.status === 'trialing') ? 'emerald' : 'blue',
+            lastSync: 'Live'
+          }
+        ]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch services:', err);
+    }
+  };
 
   const fetchActivities = async () => {
     setLoadingActivities(true);
@@ -148,14 +203,14 @@ export default function DashboardPage() {
   };
 
   const dashboardStats = statsData ? [
-    { name: 'Total Emails Sent', value: statsData.totalSent.toLocaleString(), change: '', icon: Send },
-    { name: 'Average Open Rate', value: statsData.totalSent > 0 ? `${(statsData.totalOpened / statsData.totalSent * 100).toFixed(1)}%` : '0%', change: '', icon: MousePointer2 },
-    { name: 'Positive Reply Rate', value: statsData.totalSent > 0 ? `${(statsData.totalReplied / statsData.totalSent * 100).toFixed(1)}%` : '0%', change: '', icon: MessageSquare },
-    { name: 'Active Campaigns', value: statsData.activeCampaigns.toString(), change: '', icon: Target },
+    { name: 'Total Emails Sent', value: (statsData.totalSent || 0).toLocaleString(), change: '', icon: Send },
+    { name: 'Average Open Rate', value: (statsData.totalSent || 0) > 0 ? `${((statsData.totalOpened || 0) / statsData.totalSent * 100).toFixed(1)}%` : '0%', change: '', icon: MousePointer2 },
+    { name: 'Average Reply Rate', value: (statsData.totalSent || 0) > 0 ? `${((statsData.totalReplied || 0) / statsData.totalSent * 100).toFixed(1)}%` : '0%', change: '', icon: MessageSquare },
+    { name: 'Active Campaigns', value: (statsData.activeCampaigns || 0).toString(), change: '', icon: Target },
   ] : [
     { name: 'Total Emails Sent', value: '0', change: '', icon: Send },
     { name: 'Average Open Rate', value: '0%', change: '', icon: MousePointer2 },
-    { name: 'Positive Reply Rate', value: '0%', change: '', icon: MessageSquare },
+    { name: 'Average Reply Rate', value: '0%', change: '', icon: MessageSquare },
     { name: 'Active Campaigns', value: '0', change: '', icon: Target },
   ];
 
@@ -199,6 +254,14 @@ export default function DashboardPage() {
     }, 2000);
   };
 
+  const handleCreateCampaignClick = () => {
+    if (!hasAccounts) {
+      setIsMissingAccountModalOpen(true);
+    } else {
+      router.push('/dashboard/campaigns/create');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen bg-[#FBFBFB]">
@@ -221,7 +284,7 @@ export default function DashboardPage() {
           <SubscriptionGuard>
             <div className="max-w-[1400px] mx-auto space-y-10">
             {/* Trial Banner */}
-            <TrialBanner daysRemaining={12} />
+            <TrialBanner daysRemaining={trialDays} />
 
             {/* Notification Toast */}
             <AnimatePresence>
@@ -446,23 +509,45 @@ export default function DashboardPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {dashboardRecentCampaigns.map((campaign: any) => (
-                          <tr key={campaign.id} className="hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => router.push('/dashboard/campaigns')}>
-                            <td className="px-8 py-5">
-                              <span className="font-bold text-[#101828] text-sm group-hover:text-[#745DF3] transition-colors">{campaign.name}</span>
+                        {dashboardRecentCampaigns.length > 0 ? (
+                          dashboardRecentCampaigns.map((campaign: any) => (
+                            <tr key={campaign.id} className="hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => router.push('/dashboard/campaigns')}>
+                              <td className="px-8 py-5">
+                                <span className="font-bold text-[#101828] text-sm group-hover:text-[#745DF3] transition-colors">{campaign.name}</span>
+                              </td>
+                              <td className="px-8 py-5">
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                                  campaign.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'
+                                }`}>
+                                  {campaign.status}
+                                </span>
+                              </td>
+                              <td className="px-8 py-5 font-bold text-[#101828] text-sm">{campaign.sent.toLocaleString()}</td>
+                              <td className="px-8 py-5 font-bold text-[#101828] text-sm">{campaign.replies}</td>
+                              <td className="px-8 py-5 font-bold text-emerald-500 text-sm">{campaign.rate}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} className="px-8 py-20 text-center">
+                              <div className="flex flex-col items-center justify-center space-y-4">
+                                <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300">
+                                  <Send className="w-8 h-8" />
+                                </div>
+                                <div className="max-w-[240px]">
+                                  <p className="text-sm font-black text-[#101828] mb-1">No Active Campaigns</p>
+                                  <p className="text-xs font-bold text-gray-400 leading-relaxed uppercase tracking-widest">Your recent outreach efforts will appear here.</p>
+                                </div>
+                                <button 
+                                  onClick={handleCreateCampaignClick}
+                                  className="px-6 py-3 bg-[#101828] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all"
+                                >
+                                  Create First Campaign
+                                </button>
+                              </div>
                             </td>
-                            <td className="px-8 py-5">
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                                campaign.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'
-                              }`}>
-                                {campaign.status}
-                              </span>
-                            </td>
-                            <td className="px-8 py-5 font-bold text-[#101828] text-sm">{campaign.sent.toLocaleString()}</td>
-                            <td className="px-8 py-5 font-bold text-[#101828] text-sm">{campaign.replies}</td>
-                            <td className="px-8 py-5 font-bold text-emerald-500 text-sm">{campaign.rate}</td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -550,7 +635,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="space-y-4">
-                    {connectedServices.map((service) => (
+                    {services.map((service) => (
                       <div 
                         key={service.id} 
                         className="group flex flex-col p-5 bg-gray-50/50 rounded-3xl border border-gray-100/50 hover:bg-white hover:border-[#745DF3]/20 hover:shadow-xl hover:shadow-[#745DF3]/5 transition-all duration-300"
@@ -609,6 +694,11 @@ export default function DashboardPage() {
           </SubscriptionGuard>
         </div>
       </main>
+
+      <MissingAccountModal 
+        isOpen={isMissingAccountModalOpen}
+        onClose={() => setIsMissingAccountModalOpen(false)}
+      />
     </div>
   );
 }

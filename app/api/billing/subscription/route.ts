@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth-utils';
 import { stripe } from '@/lib/stripe-billing';
+import { getAdminClient } from '@/lib/supabase';
 
 export async function GET() {
   const context = await getSessionContext();
@@ -9,14 +10,24 @@ export async function GET() {
   }
 
   try {
-    const { data: org, error } = await context.supabase
+    const adminSupabase = getAdminClient();
+    const { data: org, error } = await adminSupabase
       .from('organizations')
-      .select('subscription_status, subscription_id, stripe_customer_id, current_discount_percent')
+      .select('subscription_status, subscription_id, stripe_customer_id, current_discount_percent, trial_ends_at')
       .eq('id', context.orgId)
       .single();
 
     if (error || !org) {
-      throw new Error('Organization not found');
+      console.error("Subscription Fetch Error: Organization not found for ID:", context.orgId, error);
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
+
+    // Determine effective status
+    let effectiveStatus = org.subscription_status || 'none';
+    const trialExpired = org.trial_ends_at ? new Date(org.trial_ends_at) < new Date() : true;
+
+    if (effectiveStatus === 'trialing' && !trialExpired) {
+      effectiveStatus = 'active'; // Treat active trial as active
     }
 
     let subscription: any = null;
@@ -66,8 +77,9 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      status: org.subscription_status || 'none',
+      status: effectiveStatus,
       discount: org.current_discount_percent || 0,
+      trial_ends_at: org.trial_ends_at,
       subscription: subscription ? {
         id: subscription.id,
         status: subscription.status,

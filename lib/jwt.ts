@@ -19,6 +19,10 @@ export async function signUserJWT(payload: UserPayload) {
     ...payload,
     // Custom claim for Supabase RLS
     org_id: payload.orgId, 
+    // We override regular Supabase 'role' to 'authenticated' to avoid DB errors,
+    // and put the app-level role in 'app_role'
+    role: 'authenticated',
+    app_role: payload.role
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()

@@ -43,8 +43,26 @@ export default function TemplatesPage() {
   const [sortBy, setSortBy] = useState<'recent' | 'name' | 'performance'>('recent');
   const [starredOnly, setStarredOnly] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [confirmModal, setConfirmModal] = useState<{
+    show: boolean;
+    type: 'duplicate' | 'delete' | null;
+    template: any | null;
+  }>({
+    show: false,
+    type: null,
+    template: null
+  });
 
-  // Form State for Create/Edit
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setActiveMenuId(null);
+    if (activeMenuId) {
+      window.addEventListener('click', handleClickOutside);
+    }
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [activeMenuId]);
   const [formData, setFormData] = useState({
     name: '',
     subject: '',
@@ -125,7 +143,9 @@ export default function TemplatesPage() {
     }
   };
 
-  const handleDuplicate = async (template: any) => {
+  const executeDuplicate = async () => {
+    const template = confirmModal.template;
+    if (!template) return;
     try {
       const res = await fetch('/api/templates', {
         method: 'POST',
@@ -145,18 +165,21 @@ export default function TemplatesPage() {
       if (res.ok) {
         const newTemplate = await res.json();
         setTemplates((prev: any[]) => [newTemplate, ...prev]);
+        setConfirmModal({ show: false, type: null, template: null });
       }
     } catch (error) {
       console.error('Error duplicating template:', error);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this template?')) return;
+  const executeDelete = async () => {
+    const templateId = confirmModal.template?.id;
+    if (!templateId) return;
     try {
-      const res = await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/templates/${templateId}`, { method: 'DELETE' });
       if (res.ok) {
-        setTemplates((prev: any[]) => prev.filter((t: any) => t.id !== id));
+        setTemplates((prev: any[]) => prev.filter((t: any) => t.id !== templateId));
+        setConfirmModal({ show: false, type: null, template: null });
       }
     } catch (error) {
       console.error('Error deleting template:', error);
@@ -488,34 +511,59 @@ export default function TemplatesPage() {
                                   className={`w-4 h-4 ${template.is_starred ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`} 
                                 />
                               </button>
-                              <div className="relative group/menu">
-                                <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50 transition-all">
+                              <div className="relative">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuId(activeMenuId === template.id ? null : template.id);
+                                  }}
+                                  className={`p-1.5 rounded-lg transition-all ${activeMenuId === template.id ? 'bg-[#745DF3]/10 text-[#745DF3]' : 'text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50'}`}
+                                >
                                   <MoreHorizontal className="w-5 h-5" />
                                 </button>
-                                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl border border-gray-100 shadow-xl shadow-gray-200/50 p-2 z-10 hidden group-hover/menu:block border-gray-100">
-                                  <button 
-                                    onClick={() => openEditModal(template)}
-                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-gray-600 hover:text-[#101828] hover:bg-gray-50 rounded-xl transition-all"
-                                  >
-                                    <Edit3 className="w-4 h-4" />
-                                    Edit Template
-                                  </button>
-                                  <button 
-                                    onClick={() => handleDuplicate(template)}
-                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-gray-600 hover:text-[#101828] hover:bg-gray-50 rounded-xl transition-all"
-                                  >
-                                    <Copy className="w-4 h-4" />
-                                    Duplicate
-                                  </button>
-                                  <div className="h-px bg-gray-50 my-1 mx-2" />
-                                  <button 
-                                    onClick={() => handleDelete(template.id)}
-                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                  </button>
-                                </div>
+                                
+                                <AnimatePresence>
+                                  {activeMenuId === template.id && (
+                                    <motion.div 
+                                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                      className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl border border-gray-100 shadow-2xl shadow-gray-200/50 p-2 z-20"
+                                    >
+                                      <button 
+                                        onClick={() => {
+                                          openEditModal(template);
+                                          setActiveMenuId(null);
+                                        }}
+                                        className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-gray-600 hover:text-[#101828] hover:bg-gray-50 rounded-xl transition-all"
+                                      >
+                                        <Edit3 className="w-4 h-4" />
+                                        Edit Template
+                                      </button>
+                                      <button 
+                                        onClick={() => {
+                                          setConfirmModal({ show: true, type: 'duplicate', template });
+                                          setActiveMenuId(null);
+                                        }}
+                                        className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-gray-600 hover:text-[#101828] hover:bg-gray-50 rounded-xl transition-all"
+                                      >
+                                        <Copy className="w-4 h-4" />
+                                        Duplicate
+                                      </button>
+                                      <div className="h-px bg-gray-50 my-1 mx-2" />
+                                      <button 
+                                        onClick={() => {
+                                          setConfirmModal({ show: true, type: 'delete', template });
+                                          setActiveMenuId(null);
+                                        }}
+                                        className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-rose-50 rounded-xl transition-all"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                        Delete
+                                      </button>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
                               </div>
                             </div>
                           </div>
@@ -554,7 +602,7 @@ export default function TemplatesPage() {
                               </span>
                               <div className="flex items-center gap-2">
                                 <button 
-                                  onClick={() => handleDuplicate(template)}
+                                  onClick={() => setConfirmModal({ show: true, type: 'duplicate', template })}
                                   className="p-2 text-gray-400 hover:text-[#745DF3] transition-colors"
                                 >
                                   <Copy className="w-4 h-4" />
@@ -608,7 +656,7 @@ export default function TemplatesPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="relative w-full max-w-6xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-8 pb-4 border-b border-gray-50 flex items-center justify-between">
                 <div>
@@ -692,8 +740,8 @@ export default function TemplatesPage() {
                   </div>
 
                   <div className="space-y-6">
-                    <div className="bg-gray-50 rounded-[2rem] border border-gray-100 p-8 h-full flex flex-col">
-                      <div className="flex items-center justify-between mb-6">
+                    <div className="bg-gray-50 rounded-[2rem] border border-gray-100 p-8 h-full flex flex-col items-center">
+                      <div className="w-full flex items-center justify-between mb-6">
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Preview</span>
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-red-400" />
@@ -702,37 +750,51 @@ export default function TemplatesPage() {
                         </div>
                       </div>
 
-                      <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+                      <motion.div 
+                        animate={{ width: previewMode === 'desktop' ? '100%' : '320px' }}
+                        transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+                        className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col relative"
+                      >
                         <div className="p-4 border-b border-gray-50 bg-gray-50/30">
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1">Subject</p>
                           <p className="text-sm font-bold text-[#101828]">
                             {formData.subject || 'Subject will appear here...'}
                           </p>
                         </div>
-                        <div className="p-6 flex-1 text-sm text-gray-600 leading-relaxed font-medium">
+                        <div className="p-6 flex-1 text-sm text-gray-600 leading-relaxed font-medium overflow-y-auto no-scrollbar">
                           <div className="whitespace-pre-wrap">
                             {formData.body || 'Your email content will be previewed here. Use {{variable_name}} to personalize your messages.'}
                           </div>
                         </div>
-                        <div className="p-4 bg-gray-50/50 border-t border-gray-50 flex items-center gap-4">
-                          <button type="button" className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                            <Monitor className="w-4 h-4" />
-                          </button>
-                          <button type="button" className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                            <Smartphone className="w-4 h-4" />
-                          </button>
-                          <div className="ml-auto flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-gray-400">Variables detected:</span>
-                            <div className="flex gap-1">
-                              {(formData.subject + formData.body).match(/{{(.*?)}}/g)?.map((v, i) => (
-                                <span key={i} className="px-2 py-0.5 bg-[#745DF3]/10 text-[#745DF3] rounded-md text-[9px] font-black">
-                                  {v.replace(/[{}]/g, '')}
-                                </span>
-                              )) || <span className="text-[9px] font-bold text-gray-300 ">None</span>}
+                        <div className="p-4 bg-gray-50/50 border-t border-gray-50 flex flex-col gap-4">
+                          <div className="flex items-center gap-2">
+                            <button 
+                              type="button" 
+                              onClick={() => setPreviewMode('desktop')}
+                              className={`p-2 rounded-lg transition-all ${previewMode === 'desktop' ? 'bg-[#745DF3] text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                              <Monitor className="w-4 h-4" />
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => setPreviewMode('mobile')}
+                              className={`p-2 rounded-lg transition-all ${previewMode === 'mobile' ? 'bg-[#745DF3] text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                              <Smartphone className="w-4 h-4" />
+                            </button>
+                            <div className="ml-auto flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-gray-400">Variables detected:</span>
+                              <div className="flex gap-1 flex-wrap justify-end">
+                                {(formData.subject + formData.body).match(/{{(.*?)}}/g)?.map((v, i) => (
+                                  <span key={i} className="px-2 py-0.5 bg-[#745DF3]/10 text-[#745DF3] rounded-md text-[9px] font-black">
+                                    {v.replace(/[{}]/g, '')}
+                                  </span>
+                                )) || <span className="text-[9px] font-bold text-gray-300 ">None</span>}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     </div>
                   </div>
                 </form>
@@ -765,6 +827,61 @@ export default function TemplatesPage() {
                     {editingTemplate ? 'Save Template' : 'Create Template'}
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {confirmModal.show && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConfirmModal({ show: false, type: null, template: null })}
+              className="absolute inset-0 bg-[#101828]/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl p-10 text-center"
+            >
+              <div className={`w-20 h-20 rounded-3xl mx-auto mb-6 flex items-center justify-center ${
+                confirmModal.type === 'delete' ? 'bg-rose-50 text-rose-500' : 'bg-[#745DF3]/5 text-[#745DF3]'
+              }`}>
+                {confirmModal.type === 'delete' ? <Trash2 className="w-10 h-10" /> : <Copy className="w-10 h-10" />}
+              </div>
+              
+              <h3 className="text-2xl font-black text-[#101828] mb-2">
+                {confirmModal.type === 'delete' ? 'Delete Template?' : 'Duplicate Template?'}
+              </h3>
+              <p className="text-gray-500 font-medium mb-10">
+                {confirmModal.type === 'delete' 
+                  ? `Are you sure you want to delete "${confirmModal.template?.name}"? This action cannot be undone.` 
+                  : `Would you like to create a copy of "${confirmModal.template?.name}"?`}
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => setConfirmModal({ show: false, type: null, template: null })}
+                  className="px-6 py-4 bg-gray-50 text-gray-400 rounded-2xl text-sm font-black hover:bg-gray-100 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmModal.type === 'delete' ? executeDelete : executeDuplicate}
+                  className={`px-6 py-4 rounded-2xl text-sm font-black text-white shadow-xl transition-all ${
+                    confirmModal.type === 'delete' 
+                      ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-200' 
+                      : 'bg-[#101828] hover:bg-[#101828]/90 shadow-gray-200'
+                  }`}
+                >
+                  {confirmModal.type === 'delete' ? 'Confirm Delete' : 'Confirm Duplicate'}
+                </button>
               </div>
             </motion.div>
           </div>

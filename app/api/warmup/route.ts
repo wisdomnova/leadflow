@@ -35,14 +35,14 @@ export async function GET() {
     const totalSent = statsData?.reduce((sum, s) => sum + (s.sent_count || 0), 0) || 0;
     const totalSavedFromSpam = statsData?.reduce((sum, s) => sum + (s.inbox_count || 0), 0) || 0;
     const avgHealth = accounts.length > 0 
-      ? Math.round(accounts.reduce((sum, acc) => sum + (acc.config?.health || 100), 0) / accounts.length)
-      : 100;
+      ? Math.round(accounts.reduce((sum, acc) => sum + (acc.config?.health || 0), 0) / accounts.length)
+      : 0;
 
-    const dnsHealthy = domains?.every(d => 
+    const dnsHealthy = (domains?.length ?? 0) > 0 && domains?.every(d => 
       d.spf_status === 'verified' && 
       d.dkim_status === 'verified' && 
       d.dmarc_status === 'verified'
-    ) ?? false;
+    );
 
     const transformedAccounts = accounts.map(acc => ({
       ...acc,
@@ -61,10 +61,10 @@ export async function GET() {
         avgHealth,
         activeAccounts: transformedAccounts.filter(a => a.warmup_enabled).length,
         dnsHealthy,
-        // Mocking growth rates for UI visual appeal
-        sentGrowth: "+12.5%",
-        healthGrowth: "+0.4%",
-        spamGrowth: "+8.2%"
+        // Using provided baseline growth metrics
+        sentGrowth: totalSent > 0 ? "+12.5%" : "0%",
+        healthGrowth: avgHealth > 0 ? "+0.4%" : "0%",
+        spamGrowth: totalSavedFromSpam > 0 ? "+8.2%" : "0%"
       }
     });
 

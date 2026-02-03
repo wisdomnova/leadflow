@@ -179,7 +179,7 @@ export default function BillingPage() {
                     <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500">
                       <Check className="w-4 h-4" />
                     </div>
-                    <p className="text-sm font-bold tracking-tight">{notificationMsg}</p>
+                    <p className="text-sm font-bold tracking-tight text-white">{notificationMsg}</p>
                   </motion.div>
                 )}
               </AnimatePresence>

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
 import SMTPModal from '@/components/dashboard/SMTPModal';
+import DNSGuideModal from '@/components/dashboard/DNSGuideModal';
 import { 
   Plus, 
   Info, 
@@ -80,6 +81,7 @@ export default function EmailProvidersPage() {
   const [selectedSender, setSelectedSender] = useState('');
   const [isAddingAccount, setIsAddingAccount] = useState<string | null>(null);
   const [isSMTPModalOpen, setIsSMTPModalOpen] = useState(false);
+  const [isDNSGuideOpen, setIsDNSGuideOpen] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [domainSearch, setDomainSearch] = useState('');
 
@@ -168,34 +170,11 @@ export default function EmailProvidersPage() {
   const handleConnectProvider = async (name: string) => {
     setIsAddingAccount(name);
     
-    // In a real app, this would redirect to OAuth
-    // For now, we'll simulate account connection via API
-    try {
-      const email = `${name.toLowerCase()}@acme-${Math.floor(Math.random() * 1000)}.com`;
-      const providerKey = name.toLowerCase().includes('google') ? 'google' : 'outlook';
-      
-      const res = await fetch('/api/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          provider: providerKey,
-          config: {}
-        })
-      });
-
-      if (res.ok) {
-        const newAcc = await res.json();
-        setAccounts(prev => [newAcc, ...prev]);
-      } else {
-        const err = await res.json();
-        alert(err.error || "Failed to connect account");
-      }
-    } catch (err) {
-      console.error("Connect error:", err);
-    } finally {
-      setIsAddingAccount(null);
-    }
+    // Determine the OAuth route based on the provider name
+    const providerKey = name.toLowerCase().includes('google') ? 'gmail' : 'outlook';
+    
+    // Redirect to our internal API route which handles the state and initial OAuth redirect
+    window.location.href = `/api/auth/oauth/${providerKey}`;
   };
 
   const handleConnectSMTP = async (data: any) => {
@@ -577,7 +556,10 @@ export default function EmailProvidersPage() {
                           <p className="text-xs text-gray-300 leading-relaxed font-medium">
                             We recommend using a <span className="text-white font-black underline decoration-[#745DF3] decoration-2">separate subdomain</span> for outreach to protect your root domain's reputation.
                           </p>
-                          <button className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                          <button 
+                            onClick={() => setIsDNSGuideOpen(true)}
+                            className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                          >
                             Read DNS Guide
                           </button>
                         </div>
@@ -871,6 +853,11 @@ export default function EmailProvidersPage() {
         isOpen={isSMTPModalOpen}
         onClose={() => setIsSMTPModalOpen(false)}
         onConnect={handleConnectSMTP}
+      />
+
+      <DNSGuideModal 
+        isOpen={isDNSGuideOpen}
+        onClose={() => setIsDNSGuideOpen(false)}
       />
     </div>
   );

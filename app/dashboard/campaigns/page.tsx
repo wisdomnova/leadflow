@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
 import ConfirmModal from '@/components/dashboard/ConfirmModal';
+import MissingAccountModal from '@/components/dashboard/MissingAccountModal';
 import { 
   Send, 
   Plus, 
@@ -31,86 +32,19 @@ import {
   RotateCcw
 } from 'lucide-react';
 
-const campaignStats = [
-  { name: 'Active Campaigns', value: '12', change: '+2', icon: Send },
-  { name: 'Total Prospects', value: '45,802', change: '+2.4k', icon: Users },
-  { name: 'Avg. Open Rate', value: '64.2%', change: '+3.1%', icon: TrendingUp },
-  { name: 'Avg. Reply Rate', value: '18.5%', change: '+1.2%', icon: Target },
-];
-
-const initialMockCampaigns = [
-  {
-    id: 1,
-    name: 'SaaS Founders - Series A',
-    status: 'Sending',
-    leads: 1240,
-    sent: 840,
-    opened: '72%',
-    replied: '14%',
-    progress: 68,
-    tags: ['Outbound', 'LinkedIn'],
-    updatedAt: '2 hours ago'
-  },
-  {
-    id: 2,
-    name: 'Enterprise CTOs - Q1 Outreach',
-    status: 'Paused',
-    leads: 2500,
-    sent: 1200,
-    opened: '61%',
-    replied: '9%',
-    progress: 48,
-    tags: ['Cold Email'],
-    updatedAt: '5 hours ago'
-  },
-  {
-    id: 3,
-    name: 'Growth Agencies - APAC',
-    status: 'Completed',
-    leads: 850,
-    sent: 850,
-    opened: '84%',
-    replied: '22%',
-    progress: 100,
-    tags: ['Agency', 'APAC'],
-    updatedAt: '1 day ago'
-  },
-  {
-    id: 4,
-    name: 'Real Estate Brokers - Florida',
-    status: 'Draft',
-    leads: 0,
-    sent: 0,
-    opened: '0%',
-    replied: '0%',
-    progress: 0,
-    tags: ['Real Estate'],
-    updatedAt: '3 days ago'
-  },
-  {
-    id: 5,
-    name: 'Fintech Executives',
-    status: 'Scheduled',
-    leads: 1800,
-    sent: 0,
-    opened: '0%',
-    replied: '0%',
-    progress: 0,
-    tags: ['Finance'],
-    updatedAt: '4 days ago'
-  }
-];
-
 const statusFilters = ['All', 'Sending', 'Paused', 'Scheduled', 'Draft', 'Completed'];
 
 export default function CampaignsPage() {
   const router = useRouter();
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [statsData, setStatsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isMissingAccountModalOpen, setIsMissingAccountModalOpen] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<number | null>(null);
   
   const menuRef = useRef<HTMLDivElement>(null);
@@ -129,13 +63,28 @@ export default function CampaignsPage() {
 
   const fetchCampaigns = async () => {
     try {
-      const resp = await fetch('/api/campaigns');
-      if (resp.ok) {
-        const data = await resp.json();
-        setCampaigns(data);
+      const [campaignsRes, accountsRes, statsRes] = await Promise.all([
+        fetch('/api/campaigns'),
+        fetch('/api/accounts'),
+        fetch('/api/stats')
+      ]);
+      
+      if (campaignsRes.ok) {
+        const data = await campaignsRes.json();
+        setCampaigns(Array.isArray(data) ? data : []);
+      }
+      
+      if (accountsRes.ok) {
+        const data = await accountsRes.json();
+        setAccounts(Array.isArray(data) ? data : []);
+      }
+
+      if (statsRes.ok) {
+        const data = await statsRes.json();
+        setStatsData(data);
       }
     } catch (err) {
-      console.error("Failed to fetch campaigns", err);
+      console.error("Failed to fetch dashboard data", err);
     } finally {
       setLoading(false);
     }
@@ -179,11 +128,19 @@ export default function CampaignsPage() {
     }
   };
 
-  const activeCampaigns = campaigns.filter(c => c.status === 'running').length;
-  const totalLeads = campaigns.reduce((acc, c) => acc + (c.total_leads || 0), 0);
-  const totalSent = campaigns.reduce((acc, c) => acc + (c.sent_count || 0), 0);
-  const totalOpened = campaigns.reduce((acc, c) => acc + (c.open_count || 0), 0);
-  const totalReplied = campaigns.reduce((acc, c) => acc + (c.reply_count || 0), 0);
+  const handleCreateCampaignClick = () => {
+    if (accounts.length === 0) {
+      setIsMissingAccountModalOpen(true);
+    } else {
+      router.push('/dashboard/campaigns/create');
+    }
+  };
+
+  const activeCampaigns = statsData?.activeCampaigns ?? campaigns.filter(c => c.status === 'running').length;
+  const totalLeads = statsData?.totalLeads ?? campaigns.reduce((acc, c) => acc + (c.total_leads || 0), 0);
+  const totalSent = statsData?.totalSent ?? campaigns.reduce((acc, c) => acc + (c.sent_count || 0), 0);
+  const totalOpened = statsData?.totalOpened ?? campaigns.reduce((acc, c) => acc + (c.open_count || 0), 0);
+  const totalReplied = statsData?.totalReplied ?? campaigns.reduce((acc, c) => acc + (c.reply_count || 0), 0);
 
   const avgOpenRate = totalSent > 0 ? (totalOpened / totalSent) * 100 : 0;
   const avgReplyRate = totalSent > 0 ? (totalReplied / totalSent) * 100 : 0;
@@ -191,8 +148,8 @@ export default function CampaignsPage() {
   const currentStats = [
     { name: 'Active Campaigns', value: activeCampaigns.toString(), change: '', icon: Send },
     { name: 'Total Prospects', value: totalLeads.toLocaleString(), change: '', icon: Users },
-    { name: 'Avg. Open Rate', value: `${avgOpenRate.toFixed(1)}%`, change: '', icon: TrendingUp },
-    { name: 'Avg. Reply Rate', value: `${avgReplyRate.toFixed(1)}%`, change: '', icon: Target },
+    { name: 'Average Open Rate', value: `${avgOpenRate.toFixed(1)}%`, change: '', icon: TrendingUp },
+    { name: 'Average Reply Rate', value: `${avgReplyRate.toFixed(1)}%`, change: '', icon: Target },
   ];
 
   const filteredCampaigns = campaigns.filter(c => {
@@ -248,15 +205,43 @@ export default function CampaignsPage() {
                   <BarChart3 className="w-4 h-4 text-[#745DF3]" />
                   Global Analytics
                 </button>
-                <Link 
-                  href="/dashboard/campaigns/create"
+                <button 
+                  onClick={handleCreateCampaignClick}
                   className="flex items-center gap-2 px-5 py-3 bg-[#101828] rounded-2xl text-sm font-bold text-white hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/10 group"
                 >
                   <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
                   New Campaign
-                </Link>
+                </button>
               </div>
             </div>
+
+            {/* Warning Banner if no accounts */}
+            {!loading && accounts.length === 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-amber-50 border border-amber-200 rounded-[28px] p-6 mb-2"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                    <AlertCircle className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-amber-900 font-bold text-lg mb-1">No sending profiles connected</h3>
+                    <p className="text-amber-700 font-medium mb-4">
+                      You haven't connected any sending accounts yet. You need at least one active sender profile to launch a campaign.
+                    </p>
+                    <Link 
+                      href="/dashboard/providers"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-amber-600/20"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Connect Sender Profile
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             {/* Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -500,13 +485,13 @@ export default function CampaignsPage() {
                     </div>
                     <h3 className="text-xl font-black text-[#101828]">No campaigns found</h3>
                     <p className="text-gray-500 font-medium mt-2 max-w-xs">Ready to scale? Create your first campaign and start reaching out.</p>
-                    <Link 
-                      href="/dashboard/campaigns/create"
+                    <button 
+                      onClick={handleCreateCampaignClick}
                       className="mt-6 inline-flex items-center gap-2 px-8 py-4 bg-[#101828] text-white rounded-2xl font-black shadow-xl shadow-[#101828]/10 hover:-translate-y-0.5 transition-all"
                     >
                       <Plus className="w-5 h-5" />
                       Create Campaign
-                    </Link>
+                    </button>
                   </div>
                 ) : (filteredCampaigns.length === 0 && (
                   <div className="py-24 flex flex-col items-center justify-center text-center px-6 border-t border-gray-50">
@@ -539,6 +524,11 @@ export default function CampaignsPage() {
         description="Are you sure you want to delete this campaign? All sequence history, lead status data, and analytics for this campaign will be permanently removed. This action cannot be reversed."
         confirmText="Yes, delete campaign"
         type="danger"
+      />
+
+      <MissingAccountModal 
+        isOpen={isMissingAccountModalOpen}
+        onClose={() => setIsMissingAccountModalOpen(false)}
       />
     </div>
   );
