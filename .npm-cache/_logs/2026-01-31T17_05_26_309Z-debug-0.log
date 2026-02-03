@@ -1,0 +1,983 @@
+0 verbose cli /usr/local/bin/node /usr/local/bin/npm
+1 info using npm@10.9.3
+2 info using node@v22.19.0
+3 silly config load:file:/usr/local/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/user/leadflow/.npmrc
+5 silly config load:file:/Users/user/.npmrc
+6 silly config load:file:/usr/local/etc/npmrc
+7 verbose title npm install nodemailer imapflow dns-packet
+8 verbose argv "install" "nodemailer" "imapflow" "dns-packet" "--cache" "./.npm-cache"
+9 verbose logfile logs-max:10 dir:/Users/user/leadflow/.npm-cache/_logs/2026-01-31T17_05_26_309Z-
+10 verbose logfile /Users/user/leadflow/.npm-cache/_logs/2026-01-31T17_05_26_309Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+13 silly idealTree buildDeps
+14 silly fetch manifest nodemailer@*
+15 silly packumentCache full:https://registry.npmjs.org/nodemailer cache-miss
+16 verbose shrinkwrap failed to load node_modules/.package-lock.json out of date, updated: node_modules
+17 http fetch GET 200 https://registry.npmjs.org/npm 4823ms
+18 http fetch GET 200 https://registry.npmjs.org/nodemailer 8196ms (cache miss)
+19 silly packumentCache full:https://registry.npmjs.org/nodemailer set size:undefined disposed:false
+20 silly fetch manifest imapflow@*
+21 silly packumentCache full:https://registry.npmjs.org/imapflow cache-miss
+22 http fetch GET 200 https://registry.npmjs.org/imapflow 11610ms (cache miss)
+23 silly packumentCache full:https://registry.npmjs.org/imapflow set size:undefined disposed:false
+24 silly fetch manifest dns-packet@*
+25 silly packumentCache full:https://registry.npmjs.org/dns-packet cache-miss
+26 http fetch GET 200 https://registry.npmjs.org/dns-packet 825ms (cache miss)
+27 silly packumentCache full:https://registry.npmjs.org/dns-packet set size:undefined disposed:false
+28 silly placeDep ROOT dns-packet@5.6.1 OK for: leadflow@0.1.0 want: *
+29 silly placeDep ROOT imapflow@1.2.8 OK for: leadflow@0.1.0 want: *
+30 silly placeDep ROOT nodemailer@7.0.13 OK for: leadflow@0.1.0 want: *
+31 silly fetch manifest @leichtgewicht/ip-codec@^2.0.1
+32 silly packumentCache full:https://registry.npmjs.org/@leichtgewicht%2fip-codec cache-miss
+33 silly fetch manifest @zone-eu/mailsplit@5.4.8
+34 silly packumentCache full:https://registry.npmjs.org/@zone-eu%2fmailsplit cache-miss
+35 silly fetch manifest encoding-japanese@2.2.0
+36 silly packumentCache full:https://registry.npmjs.org/encoding-japanese cache-miss
+37 silly fetch manifest iconv-lite@0.7.2
+38 silly packumentCache full:https://registry.npmjs.org/iconv-lite cache-miss
+39 silly fetch manifest libbase64@1.3.0
+40 silly packumentCache full:https://registry.npmjs.org/libbase64 cache-miss
+41 silly fetch manifest libmime@5.3.7
+42 silly packumentCache full:https://registry.npmjs.org/libmime cache-miss
+43 silly fetch manifest libqp@2.1.1
+44 silly packumentCache full:https://registry.npmjs.org/libqp cache-miss
+45 http fetch GET 200 https://registry.npmjs.org/@zone-eu%2fmailsplit 360ms (cache miss)
+46 silly packumentCache full:https://registry.npmjs.org/@zone-eu%2fmailsplit set size:undefined disposed:false
+47 silly fetch manifest nodemailer@7.0.13
+48 silly packumentCache full:https://registry.npmjs.org/nodemailer cache-miss
+49 http cache https://registry.npmjs.org/nodemailer 9ms (cache hit)
+50 silly packumentCache full:https://registry.npmjs.org/nodemailer set size:558326 disposed:false
+51 silly fetch manifest pino@10.3.0
+52 silly packumentCache full:https://registry.npmjs.org/pino cache-miss
+53 http fetch GET 200 https://registry.npmjs.org/@leichtgewicht%2fip-codec 563ms (cache miss)
+54 silly packumentCache full:https://registry.npmjs.org/@leichtgewicht%2fip-codec set size:undefined disposed:false
+55 silly fetch manifest socks@2.8.7
+56 silly packumentCache full:https://registry.npmjs.org/socks cache-miss
+57 http fetch GET 200 https://registry.npmjs.org/pino 852ms (cache miss)
+58 silly packumentCache full:https://registry.npmjs.org/pino set size:undefined disposed:false
+59 http fetch GET 200 https://registry.npmjs.org/libbase64 2392ms (cache miss)
+60 silly packumentCache full:https://registry.npmjs.org/libbase64 set size:undefined disposed:false
+61 http fetch GET 200 https://registry.npmjs.org/libqp 2393ms (cache miss)
+62 silly packumentCache full:https://registry.npmjs.org/libqp set size:undefined disposed:false
+63 http fetch GET 200 https://registry.npmjs.org/libmime 2398ms (cache miss)
+64 silly packumentCache full:https://registry.npmjs.org/libmime set size:undefined disposed:false
+65 http fetch GET 200 https://registry.npmjs.org/iconv-lite 2470ms (cache miss)
+66 silly packumentCache full:https://registry.npmjs.org/iconv-lite set size:undefined disposed:false
+67 http fetch GET 200 https://registry.npmjs.org/encoding-japanese 2473ms (cache miss)
+68 silly packumentCache full:https://registry.npmjs.org/encoding-japanese set size:undefined disposed:false
+69 http fetch GET 200 https://registry.npmjs.org/socks 1911ms (cache miss)
+70 silly packumentCache full:https://registry.npmjs.org/socks set size:undefined disposed:false
+71 silly placeDep ROOT @leichtgewicht/ip-codec@2.0.5 OK for: dns-packet@5.6.1 want: ^2.0.1
+72 silly placeDep ROOT @zone-eu/mailsplit@5.4.8 OK for: imapflow@1.2.8 want: 5.4.8
+73 silly placeDep ROOT encoding-japanese@2.2.0 OK for: imapflow@1.2.8 want: 2.2.0
+74 silly placeDep ROOT iconv-lite@0.7.2 OK for: imapflow@1.2.8 want: 0.7.2
+75 silly placeDep ROOT libbase64@1.3.0 OK for: imapflow@1.2.8 want: 1.3.0
+76 silly placeDep ROOT libmime@5.3.7 OK for: imapflow@1.2.8 want: 5.3.7
+77 silly placeDep ROOT libqp@2.1.1 OK for: imapflow@1.2.8 want: 2.1.1
+78 silly placeDep ROOT pino@10.3.0 OK for: imapflow@1.2.8 want: 10.3.0
+79 silly placeDep ROOT socks@2.8.7 OK for: imapflow@1.2.8 want: 2.8.7
+80 silly fetch manifest safer-buffer@>= 2.1.2 < 3.0.0
+81 silly packumentCache full:https://registry.npmjs.org/safer-buffer cache-miss
+82 silly fetch manifest iconv-lite@0.6.3
+83 silly packumentCache full:https://registry.npmjs.org/iconv-lite cache-miss
+84 silly fetch manifest atomic-sleep@^1.0.0
+85 silly packumentCache full:https://registry.npmjs.org/atomic-sleep cache-miss
+86 silly fetch manifest on-exit-leak-free@^2.1.0
+87 silly packumentCache full:https://registry.npmjs.org/on-exit-leak-free cache-miss
+88 silly fetch manifest pino-abstract-transport@^3.0.0
+89 silly packumentCache full:https://registry.npmjs.org/pino-abstract-transport cache-miss
+90 silly fetch manifest pino-std-serializers@^7.0.0
+91 silly packumentCache full:https://registry.npmjs.org/pino-std-serializers cache-miss
+92 silly fetch manifest process-warning@^5.0.0
+93 silly packumentCache full:https://registry.npmjs.org/process-warning cache-miss
+94 http cache https://registry.npmjs.org/iconv-lite 9ms (cache hit)
+95 silly packumentCache full:https://registry.npmjs.org/iconv-lite set size:120557 disposed:false
+96 silly fetch manifest quick-format-unescaped@^4.0.3
+97 silly packumentCache full:https://registry.npmjs.org/quick-format-unescaped cache-miss
+98 http fetch GET 200 https://registry.npmjs.org/atomic-sleep 257ms (cache miss)
+99 silly packumentCache full:https://registry.npmjs.org/atomic-sleep set size:undefined disposed:false
+100 silly fetch manifest real-require@^0.2.0
+101 silly packumentCache full:https://registry.npmjs.org/real-require cache-miss
+102 http fetch GET 200 https://registry.npmjs.org/pino-abstract-transport 259ms (cache miss)
+103 silly packumentCache full:https://registry.npmjs.org/pino-abstract-transport set size:undefined disposed:false
+104 silly fetch manifest safe-stable-stringify@^2.3.1
+105 silly packumentCache full:https://registry.npmjs.org/safe-stable-stringify cache-miss
+106 http fetch GET 200 https://registry.npmjs.org/process-warning 260ms (cache miss)
+107 silly packumentCache full:https://registry.npmjs.org/process-warning set size:undefined disposed:false
+108 silly fetch manifest @pinojs/redact@^0.4.0
+109 silly packumentCache full:https://registry.npmjs.org/@pinojs%2fredact cache-miss
+110 http fetch GET 200 https://registry.npmjs.org/on-exit-leak-free 583ms (cache miss)
+111 silly packumentCache full:https://registry.npmjs.org/on-exit-leak-free set size:undefined disposed:false
+112 silly fetch manifest sonic-boom@^4.0.1
+113 silly packumentCache full:https://registry.npmjs.org/sonic-boom cache-miss
+114 http fetch GET 200 https://registry.npmjs.org/quick-format-unescaped 851ms (cache miss)
+115 silly packumentCache full:https://registry.npmjs.org/quick-format-unescaped set size:undefined disposed:false
+116 silly fetch manifest thread-stream@^4.0.0
+117 silly packumentCache full:https://registry.npmjs.org/thread-stream cache-miss
+118 http fetch GET 200 https://registry.npmjs.org/safer-buffer 863ms (cache miss)
+119 silly packumentCache full:https://registry.npmjs.org/safer-buffer set size:undefined disposed:false
+120 silly fetch manifest ip-address@^10.0.1
+121 silly packumentCache full:https://registry.npmjs.org/ip-address cache-miss
+122 http fetch GET 200 https://registry.npmjs.org/real-require 605ms (cache miss)
+123 silly packumentCache full:https://registry.npmjs.org/real-require set size:undefined disposed:false
+124 silly fetch manifest smart-buffer@^4.2.0
+125 silly packumentCache full:https://registry.npmjs.org/smart-buffer cache-miss
+126 http fetch GET 200 https://registry.npmjs.org/@pinojs%2fredact 603ms (cache miss)
+127 silly packumentCache full:https://registry.npmjs.org/@pinojs%2fredact set size:undefined disposed:false
+128 http fetch GET 200 https://registry.npmjs.org/safe-stable-stringify 612ms (cache miss)
+129 silly packumentCache full:https://registry.npmjs.org/safe-stable-stringify set size:undefined disposed:false
+130 http fetch GET 200 https://registry.npmjs.org/pino-std-serializers 872ms (cache miss)
+131 silly packumentCache full:https://registry.npmjs.org/pino-std-serializers set size:undefined disposed:false
+132 http fetch GET 200 https://registry.npmjs.org/sonic-boom 298ms (cache miss)
+133 silly packumentCache full:https://registry.npmjs.org/sonic-boom set size:undefined disposed:false
+134 http fetch GET 200 https://registry.npmjs.org/smart-buffer 411ms (cache miss)
+135 silly packumentCache full:https://registry.npmjs.org/smart-buffer set size:undefined disposed:false
+136 http fetch GET 200 https://registry.npmjs.org/ip-address 433ms (cache miss)
+137 silly packumentCache full:https://registry.npmjs.org/ip-address set size:undefined disposed:false
+138 http fetch GET 200 https://registry.npmjs.org/thread-stream 537ms (cache miss)
+139 silly packumentCache full:https://registry.npmjs.org/thread-stream set size:undefined disposed:false
+140 silly placeDep ROOT safer-buffer@2.1.2 OK for: iconv-lite@0.7.2 want: >= 2.1.2 < 3.0.0
+141 silly placeDep node_modules/libmime iconv-lite@0.6.3 OK for: libmime@5.3.7 want: 0.6.3
+142 silly placeDep ROOT @pinojs/redact@0.4.0 OK for: pino@10.3.0 want: ^0.4.0
+143 silly placeDep ROOT atomic-sleep@1.0.0 OK for: pino@10.3.0 want: ^1.0.0
+144 silly placeDep ROOT on-exit-leak-free@2.1.2 OK for: pino@10.3.0 want: ^2.1.0
+145 silly placeDep ROOT pino-abstract-transport@3.0.0 OK for: pino@10.3.0 want: ^3.0.0
+146 silly placeDep ROOT pino-std-serializers@7.1.0 OK for: pino@10.3.0 want: ^7.0.0
+147 silly placeDep ROOT process-warning@5.0.0 OK for: pino@10.3.0 want: ^5.0.0
+148 silly placeDep ROOT quick-format-unescaped@4.0.4 OK for: pino@10.3.0 want: ^4.0.3
+149 silly placeDep ROOT real-require@0.2.0 OK for: pino@10.3.0 want: ^0.2.0
+150 silly placeDep ROOT safe-stable-stringify@2.5.0 OK for: pino@10.3.0 want: ^2.3.1
+151 silly placeDep ROOT sonic-boom@4.2.0 OK for: pino@10.3.0 want: ^4.0.1
+152 silly placeDep ROOT thread-stream@4.0.0 OK for: pino@10.3.0 want: ^4.0.0
+153 silly fetch manifest split2@^4.0.0
+154 silly packumentCache full:https://registry.npmjs.org/split2 cache-miss
+155 http fetch GET 200 https://registry.npmjs.org/split2 96ms (cache miss)
+156 silly packumentCache full:https://registry.npmjs.org/split2 set size:undefined disposed:false
+157 silly placeDep ROOT split2@4.2.0 OK for: pino-abstract-transport@3.0.0 want: ^4.0.0
+158 silly placeDep ROOT ip-address@10.1.0 OK for: socks@2.8.7 want: ^10.0.1
+159 silly placeDep ROOT smart-buffer@4.2.0 OK for: socks@2.8.7 want: ^4.2.0
+160 silly reify moves {}
+161 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-wasm32-wasi
+162 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@tailwindcss/oxide-wasm32-wasi' ]
+163 silly audit bulk request {
+163 silly audit   '@alloc/quick-lru': [ '5.2.0' ],
+163 silly audit   '@aws-crypto/sha256-browser': [ '5.2.0' ],
+163 silly audit   '@smithy/is-array-buffer': [ '2.2.0', '4.2.0' ],
+163 silly audit   '@smithy/util-buffer-from': [ '2.2.0', '4.2.0' ],
+163 silly audit   '@smithy/util-utf8': [ '2.3.0', '4.2.0' ],
+163 silly audit   '@aws-crypto/sha256-js': [ '5.2.0' ],
+163 silly audit   '@aws-crypto/supports-web-crypto': [ '5.2.0' ],
+163 silly audit   '@aws-crypto/util': [ '5.2.0' ],
+163 silly audit   '@aws-sdk/client-sesv2': [ '3.980.0' ],
+163 silly audit   '@aws-sdk/client-sso': [ '3.980.0' ],
+163 silly audit   '@aws-sdk/core': [ '3.973.5' ],
+163 silly audit   '@aws-sdk/credential-provider-env': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/credential-provider-http': [ '3.972.5' ],
+163 silly audit   '@aws-sdk/credential-provider-ini': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/credential-provider-login': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/credential-provider-node': [ '3.972.4' ],
+163 silly audit   '@aws-sdk/credential-provider-process': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/credential-provider-sso': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/credential-provider-web-identity': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/middleware-host-header': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/middleware-logger': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/middleware-recursion-detection': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/middleware-sdk-s3': [ '3.972.5' ],
+163 silly audit   '@aws-sdk/middleware-user-agent': [ '3.972.5' ],
+163 silly audit   '@aws-sdk/nested-clients': [ '3.980.0' ],
+163 silly audit   '@aws-sdk/region-config-resolver': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/signature-v4-multi-region': [ '3.980.0' ],
+163 silly audit   '@aws-sdk/token-providers': [ '3.980.0' ],
+163 silly audit   '@aws-sdk/types': [ '3.973.1' ],
+163 silly audit   '@aws-sdk/util-arn-parser': [ '3.972.2' ],
+163 silly audit   '@aws-sdk/util-endpoints': [ '3.980.0' ],
+163 silly audit   '@aws-sdk/util-locate-window': [ '3.965.4' ],
+163 silly audit   '@aws-sdk/util-user-agent-browser': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/util-user-agent-node': [ '3.972.3' ],
+163 silly audit   '@aws-sdk/xml-builder': [ '3.972.2' ],
+163 silly audit   '@aws/lambda-invoke-store': [ '0.2.3' ],
+163 silly audit   '@bufbuild/protobuf': [ '2.11.0' ],
+163 silly audit   '@emnapi/runtime': [ '1.8.1' ],
+163 silly audit   '@grpc/grpc-js': [ '1.14.3' ],
+163 silly audit   '@grpc/proto-loader': [ '0.8.0' ],
+163 silly audit   protobufjs: [ '7.5.4', '8.0.0' ],
+163 silly audit   '@hookform/resolvers': [ '5.2.2' ],
+163 silly audit   '@img/colour': [ '1.0.0' ],
+163 silly audit   '@img/sharp-darwin-arm64': [ '0.34.5' ],
+163 silly audit   '@img/sharp-darwin-x64': [ '0.34.5' ],
+163 silly audit   '@img/sharp-libvips-darwin-arm64': [ '1.2.4' ],
+163 silly audit   '@img/sharp-libvips-darwin-x64': [ '1.2.4' ],
+163 silly audit   '@img/sharp-libvips-linux-arm': [ '1.2.4' ],
+163 silly audit   '@img/sharp-libvips-linux-arm64': [ '1.2.4' ],
+163 silly audit   '@img/sharp-libvips-linux-ppc64': [ '1.2.4' ],
+163 silly audit   '@img/sharp-libvips-linux-riscv64': [ '1.2.4' ],
+163 silly audit   '@img/sharp-libvips-linux-s390x': [ '1.2.4' ],
+163 silly audit   '@img/sharp-libvips-linux-x64': [ '1.2.4' ],
+163 silly audit   '@img/sharp-libvips-linuxmusl-arm64': [ '1.2.4' ],
+163 silly audit   '@img/sharp-libvips-linuxmusl-x64': [ '1.2.4' ],
+163 silly audit   '@img/sharp-linux-arm': [ '0.34.5' ],
+163 silly audit   '@img/sharp-linux-arm64': [ '0.34.5' ],
+163 silly audit   '@img/sharp-linux-ppc64': [ '0.34.5' ],
+163 silly audit   '@img/sharp-linux-riscv64': [ '0.34.5' ],
+163 silly audit   '@img/sharp-linux-s390x': [ '0.34.5' ],
+163 silly audit   '@img/sharp-linux-x64': [ '0.34.5' ],
+163 silly audit   '@img/sharp-linuxmusl-arm64': [ '0.34.5' ],
+163 silly audit   '@img/sharp-linuxmusl-x64': [ '0.34.5' ],
+163 silly audit   '@img/sharp-wasm32': [ '0.34.5' ],
+163 silly audit   '@img/sharp-win32-arm64': [ '0.34.5' ],
+163 silly audit   '@img/sharp-win32-ia32': [ '0.34.5' ],
+163 silly audit   '@img/sharp-win32-x64': [ '0.34.5' ],
+163 silly audit   '@inngest/ai': [ '0.1.7' ],
+163 silly audit   '@types/node': [ '22.19.7', '20.19.30' ],
+163 silly audit   '@isaacs/fs-minipass': [ '4.0.1' ],
+163 silly audit   '@jpwilliams/waitgroup': [ '2.1.1' ],
+163 silly audit   '@jridgewell/gen-mapping': [ '0.3.13' ],
+163 silly audit   '@jridgewell/remapping': [ '2.3.5' ],
+163 silly audit   '@jridgewell/resolve-uri': [ '3.1.2' ],
+163 silly audit   '@jridgewell/sourcemap-codec': [ '1.5.5' ],
+163 silly audit   '@jridgewell/trace-mapping': [ '0.3.31' ],
+163 silly audit   '@js-sdsl/ordered-map': [ '4.4.2' ],
+163 silly audit   '@next/env': [ '16.1.6' ],
+163 silly audit   '@next/swc-darwin-arm64': [ '16.1.6' ],
+163 silly audit   '@next/swc-darwin-x64': [ '16.1.6' ],
+163 silly audit   '@next/swc-linux-arm64-gnu': [ '16.1.6' ],
+163 silly audit   '@next/swc-linux-arm64-musl': [ '16.1.6' ],
+163 silly audit   '@next/swc-linux-x64-gnu': [ '16.1.6' ],
+163 silly audit   '@next/swc-linux-x64-musl': [ '16.1.6' ],
+163 silly audit   '@next/swc-win32-arm64-msvc': [ '16.1.6' ],
+163 silly audit   '@next/swc-win32-x64-msvc': [ '16.1.6' ],
+163 silly audit   '@opentelemetry/api': [ '1.9.0' ],
+163 silly audit   '@opentelemetry/api-logs': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/auto-instrumentations-node': [ '0.69.0' ],
+163 silly audit   '@opentelemetry/configuration': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/context-async-hooks': [ '2.5.0' ],
+163 silly audit   '@opentelemetry/core': [ '2.5.0' ],
+163 silly audit   '@opentelemetry/exporter-logs-otlp-grpc': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/exporter-logs-otlp-http': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/exporter-logs-otlp-proto': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/exporter-metrics-otlp-grpc': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/exporter-metrics-otlp-http': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/exporter-metrics-otlp-proto': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/exporter-prometheus': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/exporter-trace-otlp-grpc': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/exporter-trace-otlp-http': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/exporter-trace-otlp-proto': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/exporter-zipkin': [ '2.5.0' ],
+163 silly audit   '@opentelemetry/instrumentation': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/instrumentation-amqplib': [ '0.58.0' ],
+163 silly audit   '@opentelemetry/instrumentation-aws-lambda': [ '0.63.0' ],
+163 silly audit   '@opentelemetry/instrumentation-aws-sdk': [ '0.66.0' ],
+163 silly audit   '@opentelemetry/instrumentation-bunyan': [ '0.56.0' ],
+163 silly audit   '@opentelemetry/instrumentation-cassandra-driver': [ '0.56.0' ],
+163 silly audit   '@opentelemetry/instrumentation-connect': [ '0.54.0' ],
+163 silly audit   '@opentelemetry/instrumentation-cucumber': [ '0.26.0' ],
+163 silly audit   '@opentelemetry/instrumentation-dataloader': [ '0.28.0' ],
+163 silly audit   '@opentelemetry/instrumentation-dns': [ '0.54.0' ],
+163 silly audit   '@opentelemetry/instrumentation-express': [ '0.59.0' ],
+163 silly audit   '@opentelemetry/instrumentation-fastify': [ '0.55.0' ],
+163 silly audit   '@opentelemetry/instrumentation-fs': [ '0.30.0' ],
+163 silly audit   '@opentelemetry/instrumentation-generic-pool': [ '0.54.0' ],
+163 silly audit   '@opentelemetry/instrumentation-graphql': [ '0.58.0' ],
+163 silly audit   '@opentelemetry/instrumentation-grpc': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/instrumentation-hapi': [ '0.57.0' ],
+163 silly audit   '@opentelemetry/instrumentation-http': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/instrumentation-ioredis': [ '0.59.0' ],
+163 silly audit   '@opentelemetry/instrumentation-kafkajs': [ '0.20.0' ],
+163 silly audit   '@opentelemetry/instrumentation-knex': [ '0.55.0' ],
+163 silly audit   '@opentelemetry/instrumentation-koa': [ '0.59.0' ],
+163 silly audit   '@opentelemetry/instrumentation-lru-memoizer': [ '0.55.0' ],
+163 silly audit   '@opentelemetry/instrumentation-memcached': [ '0.54.0' ],
+163 silly audit   '@opentelemetry/instrumentation-mongodb': [ '0.64.0' ],
+163 silly audit   '@opentelemetry/instrumentation-mongoose': [ '0.57.0' ],
+163 silly audit   '@opentelemetry/instrumentation-mysql': [ '0.57.0' ],
+163 silly audit   '@opentelemetry/instrumentation-mysql2': [ '0.57.0' ],
+163 silly audit   '@opentelemetry/instrumentation-nestjs-core': [ '0.57.0' ],
+163 silly audit   '@opentelemetry/instrumentation-net': [ '0.55.0' ],
+163 silly audit   '@opentelemetry/instrumentation-openai': [ '0.9.0' ],
+163 silly audit   '@opentelemetry/instrumentation-oracledb': [ '0.36.0' ],
+163 silly audit   '@opentelemetry/instrumentation-pg': [ '0.63.0' ],
+163 silly audit   '@opentelemetry/instrumentation-pino': [ '0.57.0' ],
+163 silly audit   '@opentelemetry/instrumentation-redis': [ '0.59.0' ],
+163 silly audit   '@opentelemetry/instrumentation-restify': [ '0.56.0' ],
+163 silly audit   '@opentelemetry/instrumentation-router': [ '0.55.0' ],
+163 silly audit   '@opentelemetry/instrumentation-runtime-node': [ '0.24.0' ],
+163 silly audit   '@opentelemetry/instrumentation-socket.io': [ '0.57.0' ],
+163 silly audit   '@opentelemetry/instrumentation-tedious': [ '0.30.0' ],
+163 silly audit   '@opentelemetry/instrumentation-undici': [ '0.21.0' ],
+163 silly audit   '@opentelemetry/instrumentation-winston': [ '0.55.0' ],
+163 silly audit   '@opentelemetry/otlp-exporter-base': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/otlp-grpc-exporter-base': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/otlp-transformer': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/propagator-b3': [ '2.5.0' ],
+163 silly audit   '@opentelemetry/propagator-jaeger': [ '2.5.0' ],
+163 silly audit   '@opentelemetry/redis-common': [ '0.38.2' ],
+163 silly audit   '@opentelemetry/resource-detector-alibaba-cloud': [ '0.33.1' ],
+163 silly audit   '@opentelemetry/resource-detector-aws': [ '2.11.0' ],
+163 silly audit   '@opentelemetry/resource-detector-azure': [ '0.19.0' ],
+163 silly audit   '@opentelemetry/resource-detector-container': [ '0.8.2' ],
+163 silly audit   '@opentelemetry/resource-detector-gcp': [ '0.46.0' ],
+163 silly audit   '@opentelemetry/resources': [ '2.5.0' ],
+163 silly audit   '@opentelemetry/sdk-logs': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/sdk-metrics': [ '2.5.0' ],
+163 silly audit   '@opentelemetry/sdk-node': [ '0.211.0' ],
+163 silly audit   '@opentelemetry/sdk-trace-base': [ '2.5.0' ],
+163 silly audit   '@opentelemetry/sdk-trace-node': [ '2.5.0' ],
+163 silly audit   '@opentelemetry/semantic-conventions': [ '1.39.0' ],
+163 silly audit   '@opentelemetry/sql-common': [ '0.41.2' ],
+163 silly audit   '@protobufjs/aspromise': [ '1.1.2' ],
+163 silly audit   '@protobufjs/base64': [ '1.1.2' ],
+163 silly audit   '@protobufjs/codegen': [ '2.0.4' ],
+163 silly audit   '@protobufjs/eventemitter': [ '1.1.0' ],
+163 silly audit   '@protobufjs/fetch': [ '1.1.0' ],
+163 silly audit   '@protobufjs/float': [ '1.0.2' ],
+163 silly audit   '@protobufjs/inquire': [ '1.1.0' ],
+163 silly audit   '@protobufjs/path': [ '1.1.2' ],
+163 silly audit   '@protobufjs/pool': [ '1.1.0' ],
+163 silly audit   '@protobufjs/utf8': [ '1.1.0' ],
+163 silly audit   '@reduxjs/toolkit': [ '2.11.2' ],
+163 silly audit   immer: [ '11.1.3', '10.2.0' ],
+163 silly audit   '@smithy/abort-controller': [ '4.2.8' ],
+163 silly audit   '@smithy/config-resolver': [ '4.4.6' ],
+163 silly audit   '@smithy/core': [ '3.22.0' ],
+163 silly audit   '@smithy/credential-provider-imds': [ '4.2.8' ],
+163 silly audit   '@smithy/fetch-http-handler': [ '5.3.9' ],
+163 silly audit   '@smithy/hash-node': [ '4.2.8' ],
+163 silly audit   '@smithy/invalid-dependency': [ '4.2.8' ],
+163 silly audit   '@smithy/middleware-content-length': [ '4.2.8' ],
+163 silly audit   '@smithy/middleware-endpoint': [ '4.4.12' ],
+163 silly audit   '@smithy/middleware-retry': [ '4.4.29' ],
+163 silly audit   '@smithy/middleware-serde': [ '4.2.9' ],
+163 silly audit   '@smithy/middleware-stack': [ '4.2.8' ],
+163 silly audit   '@smithy/node-config-provider': [ '4.3.8' ],
+163 silly audit   '@smithy/node-http-handler': [ '4.4.8' ],
+163 silly audit   '@smithy/property-provider': [ '4.2.8' ],
+163 silly audit   '@smithy/protocol-http': [ '5.3.8' ],
+163 silly audit   '@smithy/querystring-builder': [ '4.2.8' ],
+163 silly audit   '@smithy/querystring-parser': [ '4.2.8' ],
+163 silly audit   '@smithy/service-error-classification': [ '4.2.8' ],
+163 silly audit   '@smithy/shared-ini-file-loader': [ '4.4.3' ],
+163 silly audit   '@smithy/signature-v4': [ '5.3.8' ],
+163 silly audit   '@smithy/smithy-client': [ '4.11.1' ],
+163 silly audit   '@smithy/types': [ '4.12.0' ],
+163 silly audit   '@smithy/url-parser': [ '4.2.8' ],
+163 silly audit   '@smithy/util-base64': [ '4.3.0' ],
+163 silly audit   '@smithy/util-body-length-browser': [ '4.2.0' ],
+163 silly audit   '@smithy/util-body-length-node': [ '4.2.1' ],
+163 silly audit   '@smithy/util-config-provider': [ '4.2.0' ],
+163 silly audit   '@smithy/util-defaults-mode-browser': [ '4.3.28' ],
+163 silly audit   '@smithy/util-defaults-mode-node': [ '4.2.31' ],
+163 silly audit   '@smithy/util-endpoints': [ '3.2.8' ],
+163 silly audit   '@smithy/util-hex-encoding': [ '4.2.0' ],
+163 silly audit   '@smithy/util-middleware': [ '4.2.8' ],
+163 silly audit   '@smithy/util-retry': [ '4.2.8' ],
+163 silly audit   '@smithy/util-stream': [ '4.5.10' ],
+163 silly audit   '@smithy/util-uri-escape': [ '4.2.0' ],
+163 silly audit   '@smithy/uuid': [ '1.1.0' ],
+163 silly audit   '@standard-schema/spec': [ '1.1.0' ],
+163 silly audit   '@standard-schema/utils': [ '0.3.0' ],
+163 silly audit   '@supabase/auth-js': [ '2.93.3' ],
+163 silly audit   '@supabase/functions-js': [ '2.93.3' ],
+163 silly audit   '@supabase/postgrest-js': [ '2.93.3' ],
+163 silly audit   '@supabase/realtime-js': [ '2.93.3' ],
+163 silly audit   '@supabase/storage-js': [ '2.93.3' ],
+163 silly audit   '@supabase/supabase-js': [ '2.93.3' ],
+163 silly audit   '@swc/helpers': [ '0.5.15' ],
+163 silly audit   '@tailwindcss/node': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-android-arm64': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-darwin-arm64': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-darwin-x64': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-freebsd-x64': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-linux-arm-gnueabihf': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-linux-arm64-gnu': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-linux-arm64-musl': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-linux-x64-gnu': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-linux-x64-musl': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-win32-arm64-msvc': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/oxide-win32-x64-msvc': [ '4.1.18' ],
+163 silly audit   '@tailwindcss/postcss': [ '4.1.18' ],
+163 silly audit   '@tanstack/query-core': [ '5.90.20' ],
+163 silly audit   '@tanstack/react-query': [ '5.90.20' ],
+163 silly audit   '@types/aws-lambda': [ '8.10.160' ],
+163 silly audit   '@types/bcryptjs': [ '2.4.6' ],
+163 silly audit   '@types/bunyan': [ '1.8.11' ],
+163 silly audit   '@types/connect': [ '3.4.38' ],
+163 silly audit   '@types/d3-array': [ '3.2.2' ],
+163 silly audit   '@types/d3-color': [ '3.1.3' ],
+163 silly audit   '@types/d3-ease': [ '3.0.2' ],
+163 silly audit   '@types/d3-interpolate': [ '3.0.4' ],
+163 silly audit   '@types/d3-path': [ '3.1.1' ],
+163 silly audit   '@types/d3-scale': [ '4.0.9' ],
+163 silly audit   '@types/d3-shape': [ '3.1.8' ],
+163 silly audit   '@types/d3-time': [ '3.0.4' ],
+163 silly audit   '@types/d3-timer': [ '3.0.2' ],
+163 silly audit   '@types/debug': [ '4.1.12' ],
+163 silly audit   '@types/memcached': [ '2.2.10' ],
+163 silly audit   '@types/ms': [ '2.1.0' ],
+163 silly audit   '@types/mysql': [ '2.15.27' ],
+163 silly audit   '@types/oracledb': [ '6.5.2' ],
+163 silly audit   '@types/pg': [ '8.15.6' ],
+163 silly audit   '@types/pg-pool': [ '2.0.7' ],
+163 silly audit   '@types/phoenix': [ '1.6.7' ],
+163 silly audit   '@types/react': [ '19.2.10' ],
+163 silly audit   '@types/react-dom': [ '19.2.3' ],
+163 silly audit   '@types/tedious': [ '4.0.14' ],
+163 silly audit   '@types/use-sync-external-store': [ '0.0.6' ],
+163 silly audit   '@types/ws': [ '8.18.1' ],
+163 silly audit   acorn: [ '8.15.0' ],
+163 silly audit   'acorn-import-attributes': [ '1.9.5' ],
+163 silly audit   'agent-base': [ '7.1.4' ],
+163 silly audit   'ansi-regex': [ '4.1.1', '5.0.1' ],
+163 silly audit   'ansi-styles': [ '4.3.0' ],
+163 silly audit   'baseline-browser-mapping': [ '2.9.19' ],
+163 silly audit   bcryptjs: [ '3.0.3' ],
+163 silly audit   'bignumber.js': [ '9.3.1' ],
+163 silly audit   'bin-links': [ '6.0.0' ],
+163 silly audit   bowser: [ '2.13.1' ],
+163 silly audit   'caniuse-lite': [ '1.0.30001766' ],
+163 silly audit   canonicalize: [ '1.0.8' ],
+163 silly audit   chalk: [ '4.1.2' ],
+163 silly audit   chownr: [ '3.0.0' ],
+163 silly audit   'cjs-module-lexer': [ '2.2.0' ],
+163 silly audit   'client-only': [ '0.0.1' ],
+163 silly audit   cliui: [ '8.0.1' ],
+163 silly audit   'strip-ansi': [ '6.0.1', '5.2.0' ],
+163 silly audit   clsx: [ '2.1.1' ],
+163 silly audit   'cmd-shim': [ '8.0.0' ],
+163 silly audit   'color-convert': [ '2.0.1' ],
+163 silly audit   'color-name': [ '1.1.4' ],
+163 silly audit   'cross-fetch': [ '4.1.0' ],
+163 silly audit   csstype: [ '3.2.3' ],
+163 silly audit   'd3-array': [ '3.2.4' ],
+163 silly audit   'd3-color': [ '3.1.0' ],
+163 silly audit   'd3-ease': [ '3.0.1' ],
+163 silly audit   'd3-format': [ '3.1.2' ],
+163 silly audit   'd3-interpolate': [ '3.0.1' ],
+163 silly audit   'd3-path': [ '3.1.0' ],
+163 silly audit   'd3-scale': [ '4.0.2' ],
+163 silly audit   'd3-shape': [ '3.2.0' ],
+163 silly audit   'd3-time': [ '3.1.0' ],
+163 silly audit   'd3-time-format': [ '4.1.0' ],
+163 silly audit   'd3-timer': [ '3.0.1' ],
+163 silly audit   'data-uri-to-buffer': [ '4.0.1' ],
+163 silly audit   debug: [ '4.4.3' ],
+163 silly audit   'decimal.js-light': [ '2.5.1' ],
+163 silly audit   'detect-libc': [ '2.1.2' ],
+163 silly audit   'emoji-regex': [ '8.0.0' ],
+163 silly audit   'enhanced-resolve': [ '5.18.4' ],
+163 silly audit   'es-toolkit': [ '1.44.0' ],
+163 silly audit   escalade: [ '3.2.0' ],
+163 silly audit   eventemitter3: [ '5.0.4' ],
+163 silly audit   extend: [ '3.0.2' ],
+163 silly audit   'fast-xml-parser': [ '5.2.5' ],
+163 silly audit   'fetch-blob': [ '3.2.0' ],
+163 silly audit   'formdata-polyfill': [ '4.0.10' ],
+163 silly audit   'forwarded-parse': [ '2.1.2' ],
+163 silly audit   'framer-motion': [ '12.29.2' ],
+163 silly audit   gaxios: [ '6.7.1' ],
+163 silly audit   'gcp-metadata': [ '6.1.1' ],
+163 silly audit   'get-caller-file': [ '2.0.5' ],
+163 silly audit   'google-logging-utils': [ '0.0.2' ],
+163 silly audit   'graceful-fs': [ '4.2.11' ],
+163 silly audit   'has-flag': [ '4.0.0' ],
+163 silly audit   'hash.js': [ '1.1.7' ],
+163 silly audit   'https-proxy-agent': [ '7.0.6' ],
+163 silly audit   'iceberg-js': [ '0.8.1' ],
+163 silly audit   'import-in-the-middle': [ '2.0.6' ],
+163 silly audit   imurmurhash: [ '0.1.4' ],
+163 silly audit   inherits: [ '2.0.4' ],
+163 silly audit   inngest: [ '3.50.0' ],
+163 silly audit   zod: [ '3.25.76', '4.3.6' ],
+163 silly audit   internmap: [ '2.0.3' ],
+163 silly audit   'is-fullwidth-code-point': [ '3.0.0' ],
+163 silly audit   'is-stream': [ '2.0.1' ],
+163 silly audit   jiti: [ '2.6.1' ],
+163 silly audit   jose: [ '6.1.3' ],
+163 silly audit   'json-bigint': [ '1.0.0' ],
+163 silly audit   'json-stringify-safe': [ '5.0.1' ],
+163 silly audit   lightningcss: [ '1.30.2' ],
+163 silly audit   'lightningcss-android-arm64': [ '1.30.2' ],
+163 silly audit   'lightningcss-darwin-arm64': [ '1.30.2' ],
+163 silly audit   'lightningcss-darwin-x64': [ '1.30.2' ],
+163 silly audit   'lightningcss-freebsd-x64': [ '1.30.2' ],
+163 silly audit   'lightningcss-linux-arm-gnueabihf': [ '1.30.2' ],
+163 silly audit   'lightningcss-linux-arm64-gnu': [ '1.30.2' ],
+163 silly audit   'lightningcss-linux-arm64-musl': [ '1.30.2' ],
+163 silly audit   'lightningcss-linux-x64-gnu': [ '1.30.2' ],
+163 silly audit   'lightningcss-linux-x64-musl': [ '1.30.2' ],
+163 silly audit   'lightningcss-win32-arm64-msvc': [ '1.30.2' ],
+163 silly audit   'lightningcss-win32-x64-msvc': [ '1.30.2' ],
+163 silly audit   'lodash.camelcase': [ '4.3.0' ],
+163 silly audit   long: [ '5.3.2' ],
+163 silly audit   'lucide-react': [ '0.563.0' ],
+163 silly audit   'magic-string': [ '0.30.21' ],
+163 silly audit   'minimalistic-assert': [ '1.0.1' ],
+163 silly audit   minipass: [ '7.1.2' ],
+163 silly audit   minizlib: [ '3.1.0' ],
+163 silly audit   'module-details-from-path': [ '1.0.4' ],
+163 silly audit   'motion-dom': [ '12.29.2' ],
+163 silly audit   'motion-utils': [ '12.29.2' ],
+163 silly audit   ms: [ '2.1.3' ],
+163 silly audit   nanoid: [ '3.3.11' ],
+163 silly audit   next: [ '16.1.6' ],
+163 silly audit   postcss: [ '8.4.31', '8.5.6' ],
+163 silly audit   'node-domexception': [ '1.0.0' ],
+163 silly audit   'node-fetch': [ '2.7.0', '3.3.2' ],
+163 silly audit   'npm-normalize-package-bin': [ '5.0.0' ],
+163 silly audit   'pg-int8': [ '1.0.1' ],
+163 silly audit   'pg-protocol': [ '1.11.0' ],
+163 silly audit   'pg-types': [ '2.2.0' ],
+163 silly audit   picocolors: [ '1.1.1' ],
+163 silly audit   'postgres-array': [ '2.0.0' ],
+163 silly audit   'postgres-bytea': [ '1.0.1' ],
+163 silly audit   'postgres-date': [ '1.0.7' ],
+163 silly audit   'postgres-interval': [ '1.2.0' ],
+163 silly audit   'proc-log': [ '6.1.0' ],
+163 silly audit   react: [ '19.2.3' ],
+163 silly audit   'react-dom': [ '19.2.3' ],
+163 silly audit   'react-hook-form': [ '7.71.1' ],
+163 silly audit   'react-is': [ '19.2.4' ],
+163 silly audit   'react-redux': [ '9.2.0' ],
+163 silly audit   'read-cmd-shim': [ '6.0.0' ],
+163 silly audit   recharts: [ '3.7.0' ],
+163 silly audit   redux: [ '5.0.1' ],
+163 silly audit   'redux-thunk': [ '3.1.0' ],
+163 silly audit   'require-directory': [ '2.1.1' ],
+163 silly audit   'require-in-the-middle': [ '8.0.1' ],
+163 silly audit   reselect: [ '5.1.1' ],
+163 silly audit   scheduler: [ '0.27.0' ],
+163 silly audit   semver: [ '7.7.3' ],
+163 silly audit   'serialize-error-cjs': [ '0.1.4' ],
+163 silly audit   sharp: [ '0.34.5' ],
+163 silly audit   'signal-exit': [ '4.1.0' ],
+163 silly audit   'source-map-js': [ '1.2.1' ],
+163 silly audit   'string-width': [ '4.2.3' ],
+163 silly audit   strnum: [ '2.1.2' ],
+163 silly audit   'styled-jsx': [ '5.1.6' ],
+163 silly audit   supabase: [ '2.74.5' ],
+163 silly audit   'supports-color': [ '7.2.0' ],
+163 silly audit   'tailwind-merge': [ '3.4.0' ],
+163 silly audit   tailwindcss: [ '4.1.18' ],
+163 silly audit   tapable: [ '2.3.0' ],
+163 silly audit   tar: [ '7.5.7' ],
+163 silly audit   'temporal-polyfill': [ '0.2.5' ],
+163 silly audit   'temporal-spec': [ '0.2.4' ],
+163 silly audit   'tiny-invariant': [ '1.3.3' ],
+163 silly audit   tr46: [ '0.0.3' ],
+163 silly audit   tslib: [ '2.8.1' ],
+163 silly audit   typescript: [ '5.9.3' ],
+163 silly audit   ulid: [ '2.4.0' ],
+163 silly audit   'undici-types': [ '6.21.0' ],
+163 silly audit   'use-sync-external-store': [ '1.6.0' ],
+163 silly audit   uuid: [ '9.0.1' ],
+163 silly audit   'victory-vendor': [ '37.3.6' ],
+163 silly audit   'web-streams-polyfill': [ '3.3.3' ],
+163 silly audit   'webidl-conversions': [ '3.0.1' ],
+163 silly audit   'whatwg-url': [ '5.0.0' ],
+163 silly audit   'wrap-ansi': [ '7.0.0' ],
+163 silly audit   'write-file-atomic': [ '7.0.0' ],
+163 silly audit   ws: [ '8.19.0' ],
+163 silly audit   xtend: [ '4.0.2' ],
+163 silly audit   y18n: [ '5.0.8' ],
+163 silly audit   yallist: [ '5.0.0' ],
+163 silly audit   yaml: [ '2.8.2' ],
+163 silly audit   yargs: [ '17.7.2' ],
+163 silly audit   'yargs-parser': [ '21.1.1' ],
+163 silly audit   zustand: [ '5.0.10' ],
+163 silly audit   'dns-packet': [ '5.6.1' ],
+163 silly audit   imapflow: [ '1.2.8' ],
+163 silly audit   nodemailer: [ '7.0.13' ],
+163 silly audit   '@leichtgewicht/ip-codec': [ '2.0.5' ],
+163 silly audit   '@zone-eu/mailsplit': [ '5.4.8' ],
+163 silly audit   'encoding-japanese': [ '2.2.0' ],
+163 silly audit   'iconv-lite': [ '0.7.2', '0.6.3' ],
+163 silly audit   libbase64: [ '1.3.0' ],
+163 silly audit   libmime: [ '5.3.7' ],
+163 silly audit   libqp: [ '2.1.1' ],
+163 silly audit   pino: [ '10.3.0' ],
+163 silly audit   socks: [ '2.8.7' ],
+163 silly audit   'safer-buffer': [ '2.1.2' ],
+163 silly audit   '@pinojs/redact': [ '0.4.0' ],
+163 silly audit   'atomic-sleep': [ '1.0.0' ],
+163 silly audit   'on-exit-leak-free': [ '2.1.2' ],
+163 silly audit   'pino-abstract-transport': [ '3.0.0' ],
+163 silly audit   'pino-std-serializers': [ '7.1.0' ],
+163 silly audit   'process-warning': [ '5.0.0' ],
+163 silly audit   'quick-format-unescaped': [ '4.0.4' ],
+163 silly audit   'real-require': [ '0.2.0' ],
+163 silly audit   'safe-stable-stringify': [ '2.5.0' ],
+163 silly audit   'sonic-boom': [ '4.2.0' ],
+163 silly audit   'thread-stream': [ '4.0.0' ],
+163 silly audit   split2: [ '4.2.0' ],
+163 silly audit   'ip-address': [ '10.1.0' ],
+163 silly audit   'smart-buffer': [ '4.2.0' ],
+163 silly audit   '@tailwindcss/oxide-wasm32-wasi': [ '4.1.18' ]
+163 silly audit }
+164 verbose reify failed optional dependency /Users/user/leadflow/node_modules/lightningcss-win32-x64-msvc
+165 silly reify mark deleted [ '/Users/user/leadflow/node_modules/lightningcss-win32-x64-msvc' ]
+166 verbose reify failed optional dependency /Users/user/leadflow/node_modules/lightningcss-win32-arm64-msvc
+167 silly reify mark deleted [ '/Users/user/leadflow/node_modules/lightningcss-win32-arm64-msvc' ]
+168 verbose reify failed optional dependency /Users/user/leadflow/node_modules/lightningcss-linux-x64-musl
+169 silly reify mark deleted [ '/Users/user/leadflow/node_modules/lightningcss-linux-x64-musl' ]
+170 verbose reify failed optional dependency /Users/user/leadflow/node_modules/lightningcss-linux-x64-gnu
+171 silly reify mark deleted [ '/Users/user/leadflow/node_modules/lightningcss-linux-x64-gnu' ]
+172 verbose reify failed optional dependency /Users/user/leadflow/node_modules/lightningcss-linux-arm64-musl
+173 silly reify mark deleted [ '/Users/user/leadflow/node_modules/lightningcss-linux-arm64-musl' ]
+174 verbose reify failed optional dependency /Users/user/leadflow/node_modules/lightningcss-linux-arm64-gnu
+175 silly reify mark deleted [ '/Users/user/leadflow/node_modules/lightningcss-linux-arm64-gnu' ]
+176 verbose reify failed optional dependency /Users/user/leadflow/node_modules/lightningcss-linux-arm-gnueabihf
+177 silly reify mark deleted [
+177 silly reify   '/Users/user/leadflow/node_modules/lightningcss-linux-arm-gnueabihf'
+177 silly reify ]
+178 verbose reify failed optional dependency /Users/user/leadflow/node_modules/lightningcss-freebsd-x64
+179 silly reify mark deleted [ '/Users/user/leadflow/node_modules/lightningcss-freebsd-x64' ]
+180 verbose reify failed optional dependency /Users/user/leadflow/node_modules/lightningcss-darwin-x64
+181 silly reify mark deleted [ '/Users/user/leadflow/node_modules/lightningcss-darwin-x64' ]
+182 verbose reify failed optional dependency /Users/user/leadflow/node_modules/lightningcss-android-arm64
+183 silly reify mark deleted [ '/Users/user/leadflow/node_modules/lightningcss-android-arm64' ]
+184 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-win32-x64-msvc
+185 silly reify mark deleted [
+185 silly reify   '/Users/user/leadflow/node_modules/@tailwindcss/oxide-win32-x64-msvc'
+185 silly reify ]
+186 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-win32-arm64-msvc
+187 silly reify mark deleted [
+187 silly reify   '/Users/user/leadflow/node_modules/@tailwindcss/oxide-win32-arm64-msvc'
+187 silly reify ]
+188 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-linux-x64-musl
+189 silly reify mark deleted [
+189 silly reify   '/Users/user/leadflow/node_modules/@tailwindcss/oxide-linux-x64-musl'
+189 silly reify ]
+190 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-linux-x64-gnu
+191 silly reify mark deleted [
+191 silly reify   '/Users/user/leadflow/node_modules/@tailwindcss/oxide-linux-x64-gnu'
+191 silly reify ]
+192 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-linux-arm64-musl
+193 silly reify mark deleted [
+193 silly reify   '/Users/user/leadflow/node_modules/@tailwindcss/oxide-linux-arm64-musl'
+193 silly reify ]
+194 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-linux-arm64-gnu
+195 silly reify mark deleted [
+195 silly reify   '/Users/user/leadflow/node_modules/@tailwindcss/oxide-linux-arm64-gnu'
+195 silly reify ]
+196 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-linux-arm-gnueabihf
+197 silly reify mark deleted [
+197 silly reify   '/Users/user/leadflow/node_modules/@tailwindcss/oxide-linux-arm-gnueabihf'
+197 silly reify ]
+198 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-freebsd-x64
+199 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@tailwindcss/oxide-freebsd-x64' ]
+200 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-darwin-x64
+201 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@tailwindcss/oxide-darwin-x64' ]
+202 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@tailwindcss/oxide-android-arm64
+203 silly reify mark deleted [
+203 silly reify   '/Users/user/leadflow/node_modules/@tailwindcss/oxide-android-arm64'
+203 silly reify ]
+204 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@next/swc-win32-x64-msvc
+205 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@next/swc-win32-x64-msvc' ]
+206 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@next/swc-win32-arm64-msvc
+207 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@next/swc-win32-arm64-msvc' ]
+208 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@next/swc-linux-x64-musl
+209 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@next/swc-linux-x64-musl' ]
+210 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@next/swc-linux-x64-gnu
+211 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@next/swc-linux-x64-gnu' ]
+212 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@next/swc-linux-arm64-musl
+213 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@next/swc-linux-arm64-musl' ]
+214 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@next/swc-linux-arm64-gnu
+215 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@next/swc-linux-arm64-gnu' ]
+216 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@next/swc-darwin-x64
+217 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@next/swc-darwin-x64' ]
+218 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-win32-x64
+219 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-win32-x64' ]
+220 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-win32-ia32
+221 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-win32-ia32' ]
+222 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-win32-arm64
+223 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-win32-arm64' ]
+224 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-wasm32
+225 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-wasm32' ]
+226 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-linuxmusl-x64
+227 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-linuxmusl-x64' ]
+228 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-linuxmusl-arm64
+229 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-linuxmusl-arm64' ]
+230 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-linux-x64
+231 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-linux-x64' ]
+232 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-linux-s390x
+233 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-linux-s390x' ]
+234 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-linux-riscv64
+235 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-linux-riscv64' ]
+236 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-linux-ppc64
+237 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-linux-ppc64' ]
+238 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-linux-arm64
+239 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-linux-arm64' ]
+240 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-linux-arm
+241 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-linux-arm' ]
+242 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-libvips-linuxmusl-x64
+243 silly reify mark deleted [
+243 silly reify   '/Users/user/leadflow/node_modules/@img/sharp-libvips-linuxmusl-x64'
+243 silly reify ]
+244 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-libvips-linuxmusl-arm64
+245 silly reify mark deleted [
+245 silly reify   '/Users/user/leadflow/node_modules/@img/sharp-libvips-linuxmusl-arm64'
+245 silly reify ]
+246 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-libvips-linux-x64
+247 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-libvips-linux-x64' ]
+248 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-libvips-linux-s390x
+249 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-libvips-linux-s390x' ]
+250 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-libvips-linux-riscv64
+251 silly reify mark deleted [
+251 silly reify   '/Users/user/leadflow/node_modules/@img/sharp-libvips-linux-riscv64'
+251 silly reify ]
+252 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-libvips-linux-ppc64
+253 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-libvips-linux-ppc64' ]
+254 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-libvips-linux-arm64
+255 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-libvips-linux-arm64' ]
+256 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-libvips-linux-arm
+257 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-libvips-linux-arm' ]
+258 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-libvips-darwin-x64
+259 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-libvips-darwin-x64' ]
+260 verbose reify failed optional dependency /Users/user/leadflow/node_modules/@img/sharp-darwin-x64
+261 silly reify mark deleted [ '/Users/user/leadflow/node_modules/@img/sharp-darwin-x64' ]
+262 http cache split2@https://registry.npmjs.org/split2/-/split2-4.2.0.tgz 0ms (cache hit)
+263 http cache smart-buffer@https://registry.npmjs.org/smart-buffer/-/smart-buffer-4.2.0.tgz 0ms (cache hit)
+264 http cache ip-address@https://registry.npmjs.org/ip-address/-/ip-address-10.1.0.tgz 0ms (cache hit)
+265 http cache thread-stream@https://registry.npmjs.org/thread-stream/-/thread-stream-4.0.0.tgz 0ms (cache hit)
+266 http cache sonic-boom@https://registry.npmjs.org/sonic-boom/-/sonic-boom-4.2.0.tgz 0ms (cache hit)
+267 http cache safe-stable-stringify@https://registry.npmjs.org/safe-stable-stringify/-/safe-stable-stringify-2.5.0.tgz 0ms (cache hit)
+268 http cache real-require@https://registry.npmjs.org/real-require/-/real-require-0.2.0.tgz 0ms (cache hit)
+269 http cache quick-format-unescaped@https://registry.npmjs.org/quick-format-unescaped/-/quick-format-unescaped-4.0.4.tgz 0ms (cache hit)
+270 http cache process-warning@https://registry.npmjs.org/process-warning/-/process-warning-5.0.0.tgz 0ms (cache hit)
+271 http cache pino-std-serializers@https://registry.npmjs.org/pino-std-serializers/-/pino-std-serializers-7.1.0.tgz 0ms (cache hit)
+272 http cache pino-abstract-transport@https://registry.npmjs.org/pino-abstract-transport/-/pino-abstract-transport-3.0.0.tgz 0ms (cache hit)
+273 http cache on-exit-leak-free@https://registry.npmjs.org/on-exit-leak-free/-/on-exit-leak-free-2.1.2.tgz 0ms (cache hit)
+274 http cache atomic-sleep@https://registry.npmjs.org/atomic-sleep/-/atomic-sleep-1.0.0.tgz 0ms (cache hit)
+275 http cache @pinojs/redact@https://registry.npmjs.org/@pinojs/redact/-/redact-0.4.0.tgz 0ms (cache hit)
+276 http cache safer-buffer@https://registry.npmjs.org/safer-buffer/-/safer-buffer-2.1.2.tgz 0ms (cache hit)
+277 http cache socks@https://registry.npmjs.org/socks/-/socks-2.8.7.tgz 0ms (cache hit)
+278 http cache pino@https://registry.npmjs.org/pino/-/pino-10.3.0.tgz 0ms (cache hit)
+279 http cache libqp@https://registry.npmjs.org/libqp/-/libqp-2.1.1.tgz 0ms (cache hit)
+280 http cache libmime@https://registry.npmjs.org/libmime/-/libmime-5.3.7.tgz 0ms (cache hit)
+281 http cache libbase64@https://registry.npmjs.org/libbase64/-/libbase64-1.3.0.tgz 0ms (cache hit)
+282 http cache iconv-lite@https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.7.2.tgz 0ms (cache hit)
+283 http cache encoding-japanese@https://registry.npmjs.org/encoding-japanese/-/encoding-japanese-2.2.0.tgz 0ms (cache hit)
+284 http cache @zone-eu/mailsplit@https://registry.npmjs.org/@zone-eu/mailsplit/-/mailsplit-5.4.8.tgz 0ms (cache hit)
+285 http cache @leichtgewicht/ip-codec@https://registry.npmjs.org/@leichtgewicht/ip-codec/-/ip-codec-2.0.5.tgz 0ms (cache hit)
+286 http cache nodemailer@https://registry.npmjs.org/nodemailer/-/nodemailer-7.0.13.tgz 0ms (cache hit)
+287 http cache imapflow@https://registry.npmjs.org/imapflow/-/imapflow-1.2.8.tgz 0ms (cache hit)
+288 http cache dns-packet@https://registry.npmjs.org/dns-packet/-/dns-packet-5.6.1.tgz 0ms (cache hit)
+289 http cache iconv-lite@https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.6.3.tgz 0ms (cache hit)
+290 silly tarball no local data for split2@https://registry.npmjs.org/split2/-/split2-4.2.0.tgz. Extracting by manifest.
+291 silly tarball no local data for smart-buffer@https://registry.npmjs.org/smart-buffer/-/smart-buffer-4.2.0.tgz. Extracting by manifest.
+292 silly tarball no local data for ip-address@https://registry.npmjs.org/ip-address/-/ip-address-10.1.0.tgz. Extracting by manifest.
+293 silly tarball no local data for thread-stream@https://registry.npmjs.org/thread-stream/-/thread-stream-4.0.0.tgz. Extracting by manifest.
+294 silly tarball no local data for sonic-boom@https://registry.npmjs.org/sonic-boom/-/sonic-boom-4.2.0.tgz. Extracting by manifest.
+295 silly tarball no local data for safe-stable-stringify@https://registry.npmjs.org/safe-stable-stringify/-/safe-stable-stringify-2.5.0.tgz. Extracting by manifest.
+296 silly tarball no local data for real-require@https://registry.npmjs.org/real-require/-/real-require-0.2.0.tgz. Extracting by manifest.
+297 silly tarball no local data for quick-format-unescaped@https://registry.npmjs.org/quick-format-unescaped/-/quick-format-unescaped-4.0.4.tgz. Extracting by manifest.
+298 silly tarball no local data for process-warning@https://registry.npmjs.org/process-warning/-/process-warning-5.0.0.tgz. Extracting by manifest.
+299 silly tarball no local data for pino-std-serializers@https://registry.npmjs.org/pino-std-serializers/-/pino-std-serializers-7.1.0.tgz. Extracting by manifest.
+300 silly tarball no local data for pino-abstract-transport@https://registry.npmjs.org/pino-abstract-transport/-/pino-abstract-transport-3.0.0.tgz. Extracting by manifest.
+301 silly tarball no local data for on-exit-leak-free@https://registry.npmjs.org/on-exit-leak-free/-/on-exit-leak-free-2.1.2.tgz. Extracting by manifest.
+302 silly tarball no local data for atomic-sleep@https://registry.npmjs.org/atomic-sleep/-/atomic-sleep-1.0.0.tgz. Extracting by manifest.
+303 silly tarball no local data for @pinojs/redact@https://registry.npmjs.org/@pinojs/redact/-/redact-0.4.0.tgz. Extracting by manifest.
+304 silly tarball no local data for safer-buffer@https://registry.npmjs.org/safer-buffer/-/safer-buffer-2.1.2.tgz. Extracting by manifest.
+305 silly tarball no local data for socks@https://registry.npmjs.org/socks/-/socks-2.8.7.tgz. Extracting by manifest.
+306 silly tarball no local data for pino@https://registry.npmjs.org/pino/-/pino-10.3.0.tgz. Extracting by manifest.
+307 silly tarball no local data for libqp@https://registry.npmjs.org/libqp/-/libqp-2.1.1.tgz. Extracting by manifest.
+308 silly tarball no local data for libmime@https://registry.npmjs.org/libmime/-/libmime-5.3.7.tgz. Extracting by manifest.
+309 silly tarball no local data for libbase64@https://registry.npmjs.org/libbase64/-/libbase64-1.3.0.tgz. Extracting by manifest.
+310 silly tarball no local data for iconv-lite@https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.7.2.tgz. Extracting by manifest.
+311 silly tarball no local data for encoding-japanese@https://registry.npmjs.org/encoding-japanese/-/encoding-japanese-2.2.0.tgz. Extracting by manifest.
+312 silly tarball no local data for @zone-eu/mailsplit@https://registry.npmjs.org/@zone-eu/mailsplit/-/mailsplit-5.4.8.tgz. Extracting by manifest.
+313 silly tarball no local data for @leichtgewicht/ip-codec@https://registry.npmjs.org/@leichtgewicht/ip-codec/-/ip-codec-2.0.5.tgz. Extracting by manifest.
+314 silly tarball no local data for nodemailer@https://registry.npmjs.org/nodemailer/-/nodemailer-7.0.13.tgz. Extracting by manifest.
+315 silly tarball no local data for imapflow@https://registry.npmjs.org/imapflow/-/imapflow-1.2.8.tgz. Extracting by manifest.
+316 silly tarball no local data for dns-packet@https://registry.npmjs.org/dns-packet/-/dns-packet-5.6.1.tgz. Extracting by manifest.
+317 silly tarball no local data for iconv-lite@https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.6.3.tgz. Extracting by manifest.
+318 http fetch GET 200 https://registry.npmjs.org/sonic-boom/-/sonic-boom-4.2.0.tgz 351ms (cache miss)
+319 http fetch GET 200 https://registry.npmjs.org/split2/-/split2-4.2.0.tgz 358ms (cache miss)
+320 http fetch GET 200 https://registry.npmjs.org/safe-stable-stringify/-/safe-stable-stringify-2.5.0.tgz 361ms (cache miss)
+321 http fetch GET 200 https://registry.npmjs.org/smart-buffer/-/smart-buffer-4.2.0.tgz 366ms (cache miss)
+322 http fetch GET 200 https://registry.npmjs.org/ip-address/-/ip-address-10.1.0.tgz 377ms (cache miss)
+323 http fetch GET 200 https://registry.npmjs.org/thread-stream/-/thread-stream-4.0.0.tgz 378ms (cache miss)
+324 http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 475ms
+325 silly audit report {
+325 silly audit report   'fast-xml-parser': [
+325 silly audit report     {
+325 silly audit report       id: 1112708,
+325 silly audit report       url: 'https://github.com/advisories/GHSA-37qj-frw5-hhjh',
+325 silly audit report       title: 'fast-xml-parser has RangeError DoS Numeric Entities Bug',
+325 silly audit report       severity: 'high',
+325 silly audit report       vulnerable_versions: '>=4.3.6 <=5.3.3',
+325 silly audit report       cwe: [Array],
+325 silly audit report       cvss: [Object]
+325 silly audit report     }
+325 silly audit report   ]
+325 silly audit report }
+326 silly packumentCache corgi:https://registry.npmjs.org/fast-xml-parser cache-miss
+327 http fetch GET 200 https://registry.npmjs.org/safer-buffer/-/safer-buffer-2.1.2.tgz 524ms (cache miss)
+328 http fetch GET 200 https://registry.npmjs.org/libbase64/-/libbase64-1.3.0.tgz 525ms (cache miss)
+329 http fetch GET 200 https://registry.npmjs.org/libqp/-/libqp-2.1.1.tgz 558ms (cache miss)
+330 http fetch GET 200 https://registry.npmjs.org/libmime/-/libmime-5.3.7.tgz 581ms (cache miss)
+331 http fetch GET 200 https://registry.npmjs.org/socks/-/socks-2.8.7.tgz 581ms (cache miss)
+332 http fetch GET 200 https://registry.npmjs.org/atomic-sleep/-/atomic-sleep-1.0.0.tgz 1107ms (cache miss)
+333 http fetch GET 200 https://registry.npmjs.org/real-require/-/real-require-0.2.0.tgz 1108ms (cache miss)
+334 http fetch GET 200 https://registry.npmjs.org/quick-format-unescaped/-/quick-format-unescaped-4.0.4.tgz 1108ms (cache miss)
+335 http fetch GET 200 https://registry.npmjs.org/on-exit-leak-free/-/on-exit-leak-free-2.1.2.tgz 1108ms (cache miss)
+336 http fetch GET 200 https://registry.npmjs.org/pino/-/pino-10.3.0.tgz 1108ms (cache miss)
+337 http fetch GET 200 https://registry.npmjs.org/pino-std-serializers/-/pino-std-serializers-7.1.0.tgz 1148ms (cache miss)
+338 http fetch GET 200 https://registry.npmjs.org/process-warning/-/process-warning-5.0.0.tgz 1148ms (cache miss)
+339 http fetch GET 200 https://registry.npmjs.org/pino-abstract-transport/-/pino-abstract-transport-3.0.0.tgz 1242ms (cache miss)
+340 http fetch GET 200 https://registry.npmjs.org/nodemailer/-/nodemailer-7.0.13.tgz 2140ms (cache miss)
+341 http fetch GET 200 https://registry.npmjs.org/@zone-eu/mailsplit/-/mailsplit-5.4.8.tgz 2165ms (cache miss)
+342 http fetch GET 200 https://registry.npmjs.org/@leichtgewicht/ip-codec/-/ip-codec-2.0.5.tgz 2222ms (cache miss)
+343 http fetch GET 200 https://registry.npmjs.org/@pinojs/redact/-/redact-0.4.0.tgz 2224ms (cache miss)
+344 http fetch GET 200 https://registry.npmjs.org/fast-xml-parser 2988ms (cache miss)
+345 silly packumentCache corgi:https://registry.npmjs.org/fast-xml-parser set size:undefined disposed:false
+346 http fetch GET 200 https://registry.npmjs.org/dns-packet/-/dns-packet-5.6.1.tgz 3458ms (cache miss)
+347 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fxml-builder cache-miss
+348 http fetch GET 200 https://registry.npmjs.org/imapflow/-/imapflow-1.2.8.tgz 3652ms (cache miss)
+349 http fetch GET 200 https://registry.npmjs.org/encoding-japanese/-/encoding-japanese-2.2.0.tgz 4797ms (cache miss)
+350 http fetch GET 200 https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.7.2.tgz 4799ms (cache miss)
+351 http fetch GET 200 https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.6.3.tgz 5421ms (cache miss)
+352 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fxml-builder 2349ms (cache miss)
+353 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fxml-builder set size:undefined disposed:false
+354 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcore cache-miss
+355 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fcore 735ms (cache miss)
+356 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcore set size:undefined disposed:false
+357 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fclient-sesv2 cache-miss
+358 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fclient-sso cache-miss
+359 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-env cache-miss
+360 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-http cache-miss
+361 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-ini cache-miss
+362 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-login cache-miss
+363 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-process cache-miss
+364 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-sso cache-miss
+365 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-web-identity cache-miss
+366 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fmiddleware-sdk-s3 cache-miss
+367 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fmiddleware-user-agent cache-miss
+368 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fnested-clients cache-miss
+369 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2ftoken-providers cache-miss
+370 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fcredential-provider-http 351ms (cache miss)
+371 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-http set size:undefined disposed:false
+372 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fcredential-provider-sso 812ms (cache miss)
+373 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-sso set size:undefined disposed:false
+374 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fcredential-provider-login 1068ms (cache miss)
+375 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-login set size:undefined disposed:false
+376 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fcredential-provider-env 2767ms (cache miss)
+377 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-env set size:undefined disposed:false
+378 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fnested-clients 2893ms (cache miss)
+379 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fnested-clients set size:undefined disposed:false
+380 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2ftoken-providers 2899ms (cache miss)
+381 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2ftoken-providers set size:undefined disposed:false
+382 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fmiddleware-user-agent 2920ms (cache miss)
+383 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fmiddleware-user-agent set size:undefined disposed:false
+384 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fcredential-provider-web-identity 2938ms (cache miss)
+385 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-web-identity set size:undefined disposed:false
+386 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fcredential-provider-process 2945ms (cache miss)
+387 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-process set size:undefined disposed:false
+388 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fclient-sso 2959ms (cache miss)
+389 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fclient-sso set size:undefined disposed:false
+390 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fmiddleware-sdk-s3 2981ms (cache miss)
+391 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fmiddleware-sdk-s3 set size:undefined disposed:false
+392 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fclient-sesv2 3924ms (cache miss)
+393 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fclient-sesv2 set size:undefined disposed:false
+394 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fcredential-provider-ini 3993ms (cache miss)
+395 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-ini set size:undefined disposed:false
+396 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-node cache-miss
+397 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fcredential-provider-node 1122ms (cache miss)
+398 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fcredential-provider-node set size:undefined disposed:false
+399 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2futil-user-agent-node cache-miss
+400 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2futil-user-agent-node 1250ms (cache miss)
+401 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2futil-user-agent-node set size:undefined disposed:false
+402 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fsignature-v4-multi-region cache-miss
+403 http fetch GET 200 https://registry.npmjs.org/@aws-sdk%2fsignature-v4-multi-region 951ms (cache miss)
+404 silly packumentCache corgi:https://registry.npmjs.org/@aws-sdk%2fsignature-v4-multi-region set size:undefined disposed:false
+405 silly ADD node_modules/smart-buffer
+406 silly ADD node_modules/ip-address
+407 silly ADD node_modules/split2
+408 silly ADD node_modules/thread-stream
+409 silly ADD node_modules/sonic-boom
+410 silly ADD node_modules/safe-stable-stringify
+411 silly ADD node_modules/real-require
+412 silly ADD node_modules/quick-format-unescaped
+413 silly ADD node_modules/process-warning
+414 silly ADD node_modules/pino-std-serializers
+415 silly ADD node_modules/pino-abstract-transport
+416 silly ADD node_modules/on-exit-leak-free
+417 silly ADD node_modules/atomic-sleep
+418 silly ADD node_modules/@pinojs/redact
+419 silly ADD node_modules/safer-buffer
+420 silly ADD node_modules/socks
+421 silly ADD node_modules/pino
+422 silly ADD node_modules/libqp
+423 silly ADD node_modules/libmime
+424 silly ADD node_modules/libmime/node_modules/iconv-lite
+425 silly ADD node_modules/libbase64
+426 silly ADD node_modules/iconv-lite
+427 silly ADD node_modules/encoding-japanese
+428 silly ADD node_modules/@zone-eu/mailsplit
+429 silly ADD node_modules/@leichtgewicht/ip-codec
+430 silly ADD node_modules/nodemailer
+431 silly ADD node_modules/imapflow
+432 silly ADD node_modules/dns-packet
+433 silly ADD
+434 silly ADD
+435 silly ADD
+436 silly ADD
+437 silly ADD
+438 silly ADD
+439 silly ADD
+440 silly ADD
+441 silly ADD
+442 silly ADD
+443 silly ADD
+444 silly ADD
+445 silly ADD
+446 silly ADD
+447 silly ADD
+448 silly ADD
+449 silly ADD
+450 silly ADD
+451 silly ADD
+452 silly ADD
+453 silly ADD
+454 silly ADD
+455 silly ADD
+456 silly ADD
+457 silly ADD
+458 silly ADD
+459 silly ADD
+460 silly ADD
+461 silly ADD
+462 silly ADD
+463 silly ADD
+464 silly ADD
+465 silly ADD
+466 silly ADD
+467 silly ADD
+468 silly ADD
+469 silly ADD
+470 silly ADD
+471 silly ADD
+472 silly ADD
+473 silly ADD
+474 silly ADD
+475 silly ADD
+476 silly ADD
+477 silly ADD
+478 silly ADD
+479 silly ADD
+480 silly ADD
+481 silly ADD
+482 silly ADD
+483 verbose cwd /Users/user/leadflow
+484 verbose os Darwin 24.6.0
+485 verbose node v22.19.0
+486 verbose npm  v10.9.3
+487 notice
+487 notice New [31mmajor[39m version of npm available! [31m10.9.3[39m -> [34m11.8.0[39m
+487 notice Changelog: [34mhttps://github.com/npm/cli/releases/tag/v11.8.0[39m
+487 notice To update run: [4mnpm install -g npm@11.8.0[24m
+487 notice  { force: true, [Symbol(proc-log.meta)]: true }
+488 verbose exit 0
+489 info ok

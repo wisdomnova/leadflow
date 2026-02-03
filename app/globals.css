@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+  }
+
+  body {
+    background-color: #FBFBFB;
+    color: #101828;
+    font-family: var(--font-jakarta, 'Plus Jakarta Sans'), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.6;
+    font-size: 16px;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1 {
+    font-weight: 700;
+    line-height: 1.2;
+    color: #101828;
+  }
+
+  h2 {
+    font-weight: 700;
+    line-height: 1.2;
+    color: #101828;
+  }
+
+  h3 {
+    font-weight: 600;
+    line-height: 1.3;
+    color: #101828;
+  }
+
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+    line-height: 1.3;
+    color: #101828;
+  }
+
+  p {
+    margin: 0;
+    color: #101828;
+  }
+
+  a {
+    color: #745DF3;
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  a:hover {
+    color: #6B5FD8;
+  }
+
+  button {
+    font-family: var(--font-jakarta, 'Plus Jakarta Sans'), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  button:hover {
+    transform: translateY(-2px);
+  }
+
+  input,
+  textarea,
+  select {
+    font-family: var(--font-jakarta, 'Plus Jakarta Sans'), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    border-color: #E5E7EB;
+    color: #101828;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #6B7280;
+  }
+
+  input:focus,
+  textarea:focus,
+  button:focus {
+    outline: none;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E5E7EB;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6B7280;
+}
