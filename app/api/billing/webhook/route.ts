@@ -119,8 +119,4 @@ export async function POST(req: Request) {
   return NextResponse.json({ received: true });
 }
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+export const maxDuration = 60;
