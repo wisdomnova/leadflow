@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     
     try {
       await resend.emails.send({
-        from: 'LeadFlow <onboarding@resend.dev>',
+        from: 'LeadFlow <contact@tryleadflow.ai>',
         to: email,
         subject: 'Reset your LeadFlow password',
         html: `

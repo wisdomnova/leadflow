@@ -1,22 +1,32 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Mail, Lock, ChevronRight, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, ChevronRight, Eye, EyeOff, Loader2, AlertTriangle, X } from 'lucide-react';
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showExpiredModal, setShowExpiredModal] = useState(false);
 
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
+
+  // Check for expired_token query parameter on mount
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam === 'expired_token') {
+      setShowExpiredModal(true);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +57,66 @@ export default function SignInPage() {
 
   return (
     <div className="min-h-screen flex font-jakarta">
+      {/* Expired Session Modal */}
+      {showExpiredModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowExpiredModal(false)}
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          />
+          
+          {/* Modal */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 sm:p-10 max-w-md w-full border border-gray-100"
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowExpiredModal(false)}
+              className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-yellow-50 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-8 h-8 text-yellow-600" />
+              </div>
+            </div>
+
+            {/* Content */}
+            <h2 className="text-2xl font-black text-[#101828] mb-3 text-center tracking-tighter">
+              Session Expired
+            </h2>
+            <p className="text-[#101828]/60 text-center mb-8 leading-relaxed">
+              Your session has expired for security reasons. Please sign in again with your credentials to continue.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              <button
+                onClick={() => setShowExpiredModal(false)}
+                className="w-full py-4 bg-[#101828] text-white rounded-2xl font-bold hover:bg-[#101828]/90 transition-all active:scale-[0.98] shadow-lg shadow-[#101828]/10"
+              >
+                Understand, Let's Sign In
+              </button>
+              <button
+                onClick={() => router.push('/')}
+                className="w-full py-4 bg-gray-100 text-[#101828] rounded-2xl font-bold hover:bg-gray-200 transition-all active:scale-[0.98]"
+              >
+                Go Back Home
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       {/* Left side - Setup Form */}
       <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-20 py-12 bg-white relative overflow-hidden">
         {/* Decorative Background Elements */}
