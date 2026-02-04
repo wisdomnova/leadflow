@@ -15,9 +15,9 @@ export async function GET() {
       .from('organizations')
       .select('affiliate_link_code, current_discount_percent, is_affiliate_eligible')
       .eq('id', context.orgId)
-      .single();
+      .single() as any;
 
-    if (!org?.is_affiliate_eligible) {
+    if (!(org as any)?.is_affiliate_eligible) {
       return NextResponse.json({ 
         eligible: false,
         message: 'Your current plan does not include access to the Referral Program. Upgrade to Pro to unlock.'

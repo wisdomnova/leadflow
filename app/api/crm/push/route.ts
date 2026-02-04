@@ -53,17 +53,17 @@ export async function POST(req: Request) {
     }));
 
     // Log activity
-    await context.supabase.from("activity_log").insert({
+    await (context.supabase as any).from("activity_log").insert([{
       org_id: context.orgId,
       action_type: "crm.push",
-      description: `Pushed lead ${lead.email} to ${targets.map(t => t.provider).join(", ")}`,
+      description: `Pushed lead ${(lead as any).email} to ${targets.map((t: any) => t.provider).join(", ")}`,
       metadata: { 
         leadId, 
-        leadEmail: lead.email,
+        leadEmail: (lead as any).email,
         results,
         duration: Math.random() * 0.5 + 0.3 // Real duration simulation for history UI
       }
-    });
+    }] as any);
 
     return NextResponse.json({ results });
   } catch (error: any) {

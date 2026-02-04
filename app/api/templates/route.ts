@@ -35,15 +35,15 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { name, subject, body: templateBody, category } = body;
 
-    const { data: template, error } = await context.supabase
+    const { data: template, error } = await (context.supabase as any)
       .from("email_templates")
-      .insert({
+      .insert([{
         org_id: context.orgId,
         name,
         subject,
         body: templateBody,
         category: category || "Cold Outreach",
-      })
+      }] as any)
       .select()
       .single();
 

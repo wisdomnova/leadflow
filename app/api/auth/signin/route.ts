@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     const supabase = getAdminClient();
 
     // 1. Fetch user by email
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await (supabase as any)
       .from("users")
       .select("*, organizations(*)")
       .eq("email", email)
@@ -26,17 +26,17 @@ export async function POST(req: Request) {
     }
 
     // 2. Compare Password
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    const isPasswordValid = await bcrypt.compare(password, (user as any).password_hash);
     if (!isPasswordValid) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
     // 3. Generate Session JWT
     const token = await signUserJWT({
-      userId: user.id,
-      orgId: user.org_id,
-      email: user.email,
-      role: user.role,
+      userId: (user as any).id,
+      orgId: (user as any).org_id,
+      email: (user as any).email,
+      role: (user as any).role,
     });
 
     // 4. Set Cookie
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      user: { email: user.email, fullName: user.full_name, orgName: user.organizations?.name } 
+      user: { email: (user as any).email, fullName: (user as any).full_name, orgName: (user as any).organizations?.name } 
     });
   } catch (err) {
     console.error("Signin error:", err);

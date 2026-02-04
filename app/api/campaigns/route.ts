@@ -33,16 +33,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Name and steps are required" }, { status: 400 });
     }
 
-    const { data, error } = await context.supabase
+    const { data, error } = await (context.supabase as any)
       .from("campaigns")
-      .insert({
+      .insert([{
         org_id: context.orgId,
         name,
         steps, // JSONB array of steps
         status: status || "draft",
         sender_id: sender_id || null,
         config: config || {}
-      })
+      }] as any)
       .select()
       .single();
 

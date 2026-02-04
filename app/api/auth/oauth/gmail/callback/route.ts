@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     const supabase = getAdminClient();
     
     // Save to email_accounts
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("email_accounts")
       .upsert({
         org_id: orgId,

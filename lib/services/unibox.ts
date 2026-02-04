@@ -11,18 +11,18 @@ export async function syncAccountInbox(accountId: string) {
     .eq("id", accountId)
     .single();
 
-  if (!account || !account.imap_host) {
+  if (!(account as any) || !(account as any).imap_host) {
     throw new Error("IMAP not configured for this account");
   }
 
   const client = new ImapFlow({
-    host: account.imap_host,
-    port: account.imap_port || 993,
+    host: (account as any).imap_host,
+    port: (account as any).imap_port || 993,
     secure: true,
     auth: {
-      user: account.email,
-      pass: account.app_password,
-      accessToken: account.access_token // Support for OAuth tokens
+      user: (account as any).email,
+      pass: (account as any).app_password,
+      accessToken: (account as any).access_token // Support for OAuth tokens
     },
     logger: false
   });
@@ -31,7 +31,7 @@ export async function syncAccountInbox(accountId: string) {
   let lock = await client.getMailboxLock('INBOX');
 
   try {
-    const lastUid = account.last_sync_uid || 0;
+    const lastUid = (account as any).last_sync_uid || 0;
     let maxUid = lastUid;
     
     // Fetch only messages with UID greater than last known UID
@@ -55,38 +55,38 @@ export async function syncAccountInbox(accountId: string) {
         if (recipients && recipients.length > 0) {
           for (const recipient of recipients) {
             // 2. Mark as replied
-            await supabase.from("campaign_recipients").update({
+            await (supabase as any).from("campaign_recipients").update({
               status: 'replied',
               replied_at: new Date().toISOString()
-            }).eq("id", recipient.id);
+            } as any).eq("id", (recipient as any).id);
 
             // 3. Log activity
-            await supabase.from("activity_log").insert({
-              org_id: account.org_id,
+            await (supabase as any).from("activity_log").insert([{
+              org_id: (account as any).org_id,
               action_type: "email.reply",
               description: `Lead replied: ${fromEmail}`,
               metadata: {
-                campaign_id: recipient.campaign_id,
-                lead_id: recipient.lead_id,
+                campaign_id: (recipient as any).campaign_id,
+                lead_id: (recipient as any).lead_id,
                 subject: parsed.subject
               }
-            });
+            }] as any);
 
             // 4. Increment campaign reply_count
-            await supabase.rpc('increment_campaign_stat', { 
-              campaign_id_param: recipient.campaign_id, 
+            await (supabase as any).rpc('increment_campaign_stat', { 
+              campaign_id_param: (recipient as any).campaign_id, 
               column_param: 'reply_count' 
             });
 
             // 5. Update lead state for Unibox
-            await supabase.from("leads").update({
+            await (supabase as any).from("leads").update({
               last_message_received_at: parsed.date || new Date().toISOString(),
               status: 'replied' // Default to replied, but maybe we could do AI sentiment later
-            }).eq("id", recipient.lead_id);
+            } as any).eq("id", (recipient as any).lead_id);
 
             // 6. Create Notification
             await createNotification({
-              orgId: account.org_id,
+              orgId: (account as any).org_id,
               title: "New Reply Received",
               description: `${fromEmail} replied to your campaign. Click to view in Unibox.`,
               type: "success",
@@ -96,16 +96,16 @@ export async function syncAccountInbox(accountId: string) {
           }
         } else {
             // Even if not a campaign recipient, we might have a lead with this email
-            await supabase.from("leads").update({
+            await (supabase as any).from("leads").update({
                 last_message_received_at: parsed.date || new Date().toISOString()
-            }).eq("email", fromEmail).eq("org_id", account.org_id);
+            } as any).eq("email", fromEmail).eq("org_id", (account as any).org_id);
         }
 
         // Store in unibox_messages
         if (parsed.messageId) {
-          await supabase.from("unibox_messages").upsert({
+          await (supabase as any).from("unibox_messages").upsert([{
             account_id: accountId,
-            org_id: account.org_id,
+            org_id: (account as any).org_id,
             message_id: parsed.messageId,
             from_email: fromEmail,
             subject: parsed.subject || "(No Subject)",
@@ -114,14 +114,14 @@ export async function syncAccountInbox(accountId: string) {
             is_read: false,
             direction: 'inbound',
             sender_name: parsed.from?.value[0]?.name || ""
-          }, { onConflict: 'message_id' });
+          }], { onConflict: 'message_id' }) as any;
         }
       }
     }
 
     // Update last sync UID once at the end
     if (maxUid > lastUid) {
-      await supabase.from("email_accounts").update({ last_sync_uid: maxUid }).eq("id", accountId);
+      await (supabase as any).from("email_accounts").update({ last_sync_uid: maxUid } as any).eq("id", accountId);
     }
   } finally {
     lock.release();

@@ -11,18 +11,18 @@ export async function POST() {
 
   try {
     const adminSupabase = getAdminClient();
-    const { data: org } = await adminSupabase
+    const { data: org } = await (adminSupabase as any)
       .from('organizations')
       .select('stripe_customer_id')
       .eq('id', context.orgId)
       .single();
 
-    if (!org?.stripe_customer_id) {
+    if (!(org as any)?.stripe_customer_id) {
       return NextResponse.json({ error: 'No active subscription found' }, { status: 400 });
     }
 
     const session = await stripe.billingPortal.sessions.create({
-      customer: org.stripe_customer_id,
+      customer: (org as any).stripe_customer_id,
       return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing`,
     });
 

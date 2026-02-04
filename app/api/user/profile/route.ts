@@ -58,7 +58,7 @@ export async function GET(req: Request) {
       { data: analyticsData },
       { data: campaignStats }
     ] = await Promise.all([
-      supabase
+      (supabase as any)
         .from("users")
         .select(`
           *,
@@ -71,20 +71,20 @@ export async function GET(req: Request) {
         `)
         .eq("id", payload.userId)
         .single(),
-      supabase
+      (supabase as any)
         .from("campaigns")
         .select("*", { count: 'exact', head: true })
         .eq("org_id", payload.orgId),
-      supabase
+      (supabase as any)
         .from("leads")
         .select("*", { count: 'exact', head: true })
         .eq("org_id", payload.orgId),
-      supabase
+      (supabase as any)
         .from("analytics_daily")
         .select("sent_count, reply_count")
         .eq("org_id", payload.orgId)
         .gte("date", firstDayOfMonthStr),
-      supabase
+      (supabase as any)
         .from("campaigns")
         .select("reply_count")
         .eq("org_id", payload.orgId)
@@ -94,22 +94,22 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const totalSentThisMonth = analyticsData?.reduce((acc, curr) => acc + (curr.sent_count || 0), 0) || 0;
-    const totalRepliesThisMonth = analyticsData?.reduce((acc, curr) => acc + (curr.reply_count || 0), 0) || 0;
+    const totalSentThisMonth = (analyticsData || [])?.reduce((acc: number, curr: any) => acc + (curr.sent_count || 0), 0) || 0;
+    const totalRepliesThisMonth = (analyticsData || [])?.reduce((acc: number, curr: any) => acc + (curr.reply_count || 0), 0) || 0;
     
     // Average response rate
     const actualResponseRate = totalSentThisMonth > 0 ? (totalRepliesThisMonth / totalSentThisMonth) * 100 : 0;
 
     // Attainment calculations
-    const monthlyTargetAttainment = user.monthly_target_goal > 0 
-      ? Math.min(Math.round((totalSentThisMonth / user.monthly_target_goal) * 100), 100)
+    const monthlyTargetAttainment = (user as any).monthly_target_goal > 0 
+      ? Math.min(Math.round((totalSentThisMonth / (user as any).monthly_target_goal) * 100), 100)
       : 0;
 
-    const responseRateAttainment = user.response_rate_goal > 0
-      ? Math.min(Math.round((actualResponseRate / user.response_rate_goal) * 100), 100)
+    const responseRateAttainment = (user as any).response_rate_goal > 0
+      ? Math.min(Math.round((actualResponseRate / (user as any).response_rate_goal) * 100), 100)
       : 0;
 
-    const totalRepliesAllTime = campaignStats?.reduce((acc, curr) => acc + (curr.reply_count || 0), 0) || 0;
+    const totalRepliesAllTime = (campaignStats || [])?.reduce((acc: number, curr: any) => acc + (curr.reply_count || 0), 0) || 0;
 
     return NextResponse.json({
       user,
@@ -164,7 +164,7 @@ export async function POST(req: Request) {
 
     const supabase = getAdminClient();
 
-    const { data: updatedUser, error: updateError } = await supabase
+    const { data: updatedUser, error: updateError } = await (supabase as any)
       .from("users")
       .update({
         full_name: fullName,

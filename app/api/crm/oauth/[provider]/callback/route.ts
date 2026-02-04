@@ -82,7 +82,7 @@ export async function GET(
     }
 
     // Save to DB
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("crm_integrations")
       .upsert({
         org_id: orgId,

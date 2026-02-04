@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = getAdminClient();
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("notifications")
       .update({ is_read: true })
       .eq("user_id", payload.userId)

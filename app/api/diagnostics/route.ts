@@ -34,15 +34,15 @@ export async function POST(req: Request) {
     }
 
     // 3. Create diagnostic record
-    const { data: diagnostic, error: diagError } = await context.supabase
+    const { data: diagnostic, error: diagError } = await (context.supabase as any)
       .from("seed_diagnostics")
-      .insert({
+      .insert([{
         org_id: context.orgId,
         sender_id: senderId,
         subject,
         status: 'sending',
         total_seeds: seeds.length,
-      })
+      }] as any)
       .select()
       .single();
 

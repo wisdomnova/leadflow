@@ -35,15 +35,15 @@ export async function POST(req: Request) {
 
     // 2. Check for affiliate discount
     const adminSupabase = getAdminClient();
-    const { data: org } = await adminSupabase
+    const { data: org } = await (adminSupabase as any)
       .from('organizations')
       .select('current_discount_percent, stripe_customer_id')
       .eq('id', context.orgId)
       .single();
 
     let discounts: any[] = [];
-    if (org && org.current_discount_percent > 0) {
-      const couponId = await getOrCreateOrgCoupon(context.orgId, org.current_discount_percent);
+    if (org && (org as any).current_discount_percent > 0) {
+      const couponId = await getOrCreateOrgCoupon(context.orgId, (org as any).current_discount_percent);
       if (couponId) {
         discounts = [{ coupon: couponId }];
       }
@@ -51,8 +51,8 @@ export async function POST(req: Request) {
 
     // 3. Create Checkout Session
     const session = await stripe.checkout.sessions.create({
-      customer: org?.stripe_customer_id || undefined,
-      customer_email: org?.stripe_customer_id ? undefined : context.email,
+      customer: (org as any)?.stripe_customer_id || undefined,
+      customer_email: (org as any)?.stripe_customer_id ? undefined : context.email,
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',

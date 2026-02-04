@@ -33,7 +33,7 @@ export async function syncAffiliateDiscount(orgId: string) {
   const discountPercent = config && config.length > 0 ? config[0].discount_percent : 0;
 
   // 3. Update organization
-  const { error: updateError } = await supabase
+  const { error: updateError } = await (supabase as any)
     .from('organizations')
     .update({ current_discount_percent: discountPercent })
     .eq('id', orgId);
@@ -60,20 +60,20 @@ export async function processReferral(newOrgId: string, referralCode: string) {
   if (referrer.id === newOrgId) return null;
 
   // Create referral record
-  const { data: referral, error: createError } = await supabase
+  const { data: referral, error: createError } = await (supabase as any)
     .from('referrals')
-    .insert({
-      affiliate_org_id: referrer.id,
+    .insert([{
+      affiliate_org_id: (referrer as any).id,
       referred_org_id: newOrgId,
       status: 'pending' // Becomes active after first payment
-    })
+    }] as any)
     .select()
     .single();
 
   if (createError) throw createError;
 
   // Update referred org
-  await supabase
+  await (supabase as any)
     .from('organizations')
     .update({ referred_by: referrer.id })
     .eq('id', newOrgId);

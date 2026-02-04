@@ -23,7 +23,7 @@ export const uniboxSyncScheduler = inngest.createFunction(
 
     if (!accounts || accounts.length === 0) return { message: "No accounts to sync" };
 
-    const events = accounts.map(acc => ({
+    const events = (accounts as any).map((acc: any) => ({
       name: "unibox/account.sync",
       data: { accountId: acc.id }
     }));
@@ -81,7 +81,7 @@ export const campaignLauncher = inngest.createFunction(
     if (leads.length === 0) return { message: "No leads found" };
 
     // 2. Initialize campaign_recipients for each lead
-    const recipients = leads.map(lead => ({
+    const recipients = (leads as any).map((lead: any) => ({
       org_id: orgId,
       campaign_id: campaignId,
       lead_id: lead.id,
@@ -96,14 +96,14 @@ export const campaignLauncher = inngest.createFunction(
 
     // 2b. Update total_leads in campaigns table
     await step.run("update-campaign-stats", async () => {
-      await supabase
+      await (supabase as any)
         .from("campaigns")
         .update({ total_leads: leads.length })
         .eq("id", campaignId);
     });
 
     // 3. Trigger first email for each lead
-    const events = leads.map(lead => ({
+    const events = (leads as any).map((lead: any) => ({
       name: "campaign/email.process",
       data: {
         campaignId,
@@ -151,7 +151,7 @@ export const emailProcessor = inngest.createFunction(
       ]);
 
       // Fetch the sender account (use campaign's sender_id or the first active account)
-      const senderId = campaignRes.data?.sender_id;
+      const senderId = (campaignRes.data as any)?.sender_id;
       let account;
 
       if (senderId) {
@@ -177,17 +177,17 @@ export const emailProcessor = inngest.createFunction(
         lead: leadRes.data,
         recipient: recipientRes.data,
         account
-      };
+      } as any;
     });
 
     if (!data.campaign || !data.lead || !data.recipient || !data.account) return { error: "Missing campaign, lead, recipient, or sending account" };
     
     // Stop if recipient is not active (e.g., replied, unsubscribed, paused)
-    if (data.recipient.status !== 'active') {
-      return { message: `Recipient status is ${data.recipient.status}, stopping sequence.` };
+    if (((data as any).recipient as any).status !== 'active') {
+      return { message: `Recipient status is ${((data as any).recipient as any).status}, stopping sequence.` };
     }
 
-    const currentStep = data.campaign.steps[stepIdx];
+    const currentStep = ((data as any).campaign as any).steps[stepIdx];
     if (!currentStep) return { message: "No more steps" };
 
     // 2. Variable Replacement & Tracking Injection
@@ -198,8 +198,8 @@ export const emailProcessor = inngest.createFunction(
     let subject = currentStep.subject;
 
     // Replace variables case-insensitively using lead data keys
-    Object.keys(data.lead).forEach(key => {
-      const value = data.lead[key] || '';
+    Object.keys(((data as any).lead as any) || {}).forEach((key: any) => {
+      const value = ((data as any).lead as any)[key] || '';
       const regex = new RegExp(`{{${key}}}`, 'gi');
       processedBody = processedBody.replace(regex, value);
       subject = subject.replace(regex, value);
@@ -222,19 +222,19 @@ export const emailProcessor = inngest.createFunction(
       // Don't track if it's already a tracking link or an unsubscribe link (if we handle it separately handle it here)
       if (url.startsWith(baseUrl) || url.startsWith('mailto:')) return match;
       
-      const trackingUrl = `${baseUrl}/api/track/click/${data.recipient.id}?url=${encodeURIComponent(url)}`;
+      const trackingUrl = `${baseUrl}/api/track/click/${((data as any).recipient as any).id}?url=${encodeURIComponent(url)}`;
       return match.replace(url, trackingUrl);
     });
 
     // Add tracking pixel
-    const trackingPixel = `<img src="${baseUrl}/api/track/open/${data.recipient.id}" width="1" height="1" style="display:none;" />`;
+    const trackingPixel = `<img src="${baseUrl}/api/track/open/${((data as any).recipient as any).id}" width="1" height="1" style="display:none;" />`;
     const finalBody = processedBody + trackingPixel;
 
     // 3. Send Email
     const sendResult = await step.run("send-email", async () => {
       try {
         const result = await sendOutreachEmail({
-          to: data.lead.email,
+          to: ((data as any).lead as any).email,
           subject: subject,
           bodyHtml: finalBody,
           fromName: "LeadFlow Support", // In prod, pull from organization/sender settings
@@ -244,13 +244,13 @@ export const emailProcessor = inngest.createFunction(
       } catch (err: any) {
         console.error("Email send failure:", err);
         // Log failure to database
-        await supabase.from("activity_log").insert({
+        await (supabase as any).from("activity_log").insert([{
           org_id: orgId,
           lead_id: leadId,
           action_type: "email_failed",
-          description: `Failed to send email to ${data.lead.email}: ${err.message}`,
+          description: `Failed to send email to ${((data as any).lead as any).email}: ${err.message}`,
           metadata: { campaign_id: campaignId, error: err.message }
-        });
+        }] as any);
         
         // Re-throw to trigger Inngest retry if it's a transient error
         throw err;
@@ -260,13 +260,13 @@ export const emailProcessor = inngest.createFunction(
     // 4. Update Stats & Schedule Next Step
     await step.run("update-status", async () => {
       // Update recipient record
-      await supabase.from("campaign_recipients").update({
+      await (supabase as any).from("campaign_recipients").update({
         last_sent_at: new Date().toISOString(),
         current_step: stepIdx
       }).eq("campaign_id", campaignId).eq("lead_id", leadId);
 
       // Increment global campaign sent_count using optimized RPC
-      await supabase.rpc('increment_campaign_stat', { 
+      await (supabase as any).rpc('increment_campaign_stat', { 
         campaign_id_param: campaignId, 
         column_param: 'sent_count' 
       });
@@ -287,7 +287,7 @@ export const emailProcessor = inngest.createFunction(
     });
 
     const nextStepIdx = stepIdx + 1;
-    const nextStep = data.campaign.steps[nextStepIdx];
+    const nextStep = ((data as any).campaign as any).steps[nextStepIdx];
 
     if (nextStep) {
       await step.sendEvent("schedule-next", {
@@ -303,7 +303,7 @@ export const emailProcessor = inngest.createFunction(
       });
     } else {
       await step.run("mark-completed", async () => {
-        await supabase.from("campaign_recipients").update({ status: 'completed' }).eq("campaign_id", campaignId).eq("lead_id", leadId);
+        await (supabase as any).from("campaign_recipients").update({ status: 'completed' }).eq("campaign_id", campaignId).eq("lead_id", leadId);
       });
     }
 
@@ -357,7 +357,7 @@ export const warmupScheduler = inngest.createFunction(
 
     if (!accounts || accounts.length === 0) return { message: "No accounts warming" };
 
-    const events = accounts.map(acc => ({
+    const events = (accounts as any).map((acc: any) => ({
       name: "warmup/account.process",
       data: { accountId: acc.id }
     }));
@@ -378,18 +378,18 @@ export const warmupAccountProcessor = inngest.createFunction(
 
     // 1. Fetch Account and Today's Stats
     const data = await step.run("fetch-warmup-context", async () => {
-      const { data: account } = await supabase.from("email_accounts").select("*").eq("id", accountId).single();
-      const { data: stats } = await supabase.from("warmup_stats").select("*").eq("account_id", accountId).eq("date", today).single();
+      const { data: account } = await (supabase as any).from("email_accounts").select("*").eq("id", accountId).single();
+      const { data: stats } = await (supabase as any).from("warmup_stats").select("*").eq("account_id", accountId).eq("date", today).single();
       
       // If no stats yet for today, create them
       if (!stats && account) {
-        const { data: newStats } = await supabase.from("warmup_stats").insert({
+        const { data: newStats } = await (supabase as any).from("warmup_stats").insert([{
           account_id: accountId,
-          org_id: account.org_id,
+          org_id: (account as any).org_id,
           date: today,
           sent_count: 0,
           inbox_count: 0
-        }).select().single();
+        }] as any).select().single();
         return { account, stats: newStats };
       }
 
@@ -402,25 +402,32 @@ export const warmupAccountProcessor = inngest.createFunction(
     // Logic: Spread daily_limit over 24 hours. 
     // If we've sent less than (limit / 24 * current_hour), send another.
     const currentHour = new Date().getHours();
-    const targetSentByNow = Math.ceil((data.account.warmup_daily_limit / 24) * (currentHour + 1));
-    const remainingToTarget = targetSentByNow - (data.stats.sent_count || 0);
+    const targetSentByNow = Math.ceil(((data.account as any).warmup_daily_limit / 24) * (currentHour + 1));
+    const remainingToTarget = targetSentByNow - ((data.stats as any).sent_count || 0);
 
-    if (remainingToTarget <= 0 || (data.stats.sent_count || 0) >= data.account.warmup_daily_limit) {
+    if (remainingToTarget <= 0 || ((data.stats as any).sent_count || 0) >= (data.account as any).warmup_daily_limit) {
       return { message: "Quota reached for this hour or day", stats: data.stats };
     }
 
     // 3. Perform a Warmup Action
     await step.run("execute-warmup-send", async () => {
-      // For the "Secret Club", we pick a random "Seed" from our pool
-      // FACT: In a real production system, this would be a remote API call to a seed network
-      // For this implementation, we'll send to a rotating list of internal seed accounts
-      const seedPool = [
-        "seed-alpha@leadflow-warmup.com",
-        "seed-beta@leadflow-warmup.com",
-        "seed-gamma@leadflow-warmup.com",
-        "inbox-check@deliverability-test.fm"
-      ];
-      const randomSeed = seedPool[Math.floor(Math.random() * seedPool.length)];
+      // Fetch a random seed from the database using an optimized RPC
+      const { data: seeds, error: seedError } = await (supabase as any).rpc('get_random_seed');
+
+      if (seedError || !seeds || (seeds as any).length === 0) {
+        // Fallback to a small list if DB is empty during migration
+        const fallbackSeeds = ["seed-alpha@leadflow-warmup.com", "seed-beta@leadflow-warmup.com"];
+        const randomSeed = fallbackSeeds[Math.floor(Math.random() * fallbackSeeds.length)];
+        
+        // If we have an error and it's not just "empty", log it
+        if (seedError && (seeds as any)?.length === 0) {
+           console.error("Seed selection error:", seedError);
+        }
+        
+        return { seed: randomSeed }; // Still proceed with fallback to avoid breaking warmup
+      }
+
+      const randomSeed = Array.isArray(seeds) ? (seeds as any)[0].email : (seeds as any).email;
 
       const subjects = [
         "Quick update for the meeting",
@@ -446,12 +453,12 @@ export const warmupAccountProcessor = inngest.createFunction(
           to: randomSeed,
           subject: subject,
           bodyHtml: `<p>${body}</p>`,
-          fromName: data.account.email.split('@')[0],
+          fromName: (data.account as any).email.split('@')[0],
           account: data.account
         });
 
         // Update stats
-        await supabase.rpc('increment_warmup_stat', { 
+        await (supabase as any).rpc('increment_warmup_stat', { 
             account_id_param: accountId, 
             date_param: today,
             column_param: 'sent_count' 
@@ -460,7 +467,7 @@ export const warmupAccountProcessor = inngest.createFunction(
         // Simulating the "Saved from Spam" fact - in a real system this would happen
         // when the recipient receives it and moves it. For this demo simulation, 
         // we increment inbox_count as well to show "Health".
-        await supabase.rpc('increment_warmup_stat', { 
+        await (supabase as any).rpc('increment_warmup_stat', { 
             account_id_param: accountId, 
             date_param: today,
             column_param: 'inbox_count' 

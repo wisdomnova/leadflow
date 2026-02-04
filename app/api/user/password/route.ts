@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const supabase = getAdminClient();
 
     // 1. Fetch user to verify current password
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await (supabase as any)
       .from("users")
       .select("password_hash")
       .eq("id", payload.userId)
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Compare current password
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+    const isPasswordValid = await bcrypt.compare(currentPassword, (user as any).password_hash);
     if (!isPasswordValid) {
       return NextResponse.json({ error: "Invalid current password" }, { status: 400 });
     }
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
     // 4. Update password
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (supabase as any)
       .from("users")
       .update({
         password_hash: hashedNewPassword,

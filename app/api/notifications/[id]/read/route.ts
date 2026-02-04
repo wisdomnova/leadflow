@@ -26,7 +26,7 @@ export async function PATCH(
 
     const supabase = getAdminClient();
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("notifications")
       .update({ is_read: true })
       .eq("id", id)

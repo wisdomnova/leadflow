@@ -11,7 +11,7 @@ export async function GET() {
 
   try {
     const adminSupabase = getAdminClient();
-    const { data: org, error } = await adminSupabase
+    const { data: org, error } = await (adminSupabase as any)
       .from('organizations')
       .select('subscription_status, subscription_id, stripe_customer_id, current_discount_percent, trial_ends_at')
       .eq('id', context.orgId)
@@ -23,8 +23,8 @@ export async function GET() {
     }
 
     // Determine effective status
-    let effectiveStatus = org.subscription_status || 'none';
-    const trialExpired = org.trial_ends_at ? new Date(org.trial_ends_at) < new Date() : true;
+    let effectiveStatus = (org as any).subscription_status || 'none';
+    const trialExpired = (org as any).trial_ends_at ? new Date((org as any).trial_ends_at) < new Date() : true;
 
     if (effectiveStatus === 'trialing' && !trialExpired) {
       effectiveStatus = 'active'; // Treat active trial as active
@@ -34,8 +34,8 @@ export async function GET() {
     let invoices: any[] = [];
     let paymentMethod: any = null;
 
-    if (org.subscription_id) {
-      subscription = await stripe.subscriptions.retrieve(org.subscription_id, {
+    if ((org as any).subscription_id) {
+      subscription = await stripe.subscriptions.retrieve((org as any).subscription_id, {
         expand: ['latest_invoice.payment_intent', 'default_payment_method']
       });
 
@@ -49,9 +49,9 @@ export async function GET() {
       }
     }
 
-    if (org.stripe_customer_id) {
+    if ((org as any).stripe_customer_id) {
         if (!paymentMethod) {
-            const customer = await stripe.customers.retrieve(org.stripe_customer_id, {
+            const customer = await stripe.customers.retrieve((org as any).stripe_customer_id, {
                 expand: ['default_payment_method']
             }) as any;
             if (customer.default_payment_method) {
@@ -64,7 +64,7 @@ export async function GET() {
             }
         }
         const inv = await stripe.invoices.list({
-            customer: org.stripe_customer_id,
+            customer: (org as any).stripe_customer_id,
             limit: 12
         });
         invoices = inv.data.map((i: any) => ({
@@ -78,8 +78,8 @@ export async function GET() {
 
     return NextResponse.json({
       status: effectiveStatus,
-      discount: org.current_discount_percent || 0,
-      trial_ends_at: org.trial_ends_at,
+      discount: (org as any).current_discount_percent || 0,
+      trial_ends_at: (org as any).trial_ends_at,
       subscription: subscription ? {
         id: subscription.id,
         status: subscription.status,

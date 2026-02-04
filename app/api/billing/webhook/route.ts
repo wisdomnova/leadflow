@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       const subscriptionId = session.subscription;
       const customerId = session.customer;
 
-      await supabaseAdmin
+      await (supabaseAdmin as any)
         .from('organizations')
         .update({
           subscription_id: subscriptionId,
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       const subscriptionId = session.id;
       const status = session.status; // active, past_due, canceled, etc.
 
-      const { data: org } = await supabaseAdmin
+      const { data: org } = await (supabaseAdmin as any)
         .from('organizations')
         .update({
           subscription_status: status
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
     case 'invoice.payment_failed': {
       // Potentially notify user or lock account
       const subscriptionId = session.subscription;
-      const { data: org } = await supabaseAdmin
+      const { data: org } = await (supabaseAdmin as any)
         .from('organizations')
         .update({
           subscription_status: 'past_due'

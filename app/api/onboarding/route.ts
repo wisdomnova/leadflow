@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const supabase = getAdminClient();
 
     // 1. Update User Role and completion status
-    const { error: userError } = await supabase
+    const { error: userError } = await (supabase as any)
       .from("users")
       .update({ 
         onboarding_role: role || null,
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Update Organization goals/industry (only if not skipped)
     if (!skipped) {
-      const { error: orgError } = await supabase
+      const { error: orgError } = await (supabase as any)
         .from("organizations")
         .update({ 
           onboarding_goal: goal || null,

@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     const supabase = getAdminClient();
 
     // 1. Find user by token
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await (supabase as any)
       .from("users")
       .select("id, reset_token_expires")
       .eq("reset_token", token)
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Check expiration
-    if (new Date(user.reset_token_expires) < new Date()) {
+    if (new Date((user as any).reset_token_expires) < new Date()) {
       return NextResponse.json({ error: "Token has expired" }, { status: 400 });
     }
 
@@ -32,14 +32,14 @@ export async function POST(req: Request) {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // 4. Update User
-    await supabase
+    await (supabase as any)
       .from("users")
       .update({
         password_hash: hashedPassword,
         reset_token: null,
         reset_token_expires: null,
       })
-      .eq("id", user.id);
+      .eq("id", (user as any).id);
 
     return NextResponse.json({ success: true, message: "Password has been reset successfully." });
   } catch (err) {

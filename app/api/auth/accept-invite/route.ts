@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     );
 
     // 1. Find user with this reset_token (acting as invite token)
-    const { data: user, error: findError } = await supabase
+    const { data: user, error: findError } = await (supabase as any)
       .from("users")
       .select("*")
       .eq("reset_token", token)
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const passwordHash = await bcrypt.hash(password, salt);
 
     // 3. Update user: set password, verify them, and clear the token
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (supabase as any)
       .from("users")
       .update({
         password_hash: passwordHash,
@@ -42,35 +42,35 @@ export async function POST(req: Request) {
         reset_token_expires: null,
         updated_at: new Date().toISOString()
       })
-      .eq("id", user.id);
+      .eq("id", (user as any).id);
 
     if (updateError) throw updateError;
 
     // 4. Notify admin(s) that the invite was accepted
     try {
       // Get organization details
-      const { data: org } = await supabase
+      const { data: org } = await (supabase as any)
         .from("organizations")
         .select("name")
-        .eq("id", user.org_id)
+        .eq("id", (user as any).org_id)
         .single();
 
       // Get admins for this organization
-      const { data: admins } = await supabase
+      const { data: admins } = await (supabase as any)
         .from("users")
         .select("email, full_name")
-        .eq("org_id", user.org_id)
+        .eq("org_id", (user as any).org_id)
         .eq("role", "admin");
 
       if (admins && admins.length > 0) {
-        const orgName = org?.name || "your organization";
-        const newMemberName = user.full_name || user.email;
+        const orgName = (org as any)?.name || "your organization";
+        const newMemberName = (user as any).full_name || (user as any).email;
 
         // Send to all admins
         for (const admin of admins) {
           await resend.emails.send({
             from: 'Leadflow <onboarding@tryleadflow.ai>',
-            to: admin.email,
+            to: (admin as any).email,
             subject: `New Team Member Joined: ${newMemberName}`,
             html: `
               <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; border: 1px solid #f0f0f0; border-radius: 24px; background-color: #ffffff;">
@@ -81,8 +81,8 @@ export async function POST(req: Request) {
                 <p style="color: #667085; font-size: 16px; font-weight: 500; margin-bottom: 32px;"><strong>${newMemberName}</strong> has successfully accepted the invitation and joined <strong>${orgName}</strong> on Leadflow.</p>
                 
                 <div style="background-color: #f9fafb; padding: 20px; border-radius: 12px; margin-bottom: 32px;">
-                  <p style="margin: 0; color: #101828; font-size: 14px; font-weight: 600;">Email: ${user.email}</p>
-                  <p style="margin: 4px 0 0 0; color: #667085; font-size: 14px;">Role: ${user.role === 'admin' ? 'Admin' : 'SDR'}</p>
+                  <p style="margin: 0; color: #101828; font-size: 14px; font-weight: 600;">Email: ${(user as any).email}</p>
+                  <p style="margin: 4px 0 0 0; color: #667085; font-size: 14px;">Role: ${(user as any).role === 'admin' ? 'Admin' : 'SDR'}</p>
                 </div>
 
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/team" style="display: inline-block; background-color: #745DF3; color: white; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; box-shadow: 0 10px 15px -3px rgba(116, 93, 243, 0.2);">Manage Team</a>

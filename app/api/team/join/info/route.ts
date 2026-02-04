@@ -12,7 +12,7 @@ export async function GET(req: Request) {
 
   try {
     const adminClient = getAdminClient();
-    const { data: org, error } = await adminClient
+    const { data: org, error } = await (adminClient as any)
       .from("organizations")
       .select("name, auto_join_enabled")
       .eq("slug", slug)
@@ -24,8 +24,8 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      name: org.name,
-      autoJoinEnabled: org.auto_join_enabled
+      name: (org as any).name,
+      autoJoinEnabled: (org as any).auto_join_enabled
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

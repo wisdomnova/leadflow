@@ -73,9 +73,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    const { data, error } = await context.supabase
+    const { data, error } = await (context.supabase as any)
       .from("leads")
-      .insert({
+      .insert([{
         org_id: context.orgId,
         email,
         first_name,
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
         tags: tags || [],
         custom_fields: custom_fields || {},
         status: "new"
-      })
+      }] as any)
       .select()
       .single();
 

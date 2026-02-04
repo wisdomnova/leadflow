@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     const supabase = getAdminClient();
 
     // 1. Check if user already exists
-    const { data: existingUser } = await supabase
+    const { data: existingUser } = await (supabase as any)
       .from("users")
       .select("id")
       .eq("email", email)
@@ -32,16 +32,16 @@ export async function POST(req: Request) {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // 3. Create Organization
-    const { data: org, error: orgError } = await supabase
+    const { data: org, error: orgError } = await (supabase as any)
       .from("organizations")
-      .insert({
+      .insert([{
         name: orgName,
         slug: orgName.toLowerCase().replace(/\s+/g, "-"),
         plan: "free",
         subscription_status: "trialing",
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         referral_code: `LF-${crypto.randomBytes(4).toString('hex').toUpperCase()}`, // Generate a unique referral code for the new org
-      })
+      }] as any)
       .select()
       .single();
 
@@ -53,28 +53,28 @@ export async function POST(req: Request) {
     // 4. Process Referral if code exists
     if (referralCode) {
       try {
-        await processReferral(org.id, referralCode);
+        await processReferral((org as any).id, referralCode);
       } catch (err) {
         console.error("Referral processing error:", err);
       }
     }
 
     // 5. Create User
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await (supabase as any)
       .from("users")
-      .insert({
-        org_id: org.id,
+      .insert([{
+        org_id: (org as any).id,
         email,
         password_hash: hashedPassword,
         full_name: fullName,
         role: "admin",
-      })
+      }] as any)
       .select()
       .single();
 
     if (userError || !user) {
       console.error("User insertion error:", userError);
-      await supabase.from("organizations").delete().eq("id", org.id);
+      await (supabase as any).from("organizations").delete().eq("id", (org as any).id);
       return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
     }
 
@@ -116,9 +116,9 @@ export async function POST(req: Request) {
 
     // 7. Generate Session JWT
     const token = await signUserJWT({
-      userId: user.id,
-      orgId: org.id,
-      email: user.email,
+      userId: (user as any).id,
+      orgId: (org as any).id,
+      email: (user as any).email,
       role: "admin",
     });
 
@@ -132,7 +132,7 @@ export async function POST(req: Request) {
       path: "/",
     });
 
-    return NextResponse.json({ success: true, user: { email: user.email, fullName: user.full_name } });
+    return NextResponse.json({ success: true, user: { email: (user as any).email, fullName: (user as any).full_name } });
   } catch (err) {
     console.error("Signup error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

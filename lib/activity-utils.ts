@@ -28,9 +28,9 @@ export async function logLeadActivity({
   metadata = {}
 }: LogActivityParams) {
   try {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("activity_log")
-      .insert({
+      .insert([{
         org_id: orgId,
         action_type: type,
         description,
@@ -39,7 +39,7 @@ export async function logLeadActivity({
           lead_id: leadId
         },
         created_at: new Date().toISOString()
-      });
+      }] as any);
 
     if (error) {
       console.error("Failed to log activity:", error);

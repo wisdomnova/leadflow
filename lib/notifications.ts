@@ -31,7 +31,7 @@ export async function createNotification({
       .eq("role", "admin");
 
     if (admins && admins.length > 0) {
-      const notifications = admins.map(admin => ({
+      const notifications = (admins as any).map((admin: any) => ({
         user_id: admin.id,
         org_id: orgId,
         title,
@@ -41,12 +41,12 @@ export async function createNotification({
         link,
       }));
 
-      const { error } = await supabase.from("notifications").insert(notifications);
+      const { error } = await (supabase as any).from("notifications").insert(notifications as any);
       if (error) console.error("Failed to batch create notifications:", error);
     }
   } else {
     // Notify specific user
-    const { error } = await supabase.from("notifications").insert({
+    const { error } = await (supabase as any).from("notifications").insert([{
       user_id: userId,
       org_id: orgId,
       title,
@@ -54,7 +54,7 @@ export async function createNotification({
       type,
       category,
       link,
-    });
+    }] as any);
     if (error) console.error("Failed to create notification:", error);
   }
 }

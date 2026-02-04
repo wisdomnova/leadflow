@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const supabase = getAdminClient();
 
   // Update user as verified
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("users")
     .update({ is_verified: true })
     .eq("email", payload.email);

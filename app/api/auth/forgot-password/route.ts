@@ -18,7 +18,7 @@ export async function POST(req: Request) {
       .from("users")
       .select("id, full_name")
       .eq("email", email)
-      .single();
+      .single() as any;
 
     if (!user) {
       // Return success anyway for security reasons (don't leak registered emails)
@@ -30,13 +30,13 @@ export async function POST(req: Request) {
     const resetExpires = new Date(Date.now() + 3600000); // 1 hour
 
     // 3. Update User
-    await supabase
+    await (supabase as any)
       .from("users")
       .update({
         reset_token: resetToken,
         reset_token_expires: resetExpires.toISOString(),
       })
-      .eq("id", user.id);
+      .eq("id", (user as any).id);
 
     // 4. Send Email via Resend
     const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${resetToken}`;
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
             </div>
             <h1 style="font-size: 24px; font-weight: 800; margin-bottom: 16px; color: #101828;">Password Reset Request</h1>
             <p style="font-size: 16px; line-height: 1.6; color: #475467; margin-bottom: 24px;">
-              Hi ${user.full_name}, we received a request to reset your password. Click the button below to choose a new one.
+              Hi ${(user as any).full_name}, we received a request to reset your password. Click the button below to choose a new one.
             </p>
             <a href="${resetUrl}" style="display: inline-block; background-color: #745DF3; color: white; padding: 14px 28px; border-radius: 12px; font-weight: 700; text-decoration: none; margin-bottom: 24px; box-shadow: 0 10px 15px -3px rgba(116, 93, 243, 0.2);">
               Reset Password

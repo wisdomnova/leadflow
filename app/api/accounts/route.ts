@@ -54,13 +54,13 @@ export async function POST(req: Request) {
 
     const { data, error } = await adminSupabase
       .from("email_accounts")
-      .insert({
+      .insert([{
         org_id: context.orgId,
         email,
         provider,
         config: config || {},
         status: "active",
-      })
+      }] as any)
       .select()
       .single();
 

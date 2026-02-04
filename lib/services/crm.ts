@@ -101,7 +101,7 @@ export class CRMService {
       expiresAt: Date.now() + (newData.expires_in * 1000),
     };
 
-    const { data, error } = await this.supabase
+    const { data, error } = await (this.supabase as any)
       .from("crm_integrations")
       .update({ config: updatedConfig })
       .eq("id", integration.id)

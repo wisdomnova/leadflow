@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
     if (response.success) {
       // 3. Store the sent message in unibox_messages
-      await context.supabase.from("unibox_messages").insert({
+      await (context.supabase as any).from("unibox_messages").insert([{
         org_id: context.orgId,
         account_id: lead.email_accounts.id,
         message_id: response.messageId || `sent-${Date.now()}`,
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
         direction: 'outbound',
         is_read: true,
         received_at: new Date().toISOString()
-      });
+      }] as any);
 
       // 4. Update lead last contacted
       await context.supabase.from("leads").update({

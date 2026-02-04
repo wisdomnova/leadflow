@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     const adminClient = getAdminClient();
 
     // 1. Verify organization and token
-    const { data: org, error: orgError } = await adminClient
+    const { data: org, error: orgError } = await (adminClient as any)
       .from("organizations")
       .select("id, name, auto_join_enabled, join_token")
       .eq("slug", slug)
@@ -29,29 +29,29 @@ export async function POST(req: Request) {
     const context = await getSessionContext();
     
     // If action is JOIN and auto-join is enabled
-    if (action === 'JOIN' && org.auto_join_enabled) {
+    if (action === 'JOIN' && (org as any).auto_join_enabled) {
       if (!context) {
         return NextResponse.json({ error: "Authentication required" }, { status: 401 });
       }
 
       // Check if user already in an org
-      const { data: user } = await adminClient
+      const { data: user } = await (adminClient as any)
         .from("users")
         .select("org_id")
         .eq("id", context.userId)
         .single();
 
-      if (user?.org_id) {
-         if (user.org_id === org.id) {
+      if ((user as any)?.org_id) {
+         if ((user as any).org_id === (org as any).id) {
             return NextResponse.json({ success: true, message: "Already a member" });
          }
          return NextResponse.json({ error: "You are already a member of another organization" }, { status: 400 });
       }
 
       // Add user to org
-      const { error: updateError } = await adminClient
+      const { error: updateError } = await (adminClient as any)
         .from("users")
-        .update({ org_id: org.id, role: 'sdr' })
+        .update({ org_id: (org as any).id, role: 'sdr' })
         .eq("id", context.userId);
 
       if (updateError) throw updateError;
@@ -60,12 +60,12 @@ export async function POST(req: Request) {
     }
 
     // If action is REQUEST or auto-join is disabled
-    if (action === 'REQUEST' || !org.auto_join_enabled) {
+    if (action === 'REQUEST' || !(org as any).auto_join_enabled) {
       // Send email to admins
-      const { data: admins } = await adminClient
+      const { data: admins } = await (adminClient as any)
         .from("users")
         .select("email, full_name")
-        .eq("org_id", org.id)
+        .eq("org_id", (org as any).id)
         .eq("role", "admin");
 
       if (admins && admins.length > 0) {
@@ -75,12 +75,12 @@ export async function POST(req: Request) {
         for (const admin of admins) {
           await resend.emails.send({
             from: 'Leadflow <onboarding@tryleadflow.ai>',
-            to: admin.email,
-            subject: `Access Request: ${org.name}`,
+            to: (admin as any).email,
+            subject: `Access Request: ${(org as any).name}`,
             html: `
               <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; border: 1px solid #f0f0f0; border-radius: 24px; background-color: #ffffff;">
                 <h1 style="color: #101828; font-size: 24px; font-weight: 900; margin-bottom: 8px;">Access Request</h1>
-                <p style="color: #667085; font-size: 16px; font-weight: 500; margin-bottom: 32px;"><strong>${requesterEmail}</strong> is requesting to join <strong>${org.name}</strong> on Leadflow.</p>
+                <p style="color: #667085; font-size: 16px; font-weight: 500; margin-bottom: 32px;"><strong>${requesterEmail}</strong> is requesting to join <strong>${(org as any).name}</strong> on Leadflow.</p>
                 <p style="color: #667085; font-size: 14px; margin-bottom: 32px;">You can add them manually from your Team Dashboard.</p>
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/team" style="display: inline-block; background-color: #101828; color: white; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px;">Review Request</a>
               </div>

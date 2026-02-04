@@ -14,7 +14,7 @@ export async function GET() {
   try {
     const adminClient = getAdminClient();
     // Fetch users (relationship with campaigns is not direct, so we fetch separately or remove for now)
-    const { data: users, error } = await adminClient
+    const { data: users, error } = await (adminClient as any)
       .from("users")
       .select("*")
       .eq("org_id", context.orgId)
@@ -23,21 +23,21 @@ export async function GET() {
     if (error) throw error;
 
     // Fetch campaigns for the organization to calculate total active if needed
-    const { data: campaigns } = await adminClient
+    const { data: campaigns } = await (adminClient as any)
       .from("campaigns")
       .select("id, status")
       .eq("org_id", context.orgId);
 
 
     // Fetch Organization details for settings
-    const { data: org, error: orgError } = await adminClient
+    const { data: org, error: orgError } = await (adminClient as any)
       .from("organizations")
       .select("*")
       .eq("id", context.orgId)
       .single();
 
     // Fetch real Audit Logs (removed join with users as FK is missing in schema)
-    const { data: logs, error: logsError } = await adminClient
+    const { data: logs, error: logsError } = await (adminClient as any)
       .from("activity_log")
       .select("*")
       .eq("org_id", context.orgId)
@@ -56,7 +56,7 @@ export async function GET() {
     const avgReplyRateNum = totalSent > 0 ? (totalReplied / totalSent) * 100 : 0;
 
     // Format the response to match the frontend expectations
-    const formattedUsers = users.map((u: any) => ({
+    const formattedUsers = (users || []).map((u: any) => ({
       id: u.id,
       name: u.full_name || u.email.split('@')[0],
       role: 
@@ -75,29 +75,29 @@ export async function GET() {
 
     // Map logs (manually finding user from the users array)
     const formattedLogs = (logs || []).map((l: any) => {
-      const user = users.find((u: any) => u.id === l.user_id);
+      const user = (users || []).find((u: any) => u.id === l.user_id);
       return {
         id: l.id,
-        user: user?.full_name || user?.email || 'System',
+        user: (user as any)?.full_name || (user as any)?.email || 'System',
         action: l.description,
         date: new Date(l.created_at).toLocaleString(),
-        avatar: (user?.full_name || 'S').substring(0, 2).toUpperCase()
+        avatar: (((user as any)?.full_name || 'S').substring(0, 2)).toUpperCase()
       };
     });
 
     // Calculate aggregate team stats
     const stats = {
-      totalMembers: users.length,
+      totalMembers: (users || []).length,
       avgReplyRate: `${avgReplyRateNum.toFixed(1)}%`, 
       avgOpenRate: `${avgOpenRateNum.toFixed(1)}%`,
       totalOutbound: totalSent >= 1000 ? `${(totalSent / 1000).toFixed(1)}k` : totalSent.toString(),
       org: {
-        name: org?.name,
-        slug: org?.slug,
-        plan: org?.plan || 'free',
-        memberLimit: org?.plan === 'pro' ? 50 : org?.plan === 'enterprise' ? 500 : 5,
-        joinToken: org?.join_token,
-        autoJoinEnabled: org?.auto_join_enabled
+        name: (org as any)?.name,
+        slug: (org as any)?.slug,
+        plan: (org as any)?.plan || 'free',
+        memberLimit: (org as any)?.plan === 'pro' ? 50 : (org as any)?.plan === 'enterprise' ? 500 : 5,
+        joinToken: (org as any)?.join_token,
+        autoJoinEnabled: (org as any)?.auto_join_enabled
       },
       logs: formattedLogs
     };
@@ -132,24 +132,24 @@ export async function POST(req: Request) {
     inviteExpires.setHours(inviteExpires.getHours() + 48); // 48 hour expiry
 
     // 2. Fetch Org Name for email
-    const { data: org } = await context.supabase
+    const { data: org } = await (context.supabase as any)
       .from("organizations")
       .select("name")
       .eq("id", context.orgId)
       .single();
 
-    const orgName = org?.name || "your team";
+    const orgName = (org as any)?.name || "your team";
     const adminSupabase = getAdminClient();
 
     // 3. Check if user already exists
-    const { data: existingUser } = await adminSupabase
+    const { data: existingUser } = await (adminSupabase as any)
       .from("users")
       .select("id, org_id")
       .eq("email", email)
       .single();
 
     if (existingUser) {
-      if (existingUser.org_id === context.orgId) {
+      if ((existingUser as any).org_id === context.orgId) {
         return NextResponse.json({ error: "This user is already a member of your team." }, { status: 400 });
       } else {
         return NextResponse.json({ error: "A user with this email already exists on Leadflow." }, { status: 400 });
@@ -157,9 +157,9 @@ export async function POST(req: Request) {
     }
 
     // 4. Insert user record with token
-    const { data: newUser, error } = await context.supabase
+    const { data: newUser, error } = await (context.supabase as any)
       .from("users")
-      .insert({
+      .insert([{
         org_id: context.orgId,
         email,
         full_name: full_name || email.split('@')[0],
@@ -168,7 +168,7 @@ export async function POST(req: Request) {
         is_verified: false,
         reset_token: inviteToken,
         reset_token_expires: inviteExpires.toISOString()
-      })
+      }] as any)
       .select()
       .single();
 
@@ -225,19 +225,19 @@ export async function DELETE(req: Request) {
   try {
     // 1. Check if the user being deleted is an admin
     const adminClient = getAdminClient();
-    const { data: targetUser } = await adminClient
+    const { data: targetUser } = await (adminClient as any)
       .from("users")
       .select("role, id")
       .eq("id", userId)
       .eq("org_id", context.orgId)
       .single();
 
-    if (targetUser?.role === 'admin') {
+    if ((targetUser as any)?.role === 'admin') {
       return NextResponse.json({ error: "Administrative accounts cannot be removed." }, { status: 403 });
     }
 
     // 2. Perform deletion
-    const { error } = await context.supabase
+    const { error } = await (context.supabase as any)
       .from("users")
       .delete()
       .eq("id", userId)

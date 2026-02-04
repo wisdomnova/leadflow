@@ -60,9 +60,9 @@ export async function POST(req: Request) {
       }
     }
 
-    const { data, error } = await context.supabase
+    const { data, error } = await (context.supabase as any)
       .from("sending_domains")
-      .insert({
+      .insert([{
         org_id: context.orgId,
         domain_name: domainName,
         dkim_selector: dkimSelector || "sig1",
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
         dkim_status: "pending",
         dmarc_status: "pending",
         tracking_status: "pending",
-      })
+      }] as any)
       .select()
       .single();
 

@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       const bounceType = bounce.bounceType; // Permanent or Transient
 
       // Mark lead as bounced and stop campaigns
-      const { data: lead } = await supabase
+      const { data: lead } = await (supabase as any)
         .from("leads")
         .update({ status: 'bounced' })
         .eq("email", toAddress)
@@ -39,15 +39,15 @@ export async function POST(req: NextRequest) {
 
       if (lead) {
         // Increment bounce stats for all active campaigns this lead was in
-        await supabase
+        await (supabase as any)
           .from("campaign_recipients")
           .update({ status: 'bounced' })
-          .eq("lead_id", lead.id)
+          .eq("lead_id", (lead as any).id)
           .eq("status", "active");
 
         // Log activity
-        await supabase.from("activity_log").insert({
-          org_id: lead.org_id,
+        await (supabase as any).from("activity_log").insert({
+          org_id: (lead as any).org_id,
           action_type: "email.bounce",
           description: `Email bounced (${bounceType}): ${toAddress}`,
           metadata: { ses_message_id: sesMessageId, bounce_info: bounce }
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
         // Create notification
         await createNotification({
-          orgId: lead.org_id,
+          orgId: (lead as any).org_id,
           title: "Email Bounced",
           description: `An email to ${toAddress} bounced (${bounceType}). The lead has been marked as inactive.`,
           type: "warning",
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     if (eventType === "Complaint") {
       // Mark as unsubscribed/complained & fetch lead info
-      const { data: lead } = await supabase
+      const { data: lead } = await (supabase as any)
         .from("leads")
         .update({ status: 'complained' })
         .eq("email", toAddress)
@@ -76,10 +76,10 @@ export async function POST(req: NextRequest) {
         
       if (lead) {
         // Stop campaigns for this lead
-        await supabase
+        await (supabase as any)
           .from("campaign_recipients")
           .update({ status: 'complained' })
-          .eq("lead_id", lead.id)
+          .eq("lead_id", (lead as any).id)
           .eq("status", "active");
 
         // Create notification
@@ -93,8 +93,8 @@ export async function POST(req: NextRequest) {
         });
 
         // Log activity
-        await supabase.from("activity_log").insert({
-          org_id: lead.org_id,
+        await (supabase as any).from("activity_log").insert({
+          org_id: (lead as any).org_id,
           action_type: "email.complaint",
           description: `Spam complaint from: ${toAddress}`,
           metadata: { ses_message_id: sesMessageId }
