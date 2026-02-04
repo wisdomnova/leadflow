@@ -3,8 +3,11 @@ import { cookies } from "next/headers";
 import { verifyUserJWT } from "@/lib/jwt";
 import { getAdminClient } from "@/lib/supabase";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const minimal = searchParams.get('minimal') === 'true';
+
     const cookieStore = await cookies();
     const token = cookieStore.get("session_token")?.value;
 
@@ -19,46 +22,77 @@ export async function GET() {
 
     const supabase = getAdminClient();
 
-    // Fetch user and organization info
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .select(`
-        *,
-        organizations (
-          name,
-          plan,
-          subscription_status,
-          trial_ends_at
-        )
-      `)
-      .eq("id", payload.userId)
-      .single();
+    // If minimal requested, only fetch user and org info (for header/dropdown)
+    if (minimal) {
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select(`
+          full_name,
+          email,
+          avatar_url,
+          organizations (
+            name,
+            plan
+          )
+        `)
+        .eq("id", payload.userId)
+        .single();
+      
+      if (userError || !user) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+      
+      return NextResponse.json({ user });
+    }
+
+    const firstDayOfMonth = new Date();
+    firstDayOfMonth.setDate(1);
+    firstDayOfMonth.setHours(0, 0, 0, 0);
+    const firstDayOfMonthStr = firstDayOfMonth.toISOString().split('T')[0];
+
+    // Fetch everything in parallel
+    const [
+      { data: user, error: userError },
+      { count: campaignsCount },
+      { count: leadsCount },
+      { data: analyticsData },
+      { data: campaignStats }
+    ] = await Promise.all([
+      supabase
+        .from("users")
+        .select(`
+          *,
+          organizations (
+            name,
+            plan,
+            subscription_status,
+            trial_ends_at
+          )
+        `)
+        .eq("id", payload.userId)
+        .single(),
+      supabase
+        .from("campaigns")
+        .select("*", { count: 'exact', head: true })
+        .eq("org_id", payload.orgId),
+      supabase
+        .from("leads")
+        .select("*", { count: 'exact', head: true })
+        .eq("org_id", payload.orgId),
+      supabase
+        .from("analytics_daily")
+        .select("sent_count, reply_count")
+        .eq("org_id", payload.orgId)
+        .gte("date", firstDayOfMonthStr),
+      supabase
+        .from("campaigns")
+        .select("reply_count")
+        .eq("org_id", payload.orgId)
+    ]);
 
     if (userError || !user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-
-    // Fetch some stats for the profile
-    const { count: campaignsCount } = await supabase
-      .from("campaigns")
-      .select("*", { count: 'exact', head: true })
-      .eq("org_id", payload.orgId);
-
-    const { count: leadsCount } = await supabase
-      .from("leads")
-      .select("*", { count: 'exact', head: true })
-      .eq("org_id", payload.orgId);
-
-    // Fetch Analytics for live goals
-    const firstDayOfMonth = new Date();
-    firstDayOfMonth.setDate(1);
-    firstDayOfMonth.setHours(0, 0, 0, 0);
-
-    const { data: analyticsData } = await supabase
-      .from("analytics_daily")
-      .select("sent_count, reply_count")
-      .eq("org_id", payload.orgId)
-      .gte("date", firstDayOfMonth.toISOString().split('T')[0]);
 
     const totalSentThisMonth = analyticsData?.reduce((acc, curr) => acc + (curr.sent_count || 0), 0) || 0;
     const totalRepliesThisMonth = analyticsData?.reduce((acc, curr) => acc + (curr.reply_count || 0), 0) || 0;
@@ -67,8 +101,6 @@ export async function GET() {
     const actualResponseRate = totalSentThisMonth > 0 ? (totalRepliesThisMonth / totalSentThisMonth) * 100 : 0;
 
     // Attainment calculations
-    // If target is 1000 emails and sent 850, monthlyTargetAttainment is 85%
-    // If goal is 10% response rate and actual is 9.2%, responseRateAttainment is 92%
     const monthlyTargetAttainment = user.monthly_target_goal > 0 
       ? Math.min(Math.round((totalSentThisMonth / user.monthly_target_goal) * 100), 100)
       : 0;
@@ -77,12 +109,6 @@ export async function GET() {
       ? Math.min(Math.round((actualResponseRate / user.response_rate_goal) * 100), 100)
       : 0;
 
-    // Fetch total replies from all time for the stats card
-    const { data: campaignStats } = await supabase
-      .from("campaigns")
-      .select("reply_count")
-      .eq("org_id", payload.orgId);
-    
     const totalRepliesAllTime = campaignStats?.reduce((acc, curr) => acc + (curr.reply_count || 0), 0) || 0;
 
     return NextResponse.json({

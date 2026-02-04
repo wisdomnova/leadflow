@@ -8,18 +8,16 @@ export async function POST(req: NextRequest) {
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { goal, audience, tone, companyInfo, existingContent } = body;
-
-    if (!goal || !audience) {
-      return NextResponse.json({ error: "Goal and Audience are required" }, { status: 400 });
-    }
+    const { goal, audience, tone, companyInfo, existingContent, fullSequence, currentStepIndex } = body;
 
     const suggestion = await generateCampaignContent({ 
-        goal, 
-        targetAudience: audience, 
+        goal: goal || "Optimize sequence", 
+        targetAudience: audience || "Prospect", 
         tone: tone || "Professional", 
         companyInfo,
-        existingContent
+        existingContent,
+        fullSequence,
+        currentStepIndex
     });
 
     return NextResponse.json(suggestion);

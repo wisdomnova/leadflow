@@ -63,7 +63,7 @@ export default function CRMPage() {
 
   const providers = [
     { id: 'hubspot', name: 'HubSpot', description: 'Sync contacts, deals, and activity with HubSpot CRM.', icon: 'https://www.vectorlogo.zone/logos/hubspot/hubspot-icon.svg', color: '#FF7A59' },
-    { id: 'pipedrive', name: 'Pipedrive', description: 'Connect your Pipedrive account to automate lead handoff.', icon: 'https://www.vectorlogo.zone/logos/pipedrive/pipedrive-icon.svg', color: '#222222' },
+    { id: 'pipedrive', name: 'Pipedrive', description: 'Connect your Pipedrive account to automate lead handoff.', icon: 'https://raw.githubusercontent.com/dochne/wappalyzer/206b81ff73111aa98af217f35b8f3003e2730617/src/images/icons/Pipedrive.svg', color: '#222222' },
     { id: 'salesforce', name: 'Salesforce', description: 'Enterprise-grade integration for high-volume outbound.', icon: 'https://www.vectorlogo.zone/logos/salesforce/salesforce-icon.svg', color: '#00A1E0' }
   ];
 

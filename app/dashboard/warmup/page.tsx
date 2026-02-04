@@ -7,6 +7,7 @@ import Header from '@/components/dashboard/Header';
 import ConfirmModal from '@/components/dashboard/ConfirmModal';
 import WarmupSettingsModal from '@/components/dashboard/WarmupSettingsModal';
 import AddWarmupAccountModal from '@/components/dashboard/AddWarmupAccountModal';
+import WarmupStatsModal from '@/components/dashboard/WarmupStatsModal';
 import { 
   Flame, 
   TrendingUp, 
@@ -48,11 +49,23 @@ export default function WarmupPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number, left: number } | null>(null);
+  
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    show: boolean;
+    accountId: string | null;
+    email: string;
+  }>({
+    show: false,
+    accountId: null,
+    email: ''
+  });
   
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [selectedAccountForSettings, setSelectedAccountForSettings] = useState<any | null>(null);
+  
+  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [selectedAccountForStats, setSelectedAccountForStats] = useState<any | null>(null);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -111,19 +124,24 @@ export default function WarmupPage() {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    if (accountToDelete !== null) {
+  const executeDeleteAccount = async () => {
+    if (deleteConfirmModal.accountId !== null) {
       try {
-        const res = await fetch(`/api/accounts/${accountToDelete}`, { method: 'DELETE' });
+        const res = await fetch(`/api/accounts/${deleteConfirmModal.accountId}`, { method: 'DELETE' });
         if (res.ok) {
-          setAccounts(prev => prev.filter(a => a.id !== accountToDelete));
-          setAccountToDelete(null);
-          setIsDeleteModalOpen(false);
+          setAccounts(prev => prev.filter(a => a.id !== deleteConfirmModal.accountId));
+          setDeleteConfirmModal({ show: false, accountId: null, email: '' });
         }
       } catch (err) {
         console.error("Failed to delete account:", err);
       }
     }
+  };
+
+  const handleDetailedStats = (account: any) => {
+    setSelectedAccountForStats(account);
+    setIsStatsModalOpen(true);
+    setActiveMenuId(null);
   };
 
   const handleRefresh = async () => {
@@ -140,6 +158,8 @@ export default function WarmupPage() {
   const filteredAccounts = accounts.filter(acc => 
     acc.warmup_enabled && acc.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const activeWarmupCount = accounts.filter(a => a.warmup_enabled).length;
 
   const stats = [
     { 
@@ -162,7 +182,7 @@ export default function WarmupPage() {
     },
     { 
       name: 'Active Accounts', 
-      value: dashboardStats.activeAccounts.toString(), 
+      value: activeWarmupCount.toString(), 
       change: '0.0%', 
       icon: Mail 
     },
@@ -352,7 +372,11 @@ export default function WarmupPage() {
                                   
                                   <div className="relative">
                                     <button 
-                                      onClick={() => setActiveMenuId(activeMenuId === account.id ? null : account.id)}
+                                      onClick={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setMenuPosition({ top: rect.bottom + 8, left: rect.right - 192 });
+                                        setActiveMenuId(activeMenuId === account.id ? null : account.id);
+                                      }}
                                       className={`p-2 rounded-xl transition-all ${
                                         activeMenuId === account.id ? 'bg-[#101828] text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'
                                       }`}
@@ -363,12 +387,17 @@ export default function WarmupPage() {
                                     <AnimatePresence>
                                       {activeMenuId === account.id && (
                                         <>
-                                          <div className="fixed inset-0 z-[100]" onClick={() => setActiveMenuId(null)} />
-                                            <motion.div
-                                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                          <div className="fixed inset-0 z-[1000]" onClick={() => setActiveMenuId(null)} />
+                                          <motion.div
+                                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                            className="absolute right-0 mt-2 w-48 bg-white rounded-2xl border border-gray-100 shadow-2xl z-[101] py-2 overflow-hidden"
+                                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                            style={{ 
+                                              position: 'fixed',
+                                              top: menuPosition?.top,
+                                              left: menuPosition?.left,
+                                            }}
+                                            className="w-48 bg-white rounded-2xl border border-gray-100 shadow-2xl z-[1001] py-2 overflow-hidden"
                                           >
                                             <button 
                                               onClick={() => {
@@ -381,15 +410,21 @@ export default function WarmupPage() {
                                               <Settings className="w-4 h-4 text-gray-400" />
                                               Warmup Settings
                                             </button>
-                                            <button className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors">
+                                            <button 
+                                              onClick={() => handleDetailedStats(account)}
+                                              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
                                               <BarChart3 className="w-4 h-4 text-[#745DF3]" />
                                               Detailed Stats
                                             </button>
                                             <div className="my-1 border-t border-gray-50" />
                                             <button 
                                               onClick={() => {
-                                                setAccountToDelete(account.id);
-                                                setIsDeleteModalOpen(true);
+                                                setDeleteConfirmModal({
+                                                  show: true,
+                                                  accountId: account.id,
+                                                  email: account.email
+                                                });
                                                 setActiveMenuId(null);
                                               }}
                                               className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
@@ -420,16 +455,6 @@ export default function WarmupPage() {
                     </table>
                   </div>
                 </div>
-
-                {filteredAccounts.length === 0 && (
-                  <div className="p-20 text-center bg-white rounded-[2.5rem] border border-gray-100">
-                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <Search className="w-10 h-10 text-gray-200" />
-                    </div>
-                    <h3 className="text-xl font-black text-[#101828]">No accounts matching your search</h3>
-                    <p className="text-gray-500 font-medium mt-2">Try searching for a different email or provider.</p>
-                  </div>
-                )}
 
                 {/* Warmup Explainers */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -542,25 +567,25 @@ export default function WarmupPage() {
 
                     <div className="flex gap-4">
                       <div className="flex flex-col items-center">
-                        <div className={`w-3 h-3 rounded-full ${accounts.length > 0 ? 'bg-emerald-500 ring-emerald-50' : 'bg-gray-300 ring-gray-100'} ring-4`} />
-                        <div className={`w-0.5 h-12 ${accounts.length > 0 ? 'bg-emerald-100' : 'bg-gray-100'}`} />
+                        <div className={`w-3 h-3 rounded-full ${activeWarmupCount > 0 ? 'bg-emerald-500 ring-emerald-50' : 'bg-gray-300 ring-gray-100'} ring-4`} />
+                        <div className={`w-0.5 h-12 ${activeWarmupCount > 0 ? 'bg-emerald-100' : 'bg-gray-100'}`} />
                       </div>
                       <div className="flex-1">
-                        <h4 className={`text-sm font-black ${accounts.length > 0 ? 'text-[#101828]' : 'text-gray-400'}`}>Accounts Connected</h4>
+                        <h4 className={`text-sm font-black ${activeWarmupCount > 0 ? 'text-[#101828]' : 'text-gray-400'}`}>Accounts Connected</h4>
                         <p className="text-xs text-gray-500 font-medium mt-1">
-                          {accounts.length > 0 ? `${accounts.length} sending accounts found.` : 'No accounts connected yet.'}
+                          {activeWarmupCount > 0 ? `${activeWarmupCount} sending accounts found.` : 'No accounts connected yet.'}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex gap-4">
                       <div className="flex flex-col items-center">
-                        <div className={`w-3 h-3 rounded-full ${dashboardStats.activeAccounts > 0 ? 'bg-[#745DF3] animate-pulse ring-[#745DF3]/10' : 'bg-gray-300 ring-gray-100'} ring-4`} />
+                        <div className={`w-3 h-3 rounded-full ${activeWarmupCount > 0 ? 'bg-[#745DF3] animate-pulse ring-[#745DF3]/10' : 'bg-gray-300 ring-gray-100'} ring-4`} />
                       </div>
                       <div className="flex-1">
-                        <h4 className={`text-sm font-black ${dashboardStats.activeAccounts > 0 ? 'text-[#745DF3]' : 'text-gray-400'}`}>Warmup Algorithm</h4>
+                        <h4 className={`text-sm font-black ${activeWarmupCount > 0 ? 'text-[#745DF3]' : 'text-gray-400'}`}>Warmup Algorithm</h4>
                         <p className="text-xs text-gray-500 font-medium mt-1">
-                          {dashboardStats.activeAccounts > 0 ? 'Reputation engine active.' : 'Enable warmup to start.'}
+                          {activeWarmupCount > 0 ? 'Reputation engine active.' : 'Enable warmup to start.'}
                         </p>
                       </div>
                     </div>
@@ -573,14 +598,13 @@ export default function WarmupPage() {
       </main>
 
       <ConfirmModal 
-        isOpen={isDeleteModalOpen}
-        onClose={() => {
-          setIsDeleteModalOpen(false);
-          setAccountToDelete(null);
-        }}
-        onConfirm={handleDeleteAccount}
-        title="Remove Account"
-        description="Are you sure you want to remove this account? All warmup history and settings will be permanently lost. This action cannot be undone."
+        isOpen={deleteConfirmModal.show}
+        onClose={() => setDeleteConfirmModal({ show: false, accountId: null, email: '' })}
+        onConfirm={executeDeleteAccount}
+        title="Delete Account?"
+        description={`Are you sure you want to remove "${deleteConfirmModal.email}"? This will disconnect the mailbox from the entire platform and all active warmup data will be lost.`}
+        confirmText="Yes, Remove"
+        cancelText="Keep Account"
         type="danger"
       />
 
@@ -601,6 +625,15 @@ export default function WarmupPage() {
         onClose={() => setIsAddModalOpen(false)}
         availableAccounts={accounts.filter(acc => !acc.warmup_enabled)}
         onAdd={() => fetchAccounts()}
+      />
+
+      <WarmupStatsModal 
+        isOpen={isStatsModalOpen}
+        onClose={() => {
+          setIsStatsModalOpen(false);
+          setSelectedAccountForStats(null);
+        }}
+        account={selectedAccountForStats}
       />
     </div>
   );

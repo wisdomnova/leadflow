@@ -14,18 +14,6 @@ export async function GET(req: Request) {
     const supabase = context.supabase;
     const orgId = context.orgId;
 
-    // 1. Fetch campaigns for "Top Performers" and summary
-    const { data: campaigns, error: campaignsError } = await supabase
-      .from("campaigns")
-      .select("id, name, sent_count, open_count, reply_count, click_count")
-      .eq("org_id", orgId)
-      .gt('sent_count', 0)
-      .order("sent_count", { ascending: false })
-      .limit(5);
-
-    if (campaignsError) throw campaignsError;
-
-    // 2. Fetch daily stats for growth/trends
     const now = new Date();
     const periodStart = new Date();
     periodStart.setDate(now.getDate() - days);
@@ -33,13 +21,27 @@ export async function GET(req: Request) {
     const prevPeriodStart = new Date();
     prevPeriodStart.setDate(now.getDate() - (days * 2));
 
-    const { data: dailyStats, error: dailyError } = await supabase
-      .from("analytics_daily")
-      .select("*")
-      .eq("org_id", orgId)
-      .gte("date", prevPeriodStart.toISOString().split('T')[0])
-      .order("date", { ascending: false });
+    // 1 & 2. Fetch everything in parallel
+    const [
+      { data: campaigns, error: campaignsError },
+      { data: dailyStats, error: dailyError }
+    ] = await Promise.all([
+      supabase
+        .from("campaigns")
+        .select("id, name, sent_count, open_count, reply_count, click_count")
+        .eq("org_id", orgId)
+        .gt('sent_count', 0)
+        .order("sent_count", { ascending: false })
+        .limit(5),
+      supabase
+        .from("analytics_daily")
+        .select("*")
+        .eq("org_id", orgId)
+        .gte("date", prevPeriodStart.toISOString().split('T')[0])
+        .order("date", { ascending: false })
+    ]);
 
+    if (campaignsError) throw campaignsError;
     if (dailyError) throw dailyError;
 
     // Split stats into current and previous periods

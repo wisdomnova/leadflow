@@ -18,10 +18,15 @@ export function LogoutProvider({ children }: { children: React.ReactNode }) {
   const openLogoutModal = () => setIsOpen(true);
   const closeLogoutModal = () => setIsOpen(false);
 
-  const handleLogout = () => {
-    // In a real app, you would clear cookies/tokens here
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/signout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
     setIsOpen(false);
     router.push('/signin');
+    router.refresh(); // Ensure the middleware re-evaluates the session
   };
 
   return (

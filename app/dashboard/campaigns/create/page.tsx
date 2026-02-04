@@ -21,6 +21,8 @@ import {
   AlertCircle,
   LogOut,
   Sparkles,
+  RotateCcw,
+  ArrowRight,
   X
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/Sidebar';
@@ -65,7 +67,14 @@ export default function CreateCampaignPage() {
   const [isOptimizingAI, setIsOptimizingAI] = useState(false);
   const [aiGoal, setAiGoal] = useState('');
   const [aiAudience, setAiAudience] = useState('');
+  const [aiCompanyInfo, setAiCompanyInfo] = useState('');
+  const [aiTone, setAiTone] = useState('Professional');
   const [showAiModal, setShowAiModal] = useState(false);
+  
+  // AI Preview States
+  const [aiPreview, setAiPreview] = useState<{ subject: string, body: string, recommendation?: string } | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewSource, setPreviewSource] = useState<'generate' | 'optimize'>('generate');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -112,13 +121,23 @@ export default function CreateCampaignPage() {
       const res = await fetch('/api/campaigns/generate-content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal: aiGoal, audience: aiAudience })
+        body: JSON.stringify({ 
+          goal: aiGoal, 
+          audience: aiAudience,
+          companyInfo: aiCompanyInfo,
+          tone: aiTone
+        })
       });
       
       const data = await res.json();
       if (data.subject && data.body) {
-        updateStepContent(activeStepIndex, 'subject', data.subject);
-        updateStepContent(activeStepIndex, 'body', data.body);
+        setAiPreview({ 
+          subject: data.subject, 
+          body: data.body,
+          recommendation: data.recommendation 
+        });
+        setPreviewSource('generate');
+        setShowPreviewModal(true);
         setShowAiModal(false);
       }
     } catch (err) {
@@ -130,7 +149,9 @@ export default function CreateCampaignPage() {
 
   const handleAIOptimize = async () => {
     const currentStepData = emailSteps[activeStepIndex];
-    if (!currentStepData.body) return alert("Write something first to optimize");
+    if (!currentStepData?.body && !currentStepData?.subject) {
+      return alert("Write a subject or body first so the AI can suggest improvements, or use 'AI Rewrite' to generate from scratch.");
+    }
     
     setIsOptimizingAI(true);
     try {
@@ -138,17 +159,25 @@ export default function CreateCampaignPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-            goal: "Optimize this existing cold email for higher response rates", 
-            audience: "The current contact",
+            goal: "Contextual sequence optimization", 
+            audience: aiAudience || "Target Prospect",
+            companyInfo: aiCompanyInfo,
+            tone: aiTone,
             existingContent: currentStepData.body,
-            tone: "Professional but engaging"
+            fullSequence: emailSteps,
+            currentStepIndex: activeStepIndex
         })
       });
       
       const data = await res.json();
       if (data.subject || data.body) {
-        if (data.subject) updateStepContent(activeStepIndex, 'subject', data.subject);
-        if (data.body) updateStepContent(activeStepIndex, 'body', data.body);
+        setAiPreview({ 
+          subject: data.subject || currentStepData.subject, 
+          body: data.body || currentStepData.body,
+          recommendation: data.recommendation
+        });
+        setPreviewSource('optimize');
+        setShowPreviewModal(true);
       }
     } catch (err) {
       console.error("AI Optimization error:", err);
@@ -184,6 +213,29 @@ export default function CreateCampaignPage() {
     const newSteps = [...emailSteps];
     newSteps[index] = { ...newSteps[index], [field]: value };
     setEmailSteps(newSteps);
+  };
+
+  const getMissingVariables = (text: string) => {
+    const matches = text.match(/{{(.*?)}}/g);
+    if (!matches) return [];
+    
+    const usedVars = Array.from(new Set(matches.map(m => m.slice(2, -2).trim())));
+    
+    const leadsToCheck = selectedLeadIds.length > 0 
+      ? availableLeads.filter(l => selectedLeadIds.includes(l.id))
+      : availableLeads;
+      
+    if (leadsToCheck.length === 0) return usedVars;
+
+    const availableKeys = new Set<string>();
+    leadsToCheck.forEach(lead => {
+      Object.keys(lead).forEach(key => availableKeys.add(key));
+      if (lead.custom_fields && typeof lead.custom_fields === 'object') {
+        Object.keys(lead.custom_fields).forEach(key => availableKeys.add(key));
+      }
+    });
+
+    return usedVars.filter(v => !availableKeys.has(v));
   };
 
   const nextStep = () => {
@@ -346,32 +398,6 @@ export default function CreateCampaignPage() {
                   </div>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={handleSaveDraft}
-                  className="px-6 py-2.5 text-sm font-black text-gray-500 hover:bg-gray-50 rounded-xl transition-all"
-                >
-                  Save as Draft
-                </button>
-                <button 
-                  onClick={nextStep}
-                  disabled={isLaunching || (currentStep === steps.length && isLaunchDisabled)}
-                  className={`px-8 py-2.5 bg-[#745DF3] text-white rounded-xl text-sm font-black shadow-xl shadow-[#745DF3]/20 hover:scale-105 transition-all flex items-center gap-2 ${isLaunching || (currentStep === steps.length && isLaunchDisabled) ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
-                >
-                  {isLaunching ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Launching...
-                    </>
-                  ) : (
-                    <>
-                      {currentStep === steps.length ? 'Launch Campaign' : 'Continue'}
-                      <ChevronRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </div>
             </div>
           </div>
 
@@ -391,7 +417,7 @@ export default function CreateCampaignPage() {
             )}
           </AnimatePresence>
 
-          <div className="max-w-[1400px] mx-auto p-8">
+          <div className="max-w-[1400px] mx-auto p-8 pb-32">
             <AnimatePresence mode="wait">
               {currentStep === 1 && (
                 <motion.div
@@ -695,34 +721,59 @@ export default function CreateCampaignPage() {
 
                   {/* WYSIWYG Editor */}
                   <div className="lg:col-span-2 space-y-6">
+                    {/* AI Assistance Bar */}
+                    <div className="bg-gradient-to-r from-[#745DF3]/5 to-[#9281f7]/5 rounded-[2rem] border border-[#745DF3]/10 p-5 flex items-center justify-between">
+                       <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-white border border-[#745DF3]/20 flex items-center justify-center text-[#745DF3] shadow-sm">
+                             <Sparkles className="w-5 h-5" />
+                          </div>
+                          <div>
+                             <h4 className="text-xs font-black text-[#101828] uppercase tracking-wider">AI Writing Assistant</h4>
+                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Optimize or generate your content</p>
+                          </div>
+                       </div>
+                       <div className="flex items-center gap-3">
+                          <button 
+                            onClick={handleAIOptimize}
+                            disabled={isOptimizingAI || (!emailSteps[activeStepIndex]?.body && !emailSteps[activeStepIndex]?.subject)}
+                            className={`px-4 py-2 bg-white text-[#745DF3] border border-[#745DF3]/20 rounded-xl text-[10px] font-black hover:border-[#745DF3] transition-all uppercase tracking-widest flex items-center gap-2 ${(!emailSteps[activeStepIndex]?.body && !emailSteps[activeStepIndex]?.subject) ? 'opacity-30 cursor-not-allowed' : ''}`}
+                          >
+                            {isOptimizingAI ? <Loader2 className="w-3 h-3 animate-spin" /> : <Type className="w-3 h-3" />}
+                            Suggest Improvements
+                          </button>
+                          <button 
+                            onClick={() => setShowAiModal(true)}
+                            className="px-4 py-2 bg-[#745DF3] text-white rounded-xl text-[10px] font-black hover:scale-105 transition-all uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-[#745DF3]/10"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            AI Rewrite
+                          </button>
+                       </div>
+                    </div>
+
                     <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
                       {/* Editor Toolbar */}
                       <div className="px-8 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
-                        <div className="flex items-center gap-1">
-                          <button 
-                            onClick={() => setShowAiModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#745DF3] to-[#9281f7] text-white rounded-lg text-xs font-black shadow-lg shadow-[#745DF3]/20 hover:scale-105 transition-all"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            AI Rewrite
-                          </button>
-                          
+                        <div className="flex items-center gap-3">
                           {/* Dynamic Variable Selector */}
-                          <div className="relative group/vars ml-2">
-                            <button className="flex items-center gap-2 px-4 py-2 bg-white text-[#101828] rounded-lg text-xs font-black border border-gray-100 group-hover/vars:border-[#745DF3]/20 transition-all">
+                          <div className="relative group/vars">
+                            <button className="flex items-center gap-2 px-4 py-2 bg-white text-[#101828] rounded-lg text-[10px] font-black border border-gray-100 group-hover/vars:border-[#745DF3]/20 transition-all uppercase tracking-widest">
                               <UserPlus className="w-3.5 h-3.5 text-[#745DF3]" />
                               Insert Variable
                             </button>
                             <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 py-3 opacity-0 invisible group-hover/vars:opacity-100 group-hover/vars:visible transition-all z-[60] max-h-64 overflow-y-auto no-scrollbar">
                               {(() => {
                                 // Extract unique keys from available leads, excluding metadata
-                                const skipKeys = ['id', 'org_id', 'created_at', 'status', 'last_contacted_at', 'updated_at', 'metadata'];
+                                const skipKeys = ['id', 'org_id', 'created_at', 'status', 'last_contacted_at', 'updated_at', 'metadata', 'custom_fields'];
                                 const dynamicKeys = new Set(['first_name', 'last_name', 'company', 'email']); // Defaults
                                 
                                 availableLeads.forEach(lead => {
                                   Object.keys(lead).forEach(key => {
                                     if (!skipKeys.includes(key)) dynamicKeys.add(key);
                                   });
+                                  if (lead.custom_fields && typeof lead.custom_fields === 'object') {
+                                    Object.keys(lead.custom_fields).forEach(key => dynamicKeys.add(key));
+                                  }
                                 });
 
                                 return Array.from(dynamicKeys).map((key) => {
@@ -748,8 +799,10 @@ export default function CreateCampaignPage() {
                             const spamWords = ['free', 'money', 'winner', 'cash', 'urgent', 'strictly', 'guarantee', 'click here', 'act now', 'limited time'];
                             const toxicWords = ['fuck', 'shit', 'asshole', 'bitch', 'idiot', 'scam', 'hate', 'stupid'];
                             
-                            const subject = (emailSteps[activeStepIndex]?.subject || '').toLowerCase();
-                            const body = (emailSteps[activeStepIndex]?.body || '').toLowerCase();
+                            const curSubject = emailSteps[activeStepIndex]?.subject || '';
+                            const curBody = emailSteps[activeStepIndex]?.body || '';
+                            const subject = curSubject.toLowerCase();
+                            const body = curBody.toLowerCase();
                             const combined = subject + ' ' + body;
                             
                             // Use regex with word boundaries to avoid false positives (e.g., "assessment" triggering "ass")
@@ -763,27 +816,23 @@ export default function CreateCampaignPage() {
                               return regex.test(combined);
                             });
                             
-                            if (hasToxic) {
-                              return (
-                                <span className="text-[10px] font-black text-red-500 bg-red-50 px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
-                                  <AlertCircle className="w-3 h-3" />
-                                  Risk: Toxic Content
-                                </span>
-                              );
-                            }
-                            
-                            if (hasSpam) {
-                              return (
-                                <span className="text-[10px] font-black text-orange-500 bg-orange-50 px-3 py-1 rounded-full uppercase tracking-widest">
-                                  Spam Score: Caution
-                                </span>
-                              );
-                            }
-
                             return (
-                              <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-widest">
-                                Spam Score: Safe
-                              </span>
+                              <div className="flex items-center gap-3">
+                                {hasToxic ? (
+                                  <span className="text-[10px] font-black text-red-500 bg-red-50 px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    Risk: Toxic Content
+                                  </span>
+                                ) : hasSpam ? (
+                                  <span className="text-[10px] font-black text-orange-500 bg-orange-50 px-3 py-1 rounded-full uppercase tracking-widest">
+                                    Spam Score: Caution
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-widest">
+                                    Spam Score: Safe
+                                  </span>
+                                )}
+                              </div>
                             );
                           })()}
                         </div>
@@ -791,6 +840,35 @@ export default function CreateCampaignPage() {
 
                       {/* Editor Inputs */}
                       <div className="flex-1 flex flex-col">
+                        {(() => {
+                          const curSubject = emailSteps[activeStepIndex]?.subject || '';
+                          const curBody = emailSteps[activeStepIndex]?.body || '';
+                          const missingVars = getMissingVariables(curSubject + ' ' + curBody);
+                          
+                          if (missingVars.length === 0) return null;
+                          
+                          return (
+                            <div className="px-8 py-3 bg-red-50/50 border-b border-red-100 flex items-center justify-between animate-in slide-in-from-top duration-300">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                                  <AlertCircle className="w-4 h-4 text-red-600" />
+                                </div>
+                                <div>
+                                  <p className="text-[11px] font-black text-red-900 uppercase tracking-tight">Missing Data Warning</p>
+                                  <p className="text-[10px] font-bold text-red-600/80">
+                                    {missingVars.length === 1 
+                                      ? `The variable {{${missingVars[0]}}} isn't in your contact list.` 
+                                      : `${missingVars.length} variables aren't in your contact list: ${missingVars.map(v => `{{${v}}}`).join(', ')}`
+                                    }
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="px-3 py-1 bg-red-100 rounded-md text-[9px] font-black text-red-700 uppercase tracking-widest">
+                                Action Required
+                              </div>
+                            </div>
+                          );
+                        })()}
                         <div className="px-8 py-6 border-b border-gray-100">
                           <input 
                             type="text" 
@@ -829,35 +907,6 @@ export default function CreateCampaignPage() {
                           Save Content
                         </button>
                       </div>
-                    </div>
-
-                    {/* AI Suggestions Box */}
-                    <div className="bg-gradient-to-r from-[#745DF3]/5 to-[#9281f7]/5 rounded-[2.5rem] border border-[#745DF3]/10 p-6 relative overflow-hidden">
-                       <div className="relative z-10 flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-[#745DF3] flex items-center justify-center text-white shadow-lg">
-                              <Type className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-black text-[#101828]">AI Optimization Suggestions</h4>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Powered by Unibox AI</p>
-                            </div>
-                          </div>
-                          <button 
-                            onClick={handleAIOptimize}
-                            disabled={isOptimizingAI}
-                            className="px-4 py-2 bg-[#745DF3] text-white rounded-lg text-[10px] font-black hover:scale-105 transition-all uppercase tracking-widest flex items-center gap-2"
-                          >
-                            {isOptimizingAI ? (
-                              <>
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                Optimizing...
-                              </>
-                            ) : (
-                              'Apply Improvements'
-                            )}
-                          </button>
-                       </div>
                     </div>
                   </div>
                 </motion.div>
@@ -963,6 +1012,57 @@ export default function CreateCampaignPage() {
             </AnimatePresence>
           </div>
         </div>
+
+        {/* Action Bar */}
+        <div className="bg-white border-t border-gray-100 px-8 py-4 z-20">
+          <div className="max-w-[1400px] mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              {currentStep > 1 && (
+                <button 
+                  onClick={prevStep}
+                  className="flex items-center gap-2 px-5 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl text-xs font-black transition-all"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous Step
+                </button>
+              )}
+              <div className="h-4 w-[1px] bg-gray-100 hidden md:block" />
+              <button 
+                onClick={handleSaveDraft}
+                className="px-6 py-2.5 text-xs font-black text-gray-400 hover:text-[#101828] transition-all uppercase tracking-widest"
+              >
+                Save as Draft
+              </button>
+            </div>
+
+            <button 
+              onClick={nextStep}
+              disabled={isLaunching || (currentStep === steps.length && isLaunchDisabled)}
+              className={`px-10 py-3 bg-[#745DF3] text-white rounded-2xl text-sm font-black shadow-xl shadow-[#745DF3]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 ${isLaunching || (currentStep === steps.length && isLaunchDisabled) ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+            >
+              {isLaunching ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Launching...
+                </>
+              ) : (
+                <>
+                  {currentStep === steps.length ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Launch Campaign
+                    </>
+                  ) : (
+                    <>
+                      Continue to Next Step
+                      <ChevronRight className="w-4 h-4" />
+                    </>
+                  )}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </main>
 
       {/* AI Generation Modal */}
@@ -1015,6 +1115,32 @@ export default function CreateCampaignPage() {
                   />
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Tone</label>
+                    <select 
+                      value={aiTone}
+                      onChange={(e) => setAiTone(e.target.value)}
+                      className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-[#101828] focus:ring-2 focus:ring-[#745DF3]/20 transition-all outline-none appearance-none"
+                    >
+                      <option value="Professional">Professional</option>
+                      <option value="Casual">Casual</option>
+                      <option value="Direct">Direct</option>
+                      <option value="Witty">Witty</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Company Context</label>
+                    <input 
+                      type="text"
+                      value={aiCompanyInfo}
+                      onChange={(e) => setAiCompanyInfo(e.target.value)}
+                      placeholder="e.g. LeadFlow AI"
+                      className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-[#101828] focus:ring-2 focus:ring-[#745DF3]/20 transition-all outline-none"
+                    />
+                  </div>
+                </div>
+
                 <div className="flex gap-4 pt-4">
                   <button 
                     onClick={() => setShowAiModal(false)}
@@ -1040,6 +1166,135 @@ export default function CreateCampaignPage() {
                     )}
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* AI Preview Modal */}
+      <AnimatePresence>
+        {showPreviewModal && aiPreview && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPreviewModal(false)}
+              className="absolute inset-0 bg-[#101828]/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-4xl bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="px-10 py-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#745DF3] flex items-center justify-center text-white shadow-xl shadow-[#745DF3]/20">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-[#101828]">Review AI Suggestions</h3>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Powered by Unibox AI</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowPreviewModal(false)}
+                  className="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all shadow-sm"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
+                {/* Original content */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Original Version</h4>
+                    <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded-full text-[9px] font-black uppercase tracking-widest">Current</span>
+                  </div>
+                  <div className="space-y-4 opacity-50">
+                    <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Subject</p>
+                      <p className="text-sm font-bold text-[#101828]">{emailSteps[activeStepIndex]?.subject || '(No subject)'}</p>
+                    </div>
+                    <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100 min-h-[200px]">
+                      <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Body</p>
+                      <p className="text-sm font-medium text-gray-600 leading-relaxed whitespace-pre-wrap">{emailSteps[activeStepIndex]?.body || '(No content)'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Improved version */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black text-[#745DF3] uppercase tracking-[0.2em]">AI Improved Version</h4>
+                    <span className="px-3 py-1 bg-[#745DF3]/10 text-[#745DF3] rounded-full text-[9px] font-black uppercase tracking-widest">Recommended</span>
+                  </div>
+                  <div className="space-y-4">
+                    {aiPreview.recommendation && (
+                      <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 mb-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">AI Strategist Note</p>
+                        </div>
+                        <p className="text-[11px] font-bold text-emerald-900 leading-relaxed italic">
+                          "{aiPreview.recommendation}"
+                        </p>
+                      </div>
+                    )}
+                    <div className="p-6 bg-[#745DF3]/5 rounded-2xl border border-[#745DF3]/20 shadow-sm relative overflow-hidden group">
+                       <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-all">
+                          <Check className="w-4 h-4 text-[#745DF3]" />
+                       </div>
+                      <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-1">Subject</p>
+                      <p className="text-sm font-bold text-[#101828]">{aiPreview.subject}</p>
+                    </div>
+                    <div className="p-6 bg-[#745DF3]/5 rounded-3xl border border-[#745DF3]/20 shadow-sm min-h-[200px] relative overflow-hidden group">
+                       <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-all">
+                          <Check className="w-4 h-4 text-[#745DF3]" />
+                       </div>
+                      <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-1">Body</p>
+                      <p className="text-sm font-medium text-gray-600 leading-relaxed whitespace-pre-wrap">{aiPreview.body}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-10 py-6 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => {
+                      if (previewSource === 'generate') handleGenerateAI();
+                      else handleAIOptimize();
+                    }}
+                    disabled={isGeneratingAI || isOptimizingAI}
+                    className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 text-[#101828] rounded-2xl text-xs font-black hover:border-[#745DF3] transition-all"
+                  >
+                    <RotateCcw className={`w-4 h-4 ${(isGeneratingAI || isOptimizingAI) ? 'animate-spin' : ''}`} />
+                    Redo Generation
+                  </button>
+                  <button 
+                    onClick={() => setShowPreviewModal(false)}
+                    className="text-xs font-black text-gray-400 hover:text-red-500 uppercase tracking-widest transition-all"
+                  >
+                    Discard Changes
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    updateStepContent(activeStepIndex, 'subject', aiPreview.subject);
+                    updateStepContent(activeStepIndex, 'body', aiPreview.body);
+                    setShowPreviewModal(false);
+                    setAiPreview(null);
+                  }}
+                  className="flex items-center gap-2 px-10 py-4 bg-[#745DF3] text-white rounded-2xl text-sm font-black shadow-xl shadow-[#745DF3]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  <Check className="w-4 h-4" />
+                  Accept & Apply Changes
+                </button>
               </div>
             </motion.div>
           </div>

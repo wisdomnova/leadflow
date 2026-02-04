@@ -30,9 +30,20 @@ export async function POST(
     let imapSuccess = false;
     let errorMsg = "";
 
-    // 1. Test SMTP
-    try {
-      if (account.provider === 'custom_smtp' || account.provider === 'google' || account.provider === 'outlook') {
+    // Test connectivity based on provider
+    if (account.provider === 'google' || account.provider === 'outlook') {
+      if (config.access_token && config.refresh_token) {
+        smtpSuccess = true;
+        imapSuccess = true;
+      } else {
+        errorMsg = "OAuth tokens missing. Please reconnect your account.";
+      }
+    } else if (account.provider === 'aws_ses') {
+      smtpSuccess = true;
+      imapSuccess = true; // SES is send-only, mark IMAP as success
+    } else if (account.provider === 'custom_smtp') {
+      // 1. Test SMTP
+      try {
         const transporter = nodemailer.createTransport({
           host: config.smtpHost,
           port: parseInt(config.smtpPort),
@@ -45,35 +56,32 @@ export async function POST(
         });
         await transporter.verify();
         smtpSuccess = true;
-      } else if (account.provider === 'aws_ses') {
-        // SES doesn't need SMTP test in the same way, but we could verify credentials
-        smtpSuccess = true; 
+      } catch (err: any) {
+        errorMsg += `SMTP: ${err.message}. `;
       }
-    } catch (err: any) {
-      errorMsg += `SMTP: ${err.message}. `;
-    }
 
-    // 2. Test IMAP
-    try {
+      // 2. Test IMAP
+      try {
         if (config.imapHost) {
-            const client = new ImapFlow({
-                host: config.imapHost,
-                port: parseInt(config.imapPort),
-                secure: config.imapPort === '993',
-                auth: {
-                    user: config.imapUser || account.email,
-                    pass: config.imapPass,
-                },
-                logger: false,
-            });
-            await client.connect();
-            await client.logout();
-            imapSuccess = true;
+          const client = new ImapFlow({
+            host: config.imapHost,
+            port: parseInt(config.imapPort),
+            secure: config.imapPort === '993',
+            auth: {
+              user: config.imapUser || account.email,
+              pass: config.imapPass,
+            },
+            logger: false,
+          });
+          await client.connect();
+          await client.logout();
+          imapSuccess = true;
         } else {
-            imapSuccess = true; // Skip if no IMAP cofig
+          imapSuccess = true; // Skip if no IMAP host provided
         }
-    } catch (err: any) {
+      } catch (err: any) {
         errorMsg += `IMAP: ${err.message}. `;
+      }
     }
 
     const overallSuccess = smtpSuccess && imapSuccess;

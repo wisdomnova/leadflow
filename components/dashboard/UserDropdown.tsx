@@ -17,7 +17,7 @@ export default function UserDropdown() {
   useEffect(() => {
     async function fetchProfile() {
       try {
-        const res = await fetch('/api/user/profile');
+        const res = await fetch('/api/user/profile?minimal=true');
         if (res.ok) {
           const data = await res.json();
           setProfile(data.user);

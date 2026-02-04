@@ -6,6 +6,7 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
 import SMTPModal from '@/components/dashboard/SMTPModal';
 import DNSGuideModal from '@/components/dashboard/DNSGuideModal';
+import ConfirmModal from '@/components/dashboard/ConfirmModal';
 import { 
   Plus, 
   Info, 
@@ -84,6 +85,17 @@ export default function EmailProvidersPage() {
   const [isDNSGuideOpen, setIsDNSGuideOpen] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [domainSearch, setDomainSearch] = useState('');
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    show: boolean;
+    type: 'account' | 'domain' | null;
+    id: string | null;
+    name: string;
+  }>({
+    show: false,
+    type: null,
+    id: null,
+    name: ''
+  });
 
   useEffect(() => {
     fetchData();
@@ -195,10 +207,15 @@ export default function EmailProvidersPage() {
         setIsSMTPModalOpen(false);
       } else {
         const err = await res.json();
-        alert(err.error || "Failed to connect SMTP");
+        if (res.status === 409) {
+          alert(`⚠️ Duplicate Account: ${err.error}`);
+        } else {
+          alert(err.error || "Failed to connect SMTP");
+        }
       }
     } catch (err) {
-      console.error("SMTP connect error:", err);
+      console.error("Connect SMTP error:", err);
+      alert("Failed to connect SMTP account");
     }
   };
 
@@ -247,29 +264,34 @@ export default function EmailProvidersPage() {
     }
   };
 
-  const handleDeleteAccount = async (id: string) => {
-    if (!confirm("Are you sure you want to remove this account?")) return;
-
-    try {
-      const res = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setAccounts(accounts.filter(a => a.id !== id));
-      }
-    } catch (err) {
-      console.error("Delete account error:", err);
-    }
+  const handleDeleteAccount = async (id: string, email: string) => {
+    setDeleteConfirmModal({ show: true, type: 'account', id, name: email });
   };
 
-  const handleDeleteDomain = async (id: string) => {
-    if (!confirm("Are you sure you want to remove this domain?")) return;
+  const handleDeleteDomain = async (id: string, domainName: string) => {
+    setDeleteConfirmModal({ show: true, type: 'domain', id, name: domainName });
+  };
+
+  const executeDelete = async () => {
+    if (!deleteConfirmModal.id || !deleteConfirmModal.type) return;
 
     try {
-      const res = await fetch(`/api/domains/${id}`, { method: 'DELETE' });
+      const endpoint = deleteConfirmModal.type === 'account' 
+        ? `/api/accounts/${deleteConfirmModal.id}` 
+        : `/api/domains/${deleteConfirmModal.id}`;
+        
+      const res = await fetch(endpoint, { method: 'DELETE' });
       if (res.ok) {
-        setDomains(domains.filter(d => d.id !== id));
+        if (deleteConfirmModal.type === 'account') {
+          setAccounts(accounts.filter(a => a.id !== deleteConfirmModal.id));
+        } else {
+          setDomains(domains.filter(d => d.id !== deleteConfirmModal.id));
+        }
       }
     } catch (err) {
-      console.error("Delete domain error:", err);
+      console.error(`Delete ${deleteConfirmModal.type} error:`, err);
+    } finally {
+      setDeleteConfirmModal({ show: false, type: null, id: null, name: '' });
     }
   };
 
@@ -443,7 +465,7 @@ export default function EmailProvidersPage() {
                                       <RefreshCw className="w-4 h-4" />
                                     </button>
                                     <button 
-                                      onClick={() => handleDeleteAccount(account.id)}
+                                      onClick={() => handleDeleteAccount(account.id, account.email)}
                                       className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                                     >
                                       <Trash2 className="w-4 h-4" />
@@ -643,7 +665,7 @@ export default function EmailProvidersPage() {
                                         <FileText className="w-4 h-4" />
                                       </button>
                                       <button 
-                                        onClick={() => handleDeleteDomain(domain.id)}
+                                        onClick={() => handleDeleteDomain(domain.id, domain.domain_name)}
                                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                       >
                                         <Trash2 className="w-4 h-4" />
@@ -858,6 +880,20 @@ export default function EmailProvidersPage() {
       <DNSGuideModal 
         isOpen={isDNSGuideOpen}
         onClose={() => setIsDNSGuideOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={deleteConfirmModal.show}
+        onClose={() => setDeleteConfirmModal({ show: false, type: null, id: null, name: '' })}
+        onConfirm={executeDelete}
+        title={`Delete ${deleteConfirmModal.type === 'account' ? 'Account' : 'Domain'}?`}
+        description={deleteConfirmModal.type === 'account' 
+          ? `Are you sure you want to remove "${deleteConfirmModal.name}"? This action cannot be undone and will disconnect the mailbox.`
+          : `Are you sure you want to remove the domain "${deleteConfirmModal.name}"? This will stop all tracking and verification for this domain.`
+        }
+        confirmText="Delete"
+        cancelText="Keep"
+        type="danger"
       />
     </div>
   );

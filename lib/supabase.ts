@@ -23,10 +23,15 @@ export const createAuthClient = (token?: string) => {
   });
 };
 
+let adminClient: ReturnType<typeof createClient> | null = null;
+
 /**
  * Admin Supabase Client (Service Role)
  * Bypasses RLS. Use ONLY in secure server-side triggers/CRONs.
  */
 export const getAdminClient = () => {
-  return createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  if (!adminClient) {
+    adminClient = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  }
+  return adminClient;
 };

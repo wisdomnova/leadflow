@@ -110,95 +110,62 @@ export default function DashboardPage() {
   ]);
 
   useEffect(() => {
-    Promise.all([
-      fetchStats(), 
-      fetchProfile(), 
-      fetchActivities(),
-      fetchServices()
-    ]).finally(() => setLoading(false));
+    fetchDashboardData();
   }, []);
 
-  const fetchServices = async () => {
+  const fetchDashboardData = async () => {
     try {
-      const [accRes, subRes] = await Promise.all([
-        fetch('/api/accounts'),
-        fetch('/api/billing/subscription')
-      ]);
+      setLoading(true);
+      const res = await fetch('/api/dashboard/init');
+      if (!res.ok) throw new Error('Failed to fetch dashboard data');
       
-      if (accRes.ok && subRes.ok) {
-        const accounts = await accRes.json();
-        const subData = await subRes.json();
-
-        setHasAccounts(Array.isArray(accounts) && accounts.length > 0);
-
-        // Calculate trial days if trialing
-        if (subData.trial_ends_at) {
-          const ends = new Date(subData.trial_ends_at);
-          const now = new Date();
-          const diff = Math.ceil((ends.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-          setTrialDays(diff > 0 ? diff : 0);
-        }
-
-        setServices([
-          {
-            id: 'email',
-            name: 'Email Provider',
-            email: accounts.length > 0 ? `${accounts.length} Active Accounts` : 'Click to connect your first mailbox',
-            status: accounts.length > 0 ? 'Connected' : 'Setup Required',
-            icon: Mail,
-            color: accounts.length > 0 ? 'emerald' : 'blue',
-            lastSync: accounts.length > 0 ? 'Now' : 'Never'
-          },
-          {
-            id: 'stripe',
-            name: 'Stripe Billing',
-            email: (subData.status === 'active' || subData.status === 'trialing') ? 'Active Subscription' : 'Subscription Required',
-            status: (subData.status === 'active' || subData.status === 'trialing') ? 'Healthy' : 'Inactive',
-            icon: ShieldCheck,
-            color: (subData.status === 'active' || subData.status === 'trialing') ? 'emerald' : 'blue',
-            lastSync: 'Live'
-          }
-        ]);
-      }
-    } catch (err) {
-      console.error('Failed to fetch services:', err);
-    }
-  };
-
-  const fetchActivities = async () => {
-    setLoadingActivities(true);
-    try {
-      const res = await fetch('/api/activity?limit=4');
-      if (res.ok) {
-        const data = await res.json();
-        setActivities(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch activities", err);
-    } finally {
-      setLoadingActivities(false);
-    }
-  };
-
-  const fetchProfile = async () => {
-    try {
-      const res = await fetch('/api/user/profile');
       const data = await res.json();
-      setUserProfile(data);
-    } catch (err) {
-      console.error("Failed to fetch profile", err);
-    }
-  };
+      
+      // Update Stats
+      setStatsData(data.stats);
+      
+      // Update Profile
+      setUserProfile(data.profile);
+      
+      // Update Activities
+      setActivities(data.activities);
+      setLoadingActivities(false);
+      
+      // Update Services
+      const { accountsCount, subscription } = data.services;
+      setHasAccounts(accountsCount > 0);
 
-  const fetchStats = async () => {
-    try {
-      const resp = await fetch('/api/stats');
-      if (resp.ok) {
-        const data = await resp.json();
-        setStatsData(data);
+      if (subscription.trial_ends_at) {
+        const ends = new Date(subscription.trial_ends_at);
+        const now = new Date();
+        const diff = Math.ceil((ends.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        setTrialDays(diff > 0 ? diff : 0);
       }
+
+      setServices([
+        {
+          id: 'email',
+          name: 'Email Provider',
+          email: accountsCount > 0 ? `${accountsCount} Active Accounts` : 'Click to connect your first mailbox',
+          status: accountsCount > 0 ? 'Connected' : 'Setup Required',
+          icon: Mail,
+          color: accountsCount > 0 ? 'emerald' : 'blue',
+          lastSync: accountsCount > 0 ? 'Now' : 'Never'
+        },
+        {
+          id: 'stripe',
+          name: 'Stripe Billing',
+          email: (subscription.status === 'active' || subscription.status === 'trialing') ? 'Active Subscription' : 'Subscription Required',
+          status: (subscription.status === 'active' || subscription.status === 'trialing') ? 'Healthy' : 'Inactive',
+          icon: ShieldCheck,
+          color: (subscription.status === 'active' || subscription.status === 'trialing') ? 'emerald' : 'blue',
+          lastSync: 'Live'
+        }
+      ]);
     } catch (err) {
-      console.error("Failed to fetch stats", err);
+      console.error('Failed to load dashboard:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
