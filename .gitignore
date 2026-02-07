@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# leads
+/leads
+
 # next.js
 /.next/
 /out/
