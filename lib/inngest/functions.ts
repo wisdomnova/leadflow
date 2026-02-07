@@ -4,6 +4,8 @@ import { sendOutreachEmail } from "../services/email-sender";
 import { logLeadActivity } from "../activity-utils";
 import { syncAccountInbox } from "../services/unibox";
 import { createNotification } from "../notifications";
+import { calculateOptimalSendTime, getInngestDelay } from "../smart-scheduling";
+import { checkSubscription } from "../subscription-check";
 
 /**
  * Unibox Sync Engine
@@ -144,43 +146,69 @@ export const emailProcessor = inngest.createFunction(
 
     // 1. Fetch Campaign, Lead, and Recipient Data
     const data = await step.run("fetch-details", async () => {
-      const [campaignRes, leadRes, recipientRes] = await Promise.all([
+      const [campaignRes, leadRes, recipientRes, orgRes] = await Promise.all([
         supabase.from("campaigns").select("*").eq("id", campaignId).single(),
         supabase.from("leads").select("*").eq("id", leadId).single(),
-        supabase.from("campaign_recipients").select("*").eq("campaign_id", campaignId).eq("lead_id", leadId).single()
+        supabase.from("campaign_recipients").select("*").eq("campaign_id", campaignId).eq("lead_id", leadId).single(),
+        supabase.from("organizations").select("*").eq("id", orgId).single()
       ]);
 
-      // Fetch the sender account (use campaign's sender_id or the first active account)
-      const senderId = (campaignRes.data as any)?.sender_id;
+      // Check for PowerSend (Smart Server rotation)
+      const isPowerSend = (campaignRes.data as any)?.use_powersend;
       let account;
 
-      if (senderId) {
-        const { data: specificAccount } = await supabase
-          .from("email_accounts")
-          .select("*")
-          .eq("id", senderId)
-          .single();
-        account = specificAccount;
-      } else {
-        const { data: firstAccount } = await supabase
-          .from("email_accounts")
-          .select("*")
-          .eq("org_id", orgId)
-          .eq("status", "active")
-          .limit(1)
-          .single();
-        account = firstAccount;
+      if (isPowerSend) {
+        // Use PowerSend rotation logic
+        const { data: node, error: nodeError } = await (supabase as any).rpc('get_next_powersend_node');
+        
+        if (node && !nodeError) {
+          // Construct a virtual account object from the smart server node
+          account = {
+            id: node.id,
+            email: node.name, // Usually the domain/sender name
+            provider: 'custom_smtp',
+            config: {
+              smtpHost: node.provider === 'mailreef' ? 'smtp.mailreef.com' : 'smtp.custom.com', // Mailreef default
+              smtpPort: '465',
+              smtpUser: node.ip_address, // Or specific mailreef creds
+              smtpPass: process.env.POWERSEND_SECRET || 'secret' 
+            }
+          };
+        }
+      }
+
+      // Fallback to traditional sender accounts if not PowerSend or PowerSend failed
+      if (!account) {
+        const senderId = (campaignRes.data as any)?.sender_id;
+        if (senderId) {
+          const { data: specificAccount } = await supabase
+            .from("email_accounts")
+            .select("*")
+            .eq("id", senderId)
+            .single();
+          account = specificAccount;
+        } else {
+          const { data: firstAccount } = await supabase
+            .from("email_accounts")
+            .select("*")
+            .eq("org_id", orgId)
+            .eq("status", "active")
+            .limit(1)
+            .single();
+          account = firstAccount;
+        }
       }
 
       return { 
         campaign: campaignRes.data, 
         lead: leadRes.data,
         recipient: recipientRes.data,
-        account
+        account,
+        org: orgRes.data
       } as any;
     });
 
-    if (!data.campaign || !data.lead || !data.recipient || !data.account) return { error: "Missing campaign, lead, recipient, or sending account" };
+    if (!data.campaign || !data.lead || !data.recipient || !data.account || !data.org) return { error: "Missing campaign, lead, recipient, org or sending account" };
     
     // Stop if recipient is not active (e.g., replied, unsubscribed, paused)
     if (((data as any).recipient as any).status !== 'active') {
@@ -271,6 +299,14 @@ export const emailProcessor = inngest.createFunction(
         column_param: 'sent_count' 
       });
 
+      // Update AI Usage count if smart sending is active for this campaign
+      if (((data as any).campaign as any).config?.smart_sending) {
+        await (supabase as any)
+          .from('organizations')
+          .update({ ai_usage_current: (data.org.ai_usage_current || 0) + 1 })
+          .eq('id', orgId);
+      }
+
       // Log activity
       await logLeadActivity({
         supabase,
@@ -290,6 +326,25 @@ export const emailProcessor = inngest.createFunction(
     const nextStep = ((data as any).campaign as any).steps[nextStepIdx];
 
     if (nextStep) {
+      const isSmartEnabled = ((data as any).campaign as any).config?.smart_sending;
+      const orgPlan = data.org;
+      
+      let delayValue = `${nextStep.wait}d`;
+
+      if (isSmartEnabled) {
+        // Enforce plan limits: Starter has a limit, Pro/Enterprise are unlimited
+        const isWithinLimits = orgPlan.plan_tier !== 'starter' || (orgPlan.ai_usage_current < orgPlan.ai_usage_limit);
+        
+        if (isWithinLimits) {
+          const optimalTime = calculateOptimalSendTime(
+            (data as any).lead.timezone, 
+            nextStep.wait, 
+            (data as any).lead.job_title
+          );
+          delayValue = getInngestDelay(optimalTime);
+        }
+      }
+
       await step.sendEvent("schedule-next", {
         name: "campaign/email.process",
         data: {
@@ -298,8 +353,8 @@ export const emailProcessor = inngest.createFunction(
           stepIdx: nextStepIdx,
           orgId
         },
-        // IMPORTANT: Schedule the follow up based on the 'wait' property
-        delay: `${nextStep.wait}d` 
+        // Dynamic delay based on Smart Sending optimizations
+        delay: delayValue 
       });
     } else {
       await step.run("mark-completed", async () => {
@@ -368,6 +423,66 @@ export const warmupScheduler = inngest.createFunction(
   }
 );
 
+/**
+ * 5. Warmup Auto-Rampup
+ * Runs daily at midnight to increase sending limits for healthy accounts.
+ */
+export const warmupRampUpScheduler = inngest.createFunction(
+  { id: "warmup-rampup-scheduler" },
+  { cron: "0 0 * * *" }, // Run at midnight every day
+  async ({ step }) => {
+    const supabase = getAdminClient();
+    
+    const results = await step.run("increment-limits", async () => {
+      // Logic: If account is 'Warming' and had good health yesterday, increase limit by ramp_up amount
+      // We cap at 100 emails/day to be safe across most ESPs (Gmail/Outlook).
+      const { data, error } = await supabase.rpc('bulk_ramp_up_warmup');
+      if (error) throw error;
+      return data;
+    });
+
+    return { updated: results };
+  }
+);
+
+/**
+ * 6. Lead Enrichment & Timezone Detection
+ * Triggered when leads are created to identify optimal sending windows
+ */
+export const leadEnrichmentProcessor = inngest.createFunction(
+  { id: "lead-enrichment-processor" },
+  { event: "lead/created" },
+  async ({ event, step }) => {
+    const { leadId, orgId } = event.data;
+    const supabase = getAdminClient();
+
+    await step.run("enrich-lead-data", async () => {
+      const { data: lead } = await (supabase as any).from("leads").select("*").eq("id", leadId).single();
+      if (!lead || (lead as any).timezone) return;
+
+      // Production Logic:
+      // In a real system, you would call a service like IP-API, Clearbit, or Apollo here.
+      // For now, we perform heuristic enrichment based on company domain or provided city.
+      
+      let inferredTz = "UTC";
+      
+      if ((lead as any).company?.toLowerCase().includes("tech") || (lead as any).city?.toLowerCase() === "san francisco") {
+        inferredTz = "America/Los_Angeles";
+      } else if ((lead as any).country === "UK" || (lead as any).city?.toLowerCase() === "london") {
+        inferredTz = "Europe/London";
+      } else if ((lead as any).city?.toLowerCase() === "new york") {
+        inferredTz = "America/New_York";
+      } else {
+        // Fallback: Default to organization's timezone if available
+        const { data: org } = await (supabase as any).from("organizations").select("timezone").eq("id", orgId).single();
+        inferredTz = (org as any)?.timezone || "America/New_York";
+      }
+
+      await (supabase as any).from("leads").update({ timezone: inferredTz } as any).eq("id", leadId);
+    });
+  }
+);
+
 export const warmupAccountProcessor = inngest.createFunction(
   { id: "warmup-account-processor", concurrency: 2 },
   { event: "warmup/account.process" },
@@ -429,24 +544,14 @@ export const warmupAccountProcessor = inngest.createFunction(
 
       const randomSeed = Array.isArray(seeds) ? (seeds as any)[0].email : (seeds as any).email;
 
-      const subjects = [
-        "Quick update for the meeting",
-        "Question about the project",
-        "Thoughts on the new strategy?",
-        "RE: Follow up from earlier",
-        "Checking in on the timeline"
-      ];
-      
-      const snippets = [
-        "I was just looking over the latest notes and wanted to see if you had any feedback on the first draft.",
-        "Great talk earlier. Let's make sure we sync up again before the weekend starts.",
-        "I've attached the latest report. Let me know if you see any red flags in the numbers.",
-        "Quick question: are we still on track for the launch next Tuesday? Let me know if you need help.",
-        "The team did a great job on that demo. I think we are ready for the next phase."
-      ];
+      // 1. Fetch dynamic content from database
+      const [subjectRes, bodyRes] = await Promise.all([
+        (supabase as any).rpc('get_random_warmup_content', { req_category: 'subject', num_results: 1 }),
+        (supabase as any).rpc('get_random_warmup_content', { req_category: 'body', num_results: 1 })
+      ]);
 
-      const subject = subjects[Math.floor(Math.random() * subjects.length)];
-      const body = snippets[Math.floor(Math.random() * snippets.length)];
+      let subject = subjectRes.data?.[0]?.content || "Quick update";
+      let body = bodyRes.data?.[0]?.content || "Just checking in on the progress.";
 
       try {
         await sendOutreachEmail({
@@ -464,18 +569,67 @@ export const warmupAccountProcessor = inngest.createFunction(
             column_param: 'sent_count' 
         });
         
-        // Simulating the "Saved from Spam" fact - in a real system this would happen
-        // when the recipient receives it and moves it. For this demo simulation, 
-        // we increment inbox_count as well to show "Health".
-        await (supabase as any).rpc('increment_warmup_stat', { 
-            account_id_param: accountId, 
-            date_param: today,
-            column_param: 'inbox_count' 
-        });
+        // Note: We no longer auto-increment inbox_count here. 
+        // Real inbox health is now verified by the Unibox Sync Engine in unibox.ts
+        // which detects when emails successfully arrive in our seed/user cluster.
 
       } catch (err: any) {
         console.error("Warmup send failed:", err);
       }
+    });
+
+    return { success: true };
+  }
+);
+
+/**
+ * 6. Warmup Reply Engine (Response Loop)
+ * Automatically replies to received warmup emails to build conversation threads.
+ */
+export const warmupReplyProcessor = inngest.createFunction(
+  { id: "warmup-reply-processor", concurrency: 3 },
+  { event: "warmup/message.received" },
+  async ({ event, step }) => {
+    const { accountId, senderEmail, subject, messageId } = event.data;
+    const supabase = getAdminClient();
+
+    // 1. Human Delay (Wait 10-45 minutes before replying)
+    await step.sleep("human-wait", `${Math.floor(Math.random() * 35) + 10}m`);
+
+    // 2. Fetch Account Details
+    const account = await step.run("fetch-account", async () => {
+      const { data } = await (supabase as any).from("email_accounts").select("*").eq("id", accountId).single();
+      return data;
+    });
+
+    if (!account) return { error: "Account not found" };
+
+    // 3. Select a Random "Positive Sentiment" Reply
+    const replyBody = await step.run("get-reply-content", async () => {
+      const { data } = await (supabase as any).rpc('get_random_warmup_content', { 
+        req_category: 'reply', 
+        num_results: 1 
+      });
+      return data?.[0]?.content || "Thanks for the update! Glad to see things are moving forward.";
+    });
+
+    // 4. Send the Reply
+    await step.run("send-reply", async () => {
+      await sendOutreachEmail({
+        to: senderEmail,
+        subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
+        bodyHtml: `<p>${replyBody}</p>`,
+        fromName: (account as any).email.split('@')[0],
+        account: account,
+        // In a real system, you'd add In-Reply-To and References headers here
+      });
+
+      // Update stats for the sender's account (since they received a reply, their reputation goes up)
+      await (supabase as any).rpc('increment_warmup_stat', { 
+          account_id_param: accountId, 
+          date_param: new Date().toISOString().split('T')[0],
+          column_param: 'replies_count' 
+      });
     });
 
     return { success: true };

@@ -13,7 +13,7 @@ export async function GET() {
     const adminSupabase = getAdminClient();
     const { data: org, error } = await (adminSupabase as any)
       .from('organizations')
-      .select('subscription_status, subscription_id, stripe_customer_id, current_discount_percent, trial_ends_at')
+      .select('subscription_status, subscription_id, stripe_customer_id, current_discount_percent, trial_ends_at, plan_tier')
       .eq('id', context.orgId)
       .single();
 
@@ -80,6 +80,7 @@ export async function GET() {
       status: effectiveStatus,
       discount: (org as any).current_discount_percent || 0,
       trial_ends_at: (org as any).trial_ends_at,
+      plan_tier: (org as any).plan_tier,
       subscription: subscription ? {
         id: subscription.id,
         status: subscription.status,

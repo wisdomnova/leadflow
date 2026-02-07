@@ -44,6 +44,7 @@ export async function POST(req: Request) {
       await (context.supabase as any).from("unibox_messages").insert([{
         org_id: context.orgId,
         account_id: lead.email_accounts.id,
+        lead_id: leadId, // Link to lead
         message_id: response.messageId || `sent-${Date.now()}`,
         from_email: lead.email_accounts.email,
         subject: subject,

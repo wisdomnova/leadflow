@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
     // 1. Fetch leads who have messages in unibox_messages
     // We join with unibox_messages to find active conversations
-    const { data: leads, error } = await context.supabase
+    const { data: leads, error } = await (context.supabase as any)
       .from("leads")
       .select(`
         id,
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
         is_starred,
         sentiment,
         last_message_received_at,
-        unibox_messages (
+        unibox_messages!lead_id (
           id,
           subject,
           snippet,
@@ -40,12 +40,15 @@ export async function GET(req: Request) {
       .eq("org_id", context.orgId)
       .order("last_message_received_at", { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Unibox API Error:", error);
+      return NextResponse.json({ error: error.message, details: error }, { status: 500 });
+    }
 
     // 2. Filter and Format for UI
-    let formatted = (leads || [])
-      .filter(l => l.unibox_messages && l.unibox_messages.length > 0)
-      .map(l => {
+    let formatted = ((leads as any) || [])
+      .filter((l: any) => l.unibox_messages && l.unibox_messages.length > 0)
+      .map((l: any) => {
         // Sort individual messages by received_at
         const sortedMessages = l.unibox_messages.sort((a: any, b: any) => 
           new Date(a.received_at).getTime() - new Date(b.received_at).getTime()
@@ -79,13 +82,13 @@ export async function GET(req: Request) {
 
     // Apply Filter
     if (filter !== "All") {
-      formatted = formatted.filter(conv => conv.status === filter);
+      formatted = formatted.filter((conv: any) => conv.status === filter);
     }
 
     // Apply Search
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      formatted = formatted.filter(conv => 
+      formatted = formatted.filter((conv: any) => 
         conv.name.toLowerCase().includes(q) || 
         conv.company.toLowerCase().includes(q) || 
         conv.subject.toLowerCase().includes(q) ||
@@ -95,6 +98,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json(formatted);
   } catch (err: any) {
+    console.error("Unibox Internal Error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

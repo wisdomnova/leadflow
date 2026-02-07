@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
 import { inngest } from "@/lib/services/inngest";
+import { checkSubscription } from "@/lib/subscription-check";
 
 export async function GET() {
   const context = await getSessionContext();
@@ -33,6 +34,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Name and steps are required" }, { status: 400 });
     }
 
+    // Plan Gating: Check if user is allowed to use Smart Sending
+    let finalConfig = config || {};
+    if (finalConfig.smart_sending) {
+      const sub = await checkSubscription(context.orgId);
+      if (!sub.active || (!sub.smartEnabled && sub.tier === 'starter' && sub.usage.isOver)) {
+        // If not entitled, disable smart sending in the config before saving
+        finalConfig.smart_sending = false;
+      }
+    }
+
     const { data, error } = await (context.supabase as any)
       .from("campaigns")
       .insert([{
@@ -41,7 +52,7 @@ export async function POST(req: Request) {
         steps, // JSONB array of steps
         status: status || "draft",
         sender_id: sender_id || null,
-        config: config || {}
+        config: finalConfig
       }] as any)
       .select()
       .single();

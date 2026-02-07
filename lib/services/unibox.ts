@@ -2,6 +2,7 @@ import { ImapFlow } from 'imapflow';
 import { getAdminClient } from '@/lib/supabase';
 import { simpleParser } from 'mailparser';
 import { createNotification } from '../notifications';
+import { inngest } from './inngest';
 
 export async function syncAccountInbox(accountId: string) {
   const supabase = getAdminClient();
@@ -94,7 +95,32 @@ export async function syncAccountInbox(accountId: string) {
               link: "/dashboard/unibox"
             });
           }
-        } else {
+        } 
+        
+        // 7. NEW: Warmup Detection and Response Loop
+        const { data: isWarmup } = await (supabase as any).rpc('is_warmup_sender', { sender_email: fromEmail });
+        if (isWarmup) {
+          // Trigger a warmup response action
+          await inngest.send({
+            name: "warmup/message.received",
+            data: {
+              accountId: accountId,
+              senderEmail: fromEmail,
+              subject: parsed.subject,
+              bodyText: parsed.text,
+              messageId: (msg.envelope as any)?.messageId
+            }
+          });
+
+          // Update warmup health stats: This email arrived in INBOX (reputation booster)
+          await (supabase as any).rpc('increment_warmup_stat', { 
+              account_id_param: accountId, 
+              date_param: new Date().toISOString().split('T')[0],
+              column_param: 'inbox_count' 
+          });
+        }
+
+        else {
             // Even if not a campaign recipient, we might have a lead with this email
             await (supabase as any).from("leads").update({
                 last_message_received_at: parsed.date || new Date().toISOString()
@@ -103,9 +129,18 @@ export async function syncAccountInbox(accountId: string) {
 
         // Store in unibox_messages
         if (parsed.messageId) {
+          // Find the lead first to link the message correctly
+          const { data: lead } = await (supabase as any)
+            .from("leads")
+            .select("id")
+            .eq("email", fromEmail)
+            .eq("org_id", (account as any).org_id)
+            .single();
+
           await (supabase as any).from("unibox_messages").upsert([{
             account_id: accountId,
             org_id: (account as any).org_id,
+            lead_id: (lead as any)?.id || null, // Link to lead if exists
             message_id: parsed.messageId,
             from_email: fromEmail,
             subject: parsed.subject || "(No Subject)",

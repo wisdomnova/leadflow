@@ -23,7 +23,8 @@ import {
   Sparkles,
   RotateCcw,
   ArrowRight,
-  X
+  X,
+  HelpCircle
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
@@ -58,7 +59,8 @@ export default function CreateCampaignPage() {
   // Real Data States
   const [accounts, setAccounts] = useState<any[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
-  const [isSmartSending, setIsSmartSending] = useState(true);
+  const [isSmartSending, setIsSmartSending] = useState(false);
+  const [showSmartSendingInfo, setShowSmartSendingInfo] = useState(false);
   const [savedTemplates, setSavedTemplates] = useState<any[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   
@@ -467,15 +469,45 @@ export default function CreateCampaignPage() {
                         ) : null}
                       </div>
                       <div className="pt-4">
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <div 
-                            onClick={() => setIsSmartSending(!isSmartSending)}
-                            className={`w-12 h-6 rounded-full relative transition-all ${isSmartSending ? 'bg-[#745DF3]' : 'bg-gray-200'}`}
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <div 
+                              onClick={() => setIsSmartSending(!isSmartSending)}
+                              className={`w-12 h-6 rounded-full relative transition-all ${isSmartSending ? 'bg-[#745DF3]' : 'bg-gray-200'}`}
+                            >
+                              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isSmartSending ? 'right-1' : 'left-1'}`} />
+                            </div>
+                            <span className="text-sm font-bold text-[#101828]">Enable Smart Sending (AI-Optimization)</span>
+                          </label>
+                          <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setShowSmartSendingInfo(!showSmartSendingInfo);
+                            }}
+                            className="p-1 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-[#745DF3]"
                           >
-                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isSmartSending ? 'right-1' : 'left-1'}`} />
-                          </div>
-                          <span className="text-sm font-bold text-[#101828]">Enable Smart Sending (AI-Optimization)</span>
-                        </label>
+                            <HelpCircle className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <AnimatePresence>
+                          {showSmartSendingInfo && (
+                            <motion.div 
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-4 p-4 bg-[#745DF3]/5 border border-[#745DF3]/10 rounded-2xl">
+                                <p className="text-[11px] leading-relaxed text-[#745DF3] font-medium">
+                                  <span className="font-black uppercase tracking-widest block mb-1">What is Smart Sending?</span>
+                                  Our AI-Optimization engine analyzes each lead's timezone, job title, and industry to calculate the perfect delivery window. 
+                                  Instead of sending at a rigid time, it waits for the recipient's peak activity hour (e.g., 8:30 AM for Founders) and adds human-like jitter to maximize open rates and bypass spam filters.
+                                </p>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     </div>
                   </div>

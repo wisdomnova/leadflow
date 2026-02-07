@@ -11,6 +11,7 @@ import {
   Server, 
   Flame, 
   Send, 
+  Zap,
   Inbox, 
   Database, 
   FileText, 
@@ -41,6 +42,7 @@ const navigation = [
     title: 'Outbound',
     items: [
       { name: 'Campaigns', href: '/dashboard/campaigns', icon: Send },
+      { name: 'PowerSend', href: '/dashboard/powersend', icon: Zap },
       { name: 'Warmup', href: '/dashboard/warmup', icon: Flame },
       { name: 'Email Provider', href: '/dashboard/providers', icon: Server },
     ]

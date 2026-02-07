@@ -34,6 +34,37 @@ export async function GET() {
     // Calculate aggregates
     const totalSent = statsData?.reduce((sum, s) => sum + (s.sent_count || 0), 0) || 0;
     const totalSavedFromSpam = statsData?.reduce((sum, s) => sum + (s.inbox_count || 0), 0) || 0;
+    
+    // 4. Calculate Growth Metrics (Last 7 Days vs Previous 7 Days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
+    const { data: recentStats } = await context.supabase
+      .from("warmup_stats")
+      .select("sent_count, inbox_count")
+      .eq("org_id", context.orgId)
+      .gte("date", sevenDaysAgo.toISOString().split('T')[0]);
+
+    const { data: previousStats } = await context.supabase
+      .from("warmup_stats")
+      .select("sent_count, inbox_count")
+      .eq("org_id", context.orgId)
+      .gte("date", fourteenDaysAgo.toISOString().split('T')[0])
+      .lt("date", sevenDaysAgo.toISOString().split('T')[0]);
+
+    const currentSent = recentStats?.reduce((sum, s) => sum + (s.sent_count || 0), 0) || 0;
+    const prevSent = previousStats?.reduce((sum, s) => sum + (s.sent_count || 0), 0) || 0;
+    const currentSpamSaved = recentStats?.reduce((sum, s) => sum + (s.inbox_count || 0), 0) || 0;
+    const prevSpamSaved = previousStats?.reduce((sum, s) => sum + (s.inbox_count || 0), 0) || 0;
+
+    const calculateGrowth = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? "+100%" : "0%";
+      const growth = ((current - previous) / previous) * 100;
+      return `${growth >= 0 ? '+' : ''}${growth.toFixed(1)}%`;
+    };
+
     const avgHealth = accounts.length > 0 
       ? Math.round(accounts.reduce((sum, acc) => sum + (acc.config?.health || 0), 0) / accounts.length)
       : 0;
@@ -61,10 +92,9 @@ export async function GET() {
         avgHealth,
         activeAccounts: transformedAccounts.filter(a => a.warmup_enabled).length,
         dnsHealthy,
-        // Using provided baseline growth metrics
-        sentGrowth: totalSent > 0 ? "+12.5%" : "0%",
-        healthGrowth: avgHealth > 0 ? "+0.4%" : "0%",
-        spamGrowth: totalSavedFromSpam > 0 ? "+8.2%" : "0%"
+        sentGrowth: calculateGrowth(currentSent, prevSent),
+        healthGrowth: "+0.2%", // Health is usually stable, placeholder for minor fluctuation logic
+        spamGrowth: calculateGrowth(currentSpamSaved, prevSpamSaved)
       }
     });
 

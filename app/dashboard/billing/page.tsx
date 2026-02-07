@@ -44,8 +44,8 @@ const plans = [
     price: { monthly: '$129', annual: '$99' },
     description: 'Best for growing teams and scaling outbound efforts.',
     features: ['50,000 Monthly Emails', '10 Sending Domains', 'Advanced Analytics', 'Unlimited Unibox', 'Unlimited AI Personalization', 'Team Dashboard'],
-    button: 'Current Plan',
-    current: true,
+    button: 'Switch to Pro',
+    current: false,
     color: 'purple'
   },
   {
@@ -54,7 +54,7 @@ const plans = [
     price: { monthly: '$399', annual: '$319' },
     description: 'For large agencies and enterprise sales organizations.',
     features: ['Unlimited Emails', 'Unlimited Domains', 'Dedicated Account Manager', 'Custom API Access', 'SSO & Advanced Security', 'White-labeling'],
-    button: 'Contact Sales',
+    button: 'Switch to Enterprise',
     current: false,
     color: 'black'
   }
@@ -104,11 +104,6 @@ export default function BillingPage() {
   };
 
   const handlePlanSwitch = async (planId: string) => {
-    if (planId === 'enterprise') {
-      window.location.href = 'mailto:sales@tryleadflow.ai';
-      return;
-    }
-    
     setIsSwitchingPlan(planId);
     try {
       const res = await fetch('/api/billing/checkout', {
@@ -195,7 +190,7 @@ export default function BillingPage() {
                 <div>
                   <div className="flex items-center gap-3 mb-6">
                     <span className={`px-3 py-1 ${subData?.status === 'active' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'} rounded-lg text-[10px] font-black uppercase tracking-widest`}>
-                      {subData?.status || 'No Active Plan'}
+                      {(subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date()) ? 'Free Trial' : (subData?.status || 'No Active Plan')}
                     </span>
                     {subData?.discount > 0 && (
                       <span className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-lg text-[10px] font-black uppercase tracking-widest">
@@ -204,10 +199,10 @@ export default function BillingPage() {
                     )}
                   </div>
                   <h2 className="text-4xl font-black text-white mb-2 tracking-tight">
-                    {subData?.subscription?.plan || (subData?.status === 'active' ? 'Standard Plan' : 'Free Trial')}
+                    {subData?.subscription?.plan || (subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date() ? 'Free Trial' : 'Standard Plan')}
                   </h2>
                   <p className="text-white font-medium mb-8 opacity-70">
-                    {subData?.status === 'active' 
+                    {subData?.status === 'active' && subData?.subscription?.current_period_end
                       ? `Your subscription is active. Next billing date: ${new Date(subData.subscription.current_period_end * 1000).toLocaleDateString()}`
                       : 'You do not have an active subscription yet.'
                     }
@@ -273,23 +268,29 @@ export default function BillingPage() {
 
             {/* Plan Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {plans.map((plan) => (
+              {plans.map((p) => {
+                // A plan is only "Current" if the user has an active Stripe subscription for it.
+                // Trial users see their limits (Starter), but haven't "selected" a paid plan yet.
+                const isCurrent = !!subData?.subscription && subData?.plan_tier === p.id;
+                const buttonText = isCurrent ? 'Current Plan' : p.button;
+                
+                return (
                 <div 
-                  key={plan.name}
+                  key={p.name}
                   className={`bg-white rounded-[2.5rem] p-10 border transition-all relative flex flex-col h-full ${
-                    plan.current ? 'border-[#745DF3] shadow-xl shadow-[#745DF3]/5 ring-1 ring-[#745DF3]' : 'border-gray-100'
+                    isCurrent ? 'border-[#745DF3] shadow-xl shadow-[#745DF3]/5 ring-1 ring-[#745DF3]' : 'border-gray-100'
                   }`}
                 >
                   <div className="mb-8">
-                    <h3 className="text-2xl font-black text-[#101828] tracking-tight mb-2">{plan.name}</h3>
-                    <p className="text-gray-500 text-sm font-medium leading-relaxed">{plan.description}</p>
+                    <h3 className="text-2xl font-black text-[#101828] tracking-tight mb-2">{p.name}</h3>
+                    <p className="text-gray-500 text-sm font-medium leading-relaxed">{p.description}</p>
                   </div>
                   
                   <div className="mb-8">
                     <div className="flex items-baseline gap-1">
                       <span className="text-5xl font-black text-[#101828] tracking-tighter">
                         {(() => {
-                          const basePrice = billingCycle === 'monthly' ? parseInt(plan.price.monthly.replace('$', '')) : parseInt(plan.price.annual.replace('$', ''));
+                          const basePrice = billingCycle === 'monthly' ? parseInt(p.price.monthly.replace('$', '')) : parseInt(p.price.annual.replace('$', ''));
                           const discount = subData?.discount || 0;
                           const finalPrice = Math.floor(basePrice * (1 - discount / 100));
                           return `$${finalPrice}`;
@@ -305,9 +306,9 @@ export default function BillingPage() {
                   </div>
 
                   <div className="flex-1 space-y-4 mb-10">
-                    {plan.features.map(feature => (
+                    {p.features.map(feature => (
                       <div key={feature} className="flex items-start gap-3">
-                        <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${plan.current ? 'bg-[#745DF3] text-white' : 'bg-gray-100 text-gray-400'}`}>
+                        <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${isCurrent ? 'bg-[#745DF3] text-white' : 'bg-gray-100 text-gray-400'}`}>
                           <Check className="w-3 h-3" />
                         </div>
                         <span className="text-sm font-bold text-gray-600 tracking-tight">{feature}</span>
@@ -316,25 +317,26 @@ export default function BillingPage() {
                   </div>
 
                   <button 
-                    onClick={() => handlePlanSwitch(plan.id)}
-                    disabled={plan.current || isSwitchingPlan !== null}
+                    onClick={() => handlePlanSwitch(p.id)}
+                    disabled={isCurrent || isSwitchingPlan !== null}
                     className={`w-full py-4 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 ${
-                      plan.current 
+                      isCurrent 
                         ? 'bg-[#101828] text-white opacity-50 cursor-default' 
                         : 'bg-[#745DF3] text-white hover:bg-[#745DF3]/90 shadow-xl shadow-[#745DF3]/10'
-                    } ${isSwitchingPlan === plan.id ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    } ${isSwitchingPlan === p.id ? 'opacity-70 cursor-not-allowed' : ''}`}
                   >
-                    {isSwitchingPlan === plan.id ? (
+                    {isSwitchingPlan === p.id ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
                         Updating...
                       </>
                     ) : (
-                      plan.button
+                      buttonText
                     )}
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Payment & History Row */}

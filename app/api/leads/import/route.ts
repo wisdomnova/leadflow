@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
 import { logLeadActivity } from "@/lib/activity-utils";
+import { inngest } from "@/lib/services/inngest";
 
 export async function POST(req: Request) {
   const context = await getSessionContext();
@@ -47,8 +48,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Log activities for each imported lead
+    // Log activities and trigger enrichment for each imported lead
     if (data) {
+      const enrichmentEvents = [];
       for (const lead of data) {
         await logLeadActivity({
           supabase: context.supabase,
@@ -57,6 +59,16 @@ export async function POST(req: Request) {
           type: "lead_created",
           description: `Lead imported via CSV: ${lead.email}`
         });
+        
+        enrichmentEvents.push({
+          name: "lead/created",
+          data: { leadId: lead.id, orgId: context.orgId }
+        });
+      }
+      
+      // Bulk send enrichment events
+      if (enrichmentEvents.length > 0) {
+        await inngest.send(enrichmentEvents as any);
       }
     }
 
