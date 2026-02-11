@@ -23,20 +23,38 @@ export async function checkSubscription(orgIdParam?: string) {
     .eq('id', targetOrgId)
     .single();
 
-  if (!org) return { active: false, error: 'Organization not found' };
+  if (!org) return { 
+    active: false, 
+    error: 'Organization not found',
+    tier: 'starter' as const,
+    smartEnabled: false,
+    usage: { current: 0, limit: 500, isOver: false },
+    limits: { emails: 10000, ai: 500, powersend: 0 }
+  };
 
   // Determine active status
   const isActive = org.subscription_status === 'active' || org.subscription_status === 'trialing';
 
+  // Define limits per tier
+  const tierLimits = {
+    starter: { emails: 10000, ai: 500, powersend: 0 },
+    pro: { emails: 100000, ai: 1000000, powersend: 1 },
+    enterprise: { emails: 500000, ai: 1000000, powersend: 3 }
+  };
+
+  const tier = (org.plan_tier || 'starter') as keyof typeof tierLimits;
+  const limits = tierLimits[tier] || tierLimits.starter;
+
   return { 
     active: isActive, 
     status: org.subscription_status,
-    tier: org.plan_tier as 'starter' | 'pro' | 'enterprise',
-    smartEnabled: org.smart_sending_enabled,
+    tier,
+    smartEnabled: org.smart_sending_enabled || (tier !== 'starter'),
     usage: {
       current: org.ai_usage_current,
-      limit: org.ai_usage_limit,
-      isOver: (org.ai_usage_current || 0) >= (org.ai_usage_limit || 500)
-    }
+      limit: limits.ai,
+      isOver: (org.ai_usage_current || 0) >= limits.ai
+    },
+    limits
   };
 }

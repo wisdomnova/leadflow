@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from "@/lib/auth-utils";
+import { checkSubscription } from "@/lib/subscription-check";
 
 export async function GET() {
   const context = await getSessionContext();
@@ -10,6 +11,11 @@ export async function GET() {
     }
 
     const { supabase, orgId } = context;
+    const sub = await checkSubscription(orgId);
+
+    if (sub.tier === 'starter') {
+      return NextResponse.json({ servers: [], stats: { totalNodes: 0, activeNodes: 0, avgReputation: 100, totalSends: 0 }, restricted: true });
+    }
 
     // Fetch smart servers
     const { data: servers, error: serversError } = await supabase
@@ -45,6 +51,23 @@ export async function POST(req: Request) {
     }
 
     const { supabase, orgId } = context;
+    const sub = await checkSubscription(orgId);
+
+    // Gating
+    if (sub.tier === 'starter') {
+       return new NextResponse('PowerSend is not available on the Starter plan. Please upgrade to Pro.', { status: 403 });
+    }
+
+    // Check limits
+    const { count } = await supabase
+      .from('smart_servers')
+      .select('*', { count: 'exact', head: true });
+    
+    const limits = sub.limits || { powersend: 0 };
+    if (count && count >= limits.powersend) {
+      return new NextResponse(`You have reached the maximum number of Smart Servers for your plan (${limits.powersend}).`, { status: 403 });
+    }
+
     const body = await req.json();
 
     const { data: server, error } = await supabase
@@ -53,6 +76,7 @@ export async function POST(req: Request) {
         {
           ...body,
           org_id: orgId,
+          provider: 'mailreef', // Only Mailreef supported now
           status: 'active',
           reputation_score: 100,
           current_usage: 0

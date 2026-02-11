@@ -9,17 +9,17 @@ const plans = [
   {
     id: 'starter',
     name: 'Starter',
-    price: { monthly: '$49', annual: '$39' },
+    price: { monthly: '$39', annual: '$39' },
     description: 'Perfect for individual founders and solo sales reps.',
-    features: ['10,000 Monthly Emails', '3 Sending Domains', 'Basic Analytics', 'Unibox Access', 'AI Personalization (500/mo)'],
+    features: ['10,000 Monthly Emails', 'Unlimited Sending Domains', 'Warm-up & Unibox', 'Full CRM Access', 'AI Personalization (Limited)', 'Basic Analytics'],
     color: 'gray'
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: { monthly: '$129', annual: '$99' },
+    price: { monthly: '$99', annual: '$99' },
     description: 'Best for growing teams and scaling outbound efforts.',
-    features: ['50,000 Monthly Emails', '10 Sending Domains', 'Advanced Analytics', 'Unlimited Unibox', 'Unlimited AI Personalization', 'Team Dashboard'],
+    features: ['100,000 Monthly Emails', 'PowerSend Unlocked (Add-on)', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Priority Support'],
     popular: true,
     color: 'purple'
   },
@@ -28,7 +28,7 @@ const plans = [
     name: 'Enterprise',
     price: { monthly: '$399', annual: '$319' },
     description: 'For large agencies and enterprise sales organizations.',
-    features: ['Unlimited Emails', 'Unlimited Domains', 'Dedicated Account Manager', 'Custom API Access', 'SSO & Advanced Security', 'White-labeling'],
+    features: ['500,000 Monthly Emails', '3 PowerSend Nodes Included', 'Custom API Access', 'SSO & Advanced Security', 'White-labeling', 'Dedicated Manager'],
     color: 'black'
   }
 ];

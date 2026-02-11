@@ -153,27 +153,76 @@ export const emailProcessor = inngest.createFunction(
         supabase.from("organizations").select("*").eq("id", orgId).single()
       ]);
 
+      if (!orgRes.data) throw new Error("Organization not found");
+
+      // 1b. Plan Volume Check
+      const sub = await checkSubscription(orgId);
+      if (!sub.active) throw new Error("Subscription inactive. Please upgrade to continue sending.");
+      
+      const firstOfMonth = new Date();
+      firstOfMonth.setDate(1);
+      const firstOfMonthStr = firstOfMonth.toISOString().split('T')[0];
+      
+      const { data: usageData } = await supabase
+        .from("analytics_daily")
+        .select("sent_count")
+        .eq("org_id", orgId)
+        .gte("date", firstOfMonthStr);
+
+      const monthlyVolume = (usageData as any[])?.reduce((acc: number, curr: any) => acc + (curr.sent_count || 0), 0) || 0;
+      
+      const limits = sub.limits || { emails: 10000, ai: 500, powersend: 0 };
+
+      if (monthlyVolume >= limits.emails) {
+        // Log a warning activity
+        await supabase.from("activity_log").insert([{
+          org_id: orgId,
+          action_type: "plan_limit_reached",
+          description: `Monthly email limit reached (${limits.emails}). Campaign paused.`,
+          metadata: { limit: limits.emails, current: monthlyVolume }
+        }] as any);
+
+        // Pause campaign automatically
+        await (supabase as any).from("campaigns").update({ status: "paused" }).eq("id", campaignId);
+
+        throw new Error(`Monthly email limit reached (${limits.emails}). Please upgrade your plan.`);
+      }
+
       // Check for PowerSend (Smart Server rotation)
       const isPowerSend = (campaignRes.data as any)?.use_powersend;
       let account;
 
       if (isPowerSend) {
         // Use PowerSend rotation logic
-        const { data: node, error: nodeError } = await (supabase as any).rpc('get_next_powersend_node');
+        const { data: node, error: nodeError } = await (supabase as any)
+          .rpc('get_next_powersend_node', { org_id_param: orgId })
+          .single();
         
         if (node && !nodeError) {
-          // Construct a virtual account object from the smart server node
-          account = {
-            id: node.id,
-            email: node.name, // Usually the domain/sender name
-            provider: 'custom_smtp',
-            config: {
-              smtpHost: node.provider === 'mailreef' ? 'smtp.mailreef.com' : 'smtp.custom.com', // Mailreef default
-              smtpPort: '465',
-              smtpUser: node.ip_address, // Or specific mailreef creds
-              smtpPass: process.env.POWERSEND_SECRET || 'secret' 
-            }
-          };
+          // IMPORTANT: According to Mailreef architecture: 
+          // 1. We pick an active Server Node (1 API Key = 1 Server)
+          // 2. We use a Mailbox attached to that server (Domains/Mailboxes handled later)
+          const { data: attachedAccount } = await (supabase as any)
+            .from("email_accounts")
+            .select("*")
+            .eq("server_id", node.id)
+            .eq("status", "active")
+            .limit(1)
+            .single();
+
+          if (attachedAccount) {
+            account = {
+              ...(attachedAccount as any),
+              provider: 'custom_smtp', // Force SMTP for PowerSend rotation
+              config: {
+                ...((attachedAccount as any).config || {}),
+                smtpHost: node.provider === 'mailreef' ? 'smtp.mailreef.com' : ((attachedAccount as any).config?.smtpHost || 'smtp.custom.com'),
+                smtpPort: '465',
+                smtpUser: node.ip_address, 
+                smtpPass: node.api_key 
+              }
+            };
+          }
         }
       }
 
@@ -200,11 +249,11 @@ export const emailProcessor = inngest.createFunction(
       }
 
       return { 
-        campaign: campaignRes.data, 
-        lead: leadRes.data,
-        recipient: recipientRes.data,
+        campaign: (campaignRes as any).data, 
+        lead: (leadRes as any).data,
+        recipient: (recipientRes as any).data,
         account,
-        org: orgRes.data
+        org: (orgRes as any).data
       } as any;
     });
 
@@ -327,13 +376,13 @@ export const emailProcessor = inngest.createFunction(
 
     if (nextStep) {
       const isSmartEnabled = ((data as any).campaign as any).config?.smart_sending;
-      const orgPlan = data.org;
+      const sub = await checkSubscription(orgId); // Use local sub check for precision
       
       let delayValue = `${nextStep.wait}d`;
 
-      if (isSmartEnabled) {
+      if (isSmartEnabled && sub.active) {
         // Enforce plan limits: Starter has a limit, Pro/Enterprise are unlimited
-        const isWithinLimits = orgPlan.plan_tier !== 'starter' || (orgPlan.ai_usage_current < orgPlan.ai_usage_limit);
+        const isWithinLimits = !(sub.usage?.isOver || false);
         
         if (isWithinLimits) {
           const optimalTime = calculateOptimalSendTime(

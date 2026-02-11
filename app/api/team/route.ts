@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
 import { resend } from "@/lib/resend";
 import { getAdminClient } from "@/lib/supabase";
+import { checkSubscription } from "@/lib/subscription-check";
 import crypto from "crypto";
 
 // GET /api/team - List all team members for an organization
@@ -9,6 +10,11 @@ export async function GET() {
   const context = await getSessionContext();
   if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const sub = await checkSubscription(context.orgId);
+  if (sub.tier === 'starter') {
+    return NextResponse.json({ restricted: true, message: "The Team Dashboard is only available on Pro and Enterprise plans." });
   }
 
   try {
@@ -114,6 +120,11 @@ export async function POST(req: Request) {
   const context = await getSessionContext();
   if (!context || context.role !== 'admin') {
     return NextResponse.json({ error: "Only admins can invite new members." }, { status: 403 });
+  }
+
+  const sub = await checkSubscription(context.orgId);
+  if (sub.tier === 'starter') {
+    return NextResponse.json({ error: "Upgrading to Pro is required to invite team members." }, { status: 403 });
   }
 
   try {

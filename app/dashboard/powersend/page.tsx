@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
 import { 
@@ -25,7 +26,8 @@ import {
   Users,
   Trash2,
   HelpCircle,
-  X
+  X,
+  ArrowRight
 } from 'lucide-react';
 
 interface SmartServer {
@@ -52,6 +54,7 @@ export default function PowerSendPage() {
     totalSends: 0
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isRestricted, setIsRestricted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Modal states
@@ -61,7 +64,6 @@ export default function PowerSendPage() {
   const [formData, setFormData] = useState({
     name: '',
     provider: 'mailreef',
-    domain_name: '',
     ip_address: '',
     daily_limit: 500,
     api_key: ''
@@ -75,9 +77,13 @@ export default function PowerSendPage() {
     try {
       setIsLoading(true);
       const res = await fetch('/api/powersend');
-      if (!res.ok) throw new Error('Failed to fetch data');
-      
       const data = await res.json();
+      
+      if (data.restricted) {
+        setIsRestricted(true);
+        return;
+      }
+
       setServers(data.servers || []);
       setStats(data.stats || {
         totalNodes: 0,
@@ -99,23 +105,26 @@ export default function PowerSendPage() {
       const res = await fetch('/api/powersend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, provider: 'mailreef' })
       });
 
-      if (!res.ok) throw new Error('Failed to add server');
+      if (!res.ok) {
+        const errData = await res.text();
+        throw new Error(errData || 'Failed to add server');
+      }
 
       await fetchData();
       setIsAddModalOpen(false);
       setFormData({
         name: '',
         provider: 'mailreef',
-        domain_name: '',
         ip_address: '',
         daily_limit: 500,
         api_key: ''
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Add server error:', error);
+      alert(error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -157,60 +166,79 @@ export default function PowerSendPage() {
         
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
           <div className="max-w-[1400px] mx-auto space-y-10">
-            {/* Hero Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-black text-[#101828] tracking-tight">PowerSend</h1>
-                  <div className="bg-[#745DF3]/10 px-2.5 py-1 rounded-md flex items-center gap-1.5 shadow-sm border border-[#745DF3]/10">
-                    <Zap className="w-3.5 h-3.5 text-[#745DF3] fill-[#745DF3]" />
-                    <span className="text-[10px] font-bold text-[#745DF3] uppercase tracking-wider">Infrastructure</span>
+            {isRestricted ? (
+              <div className="bg-white rounded-[32px] border border-gray-100 shadow-xl p-12 text-center max-w-2xl mx-auto my-20">
+                <div className="w-20 h-20 bg-[#745DF3]/5 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-[#745DF3]/10">
+                  <Zap className="w-10 h-10 text-[#745DF3]" />
+                </div>
+                <h2 className="text-2xl font-black text-[#101828] mb-3">PowerSend is Locked</h2>
+                <p className="text-gray-500 font-medium mb-8 leading-relaxed">
+                  Infrastructure-level IP rotation is only available on <b>Pro</b> and <b>Enterprise</b> plans. Upgrade today to scale your deliverability with dedicated Nodes.
+                </p>
+                <Link 
+                  href="/dashboard/billing"
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-[#745DF3] text-white rounded-2xl font-bold hover:bg-[#6349df] transition-all shadow-lg shadow-[#745DF3]/20"
+                >
+                  Upgrade to Unlock
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            ) : (
+              <>
+                {/* Hero Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h1 className="text-3xl font-black text-[#101828] tracking-tight">PowerSend</h1>
+                      <div className="bg-[#745DF3]/10 px-2.5 py-1 rounded-md flex items-center gap-1.5 shadow-sm border border-[#745DF3]/10">
+                        <Zap className="w-3.5 h-3.5 text-[#745DF3] fill-[#745DF3]" />
+                        <span className="text-[10px] font-bold text-[#745DF3] uppercase tracking-wider">Infrastructure</span>
+                      </div>
+                    </div>
+                    <p className="text-gray-500 font-medium mt-1">
+                      Monitor distributed server pools and control high-volume outbound rotation.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => setIsHelpModalOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-[#745DF3] bg-[#745DF3]/5 border border-[#745DF3]/10 rounded-xl text-sm font-bold hover:bg-[#745DF3]/10 transition-all"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      Guide
+                    </button>
+                    <button 
+                      onClick={fetchData}
+                      disabled={isLoading}
+                      className="flex items-center gap-2 px-4 py-2.5 text-gray-700 bg-white border border-gray-200 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all shadow-sm"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </button>
+                    <button 
+                      onClick={() => setIsAddModalOpen(true)}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-[#101828] text-white rounded-xl text-sm font-bold hover:bg-[#101828]/90 transition-all shadow-xl shadow-gray-200"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Smart Server
+                    </button>
                   </div>
                 </div>
-                <p className="text-gray-500 font-medium mt-1">
-                  Monitor distributed server pools and control high-volume outbound rotation.
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => setIsHelpModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 text-[#745DF3] bg-[#745DF3]/5 border border-[#745DF3]/10 rounded-xl text-sm font-bold hover:bg-[#745DF3]/10 transition-all"
-                >
-                  <HelpCircle className="w-4 h-4" />
-                  Guide
-                </button>
-                <button 
-                  onClick={fetchData}
-                  disabled={isLoading}
-                  className="flex items-center gap-2 px-4 py-2.5 text-gray-700 bg-white border border-gray-200 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all shadow-sm"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </button>
-                <button 
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-[#101828] text-white rounded-xl text-sm font-bold hover:bg-[#101828]/90 transition-all shadow-xl shadow-gray-200"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Smart Server
-                </button>
-              </div>
-            </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {statCards.map((stat, idx) => (
-                <motion.div
-                  key={stat.name}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  className="bg-white p-6 rounded-3xl border border-gray-100 hover:border-[#745DF3]/20 transition-all group"
-                >
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-[#745DF3]/5 flex items-center justify-center text-[#745DF3] group-hover:bg-[#745DF3] group-hover:text-white transition-all duration-300">
-                      <stat.icon className="w-6 h-6" />
-                    </div>
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                  {statCards.map((stat, idx) => (
+                    <motion.div
+                      key={stat.name}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      className="bg-white p-6 rounded-3xl border border-gray-100 hover:border-[#745DF3]/20 transition-all group"
+                    >
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="w-12 h-12 rounded-2xl bg-[#745DF3]/5 flex items-center justify-center text-[#745DF3] group-hover:bg-[#745DF3] group-hover:text-white transition-all duration-300">
+                          <stat.icon className="w-6 h-6" />
+                        </div>
                     <div>
                       <h3 className="text-gray-400 text-[10px] font-black uppercase tracking-[0.15em] leading-none mb-1.5">{stat.name}</h3>
                       <div className="flex items-center gap-2">
@@ -387,9 +415,11 @@ export default function PowerSendPage() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </main>
+        </>
+      )}
+    </div>
+  </div>
+</main>
 
       {/* Add Smart Server Modal */}
       <AnimatePresence>
@@ -439,18 +469,7 @@ export default function PowerSendPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Domain Name</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="mx.example.com"
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
-                          value={formData.domain_name}
-                          onChange={e => setFormData({ ...formData, domain_name: e.target.value })}
-                        />
-                      </div>
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">IP Address</label>
                         <input
@@ -466,16 +485,11 @@ export default function PowerSendPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Provider</label>
-                        <select
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium appearance-none"
-                          value={formData.provider}
-                          onChange={e => setFormData({ ...formData, provider: e.target.value })}
-                        >
-                          <option value="mailreef">Mailreef</option>
-                          <option value="sendgrid">SendGrid (Dedicated)</option>
-                          <option value="custom">Custom SMTP</option>
-                        </select>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Infrastructure Provider</label>
+                        <div className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-[#745DF3] flex items-center gap-2">
+                          <Zap className="w-4 h-4 fill-[#745DF3]" />
+                          Mailreef Node
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Daily Limit</label>
@@ -572,17 +586,11 @@ export default function PowerSendPage() {
                     <p className="text-sm text-gray-600 leading-relaxed mb-4 font-medium">
                       Log in to your Mailreef dashboard. Each IP or "Node" you purchase will have specific networking details required for rotation.
                     </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                        <p className="text-[10px] font-black text-[#745DF3] uppercase mb-1">Domain Name</p>
+                        <p className="text-[10px] font-black text-[#745DF3] uppercase mb-1">IP Address / Node Identifier</p>
                         <p className="text-xs text-gray-600 font-medium font-jakarta leading-relaxed">
-                          The subdomain associated with your IP (e.g., mail1.yourdomain.com). This must match the DNS records in Mailreef.
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                        <p className="text-[10px] font-black text-[#745DF3] uppercase mb-1">IP Address</p>
-                        <p className="text-xs text-gray-600 font-medium font-jakarta leading-relaxed">
-                          The dedicated IPv4 address assigned to you. This acts as the physical 'mailman' for your outbound traffic.
+                          The dedicated IPv4 address or hostname assigned by Mailreef. This acts as the physical 'mailman' for your outbound traffic. No DNS configuration is required at this stage.
                         </p>
                       </div>
                     </div>

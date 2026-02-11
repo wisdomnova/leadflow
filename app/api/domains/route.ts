@@ -32,34 +32,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Domain name is required" }, { status: 400 });
     }
 
-    // Plan Gating Check
-    const { data: org, error: orgError } = await context.supabase
-      .from("organizations")
-      .select("plan")
-      .single();
-
-    if (orgError) {
-      return NextResponse.json({ error: "Failed to verify organization plan" }, { status: 500 });
-    }
-
-    // If Starter (free/starter in our trial context), limit to 3 domains
-    if (org.plan === "free" || org.plan === "starter") {
-      const { count, error: countError } = await context.supabase
-        .from("sending_domains")
-        .select("*", { count: "exact", head: true });
-
-      if (countError) {
-        return NextResponse.json({ error: "Failed to check domain limit" }, { status: 500 });
-      }
-
-      if (count && count >= 3) {
-        return NextResponse.json({ 
-          error: "Domain limit reached", 
-          message: "The Starter plan is limited to 3 domains. Please upgrade to Pro for unlimited domains." 
-        }, { status: 403 });
-      }
-    }
-
+    // Unlimited domains for all plans in current version
+    
     const { data, error } = await (context.supabase as any)
       .from("sending_domains")
       .insert([{
