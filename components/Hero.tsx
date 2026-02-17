@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, BarChart3, Mail, Users, Layout, Settings, Cpu, Inbox, ArrowRight } from 'lucide-react';
+import { Zap, BarChart3, Mail, Users, Layout, Settings, Cpu, Inbox, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -10,8 +10,11 @@ const Hero = () => {
   return (
     <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden bg-[#FBFBFB]">
       {/* Background Gradient Effect */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[800px] pointer-events-none -z-10">
-        <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[1200px] h-[1200px] bg-[radial-gradient(circle_at_center,rgba(116,93,243,0.06)_0%,transparent_70%)] rounded-full blur-[100px]" />
+      <div className="absolute bottom-0 left-0 right-0 h-[70%] pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-tr from-[#745DF3]/20 via-[#a78bfa]/15 to-[#c4b5fd]/10" />
+        <div className="absolute bottom-0 left-[-10%] w-[60%] h-[80%] bg-[radial-gradient(ellipse_at_center,rgba(116,93,243,0.25)_0%,transparent_70%)] blur-[80px]" />
+        <div className="absolute bottom-0 right-[-10%] w-[60%] h-[80%] bg-[radial-gradient(ellipse_at_center,rgba(167,139,250,0.2)_0%,transparent_70%)] blur-[80px]" />
+        <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-[#FBFBFB] to-transparent" />
       </div>
 
       <div className="max-w-[1200px] mx-auto px-6 relative z-10">
@@ -23,8 +26,8 @@ const Hero = () => {
             transition={{ duration: 0.5 }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-100 bg-white shadow-sm text-sm font-bold text-[#101828] mb-8"
           >
-            <span className="flex h-2 w-2 rounded-full bg-[#745DF3]" />
-            <span>The #1 AI Sourcing Engine</span>
+            <Zap className="w-4 h-4 text-[#745DF3] fill-[#745DF3]" />
+            <span>AI Powered Cold Outreach</span>
           </motion.div>
 
           {/* Headline */}
@@ -32,10 +35,9 @@ const Hero = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-[2.75rem] md:text-[6.5rem] font-black tracking-tighter text-[#101828] max-w-5xl mb-8 leading-[1.05]"
+            className="text-[2rem] md:text-[4.5rem] font-black tracking-tighter text-[#101828] max-w-5xl mb-8 leading-[1.05]"
           >
-            Scaling high-touch <br className="hidden md:block" />
-            <span className="text-[#745DF3]">outreach with AI.</span>
+            Everything you need to run cold Outreach at scale in one place.
           </motion.h1>
 
           {/* Subheadline */}
@@ -43,9 +45,9 @@ const Hero = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-lg md:text-2xl text-[#101828]/60 max-w-2xl mb-12 font-medium leading-tight"
+            className="text-base md:text-xl text-[#101828]/60 max-w-2xl mb-12 font-medium leading-tight"
           >
-            Automate lead generation, personalized messaging, and campaign management. The all-in-one platform for modern sales teams.
+            Leadflow helps you scale cold outreach with smart sequences, AI personalization, inbox rotation, and a unified Unibox without killing deliverability.
           </motion.p>
 
           {/* CTAs */}
@@ -56,13 +58,13 @@ const Hero = () => {
             className="flex flex-col sm:flex-row items-center gap-4 mb-12"
           >
             <Link href="/signup">
-              <button className="bg-[#101828] text-white px-10 py-5 rounded-2xl font-bold text-lg hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/10 flex items-center gap-2 group">
+              <button className="bg-[#745DF3] text-white px-10 py-5 rounded-2xl font-bold text-lg hover:bg-[#745DF3]/90 transition-all shadow-xl shadow-[#745DF3]/10 flex items-center gap-2 group">
                 Start free trial
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
             </Link>
             <button className="bg-white text-[#101828] px-10 py-5 rounded-2xl font-bold text-lg border border-gray-100 hover:border-gray-200 transition-all shadow-sm">
-              Watch demo
+              Watch a demo
             </button>
           </motion.div>
 
@@ -88,7 +90,7 @@ const Hero = () => {
             transition={{ duration: 0.8, delay: 0.5 }}
             className="relative w-full max-w-[1100px] mx-auto group"
           >
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#745DF3]/20 to-[#745DF3]/10 rounded-[2.5rem] blur-3xl opacity-50 group-hover:opacity-100 transition duration-1000" />
+            <div className="absolute -inset-4 bg-gradient-to-r from-[#745DF3]/30 via-[#a78bfa]/20 to-[#c4b5fd]/15 rounded-[3rem] blur-3xl opacity-70 group-hover:opacity-100 transition duration-1000" />
             <div className="relative rounded-[2rem] border border-gray-200 overflow-hidden shadow-2xl bg-white p-1">
               <div className="rounded-[1.8rem] overflow-hidden bg-gray-50 border border-gray-100 flex aspect-[16/10] relative">
                 {/* Simplified Sidebar Mockup */}

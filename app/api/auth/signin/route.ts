@@ -7,8 +7,10 @@ import { cookies } from "next/headers";
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
+    console.log("[SIGNIN] Attempt for email:", email);
 
     if (!email || !password) {
+      console.log("[SIGNIN] Missing fields - email:", !!email, "password:", !!password);
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -22,14 +24,20 @@ export async function POST(req: Request) {
       .single();
 
     if (userError || !user) {
+      console.log("[SIGNIN] User lookup failed - error:", userError?.message, "| user found:", !!user);
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
+
+    console.log("[SIGNIN] User found - id:", (user as any).id, "| has password_hash:", !!(user as any).password_hash, "| org_id:", (user as any).org_id);
 
     // 2. Compare Password
     const isPasswordValid = await bcrypt.compare(password, (user as any).password_hash);
     if (!isPasswordValid) {
+      console.log("[SIGNIN] Password mismatch for user:", (user as any).id);
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
+
+    console.log("[SIGNIN] Password valid, generating JWT...");
 
     // 3. Generate Session JWT
     const token = await signUserJWT({

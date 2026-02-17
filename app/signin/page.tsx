@@ -223,12 +223,6 @@ function SignInPageContent() {
                     Remember me
                   </label>
                 </div>
-                <Link 
-                  href="/forgot-password" 
-                  className="text-xs font-bold text-[#745DF3] hover:underline uppercase tracking-widest"
-                >
-                  Forgot password?
-                </Link>
               </div>
 
               <button
