@@ -78,19 +78,25 @@ async function syncGoogleInbox(accountId: string, account: any) {
       const fromEmail = (emailMatch[1] || fromRaw).toLowerCase().trim();
       const fromName = fromRaw.replace(/<[^>]+>/, '').replace(/"/g, '').trim();
 
-      // Skip emails FROM our own account (sent by us)
-      if (fromEmail === account.email.toLowerCase()) continue;
-
       // Extract snippet for unibox display
       const snippet = msgData.snippet || '';
 
+      // Skip emails FROM our own account (sent by us) — but only for
+      // reply detection. We still store them in unibox for conversation view.
+      const isSelfEmail = fromEmail === account.email.toLowerCase();
+
       // ── Reply Detection ──────────────────────────────────────────────
-      // Check if this sender is an active campaign recipient
-      const { data: recipients } = await supabase
-        .from("campaign_recipients")
-        .select("id, campaign_id, lead_id, leads!inner(email)")
-        .eq("leads.email", fromEmail)
-        .eq("status", "active");
+      // Check campaign recipients that were sent emails (active OR completed).
+      // Leads reply AFTER all sequence steps finish, so 'completed' must be included.
+      let recipients: any[] | null = null;
+      if (!isSelfEmail) {
+        const { data } = await supabase
+          .from("campaign_recipients")
+          .select("id, campaign_id, lead_id, leads!inner(email)")
+          .eq("leads.email", fromEmail)
+          .in("status", ["active", "completed"]);
+        recipients = data;
+      }
 
       if (recipients && recipients.length > 0) {
         for (const recipient of recipients) {
@@ -299,12 +305,12 @@ export async function syncAccountInbox(accountId: string) {
       const fromEmail = parsed.from?.value[0]?.address?.toLowerCase();
       
       if (fromEmail) {
-        // 1. Check for ANY active campaign recipients from this sender
+        // 1. Check campaign recipients (active OR completed) from this sender
         const { data: recipients } = await supabase
           .from("campaign_recipients")
           .select("id, campaign_id, lead_id, leads!inner(email)")
           .eq("leads.email", fromEmail)
-          .eq("status", "active");
+          .in("status", ["active", "completed"]);
 
         if (recipients && recipients.length > 0) {
           for (const recipient of recipients) {
