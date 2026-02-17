@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
+import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -95,8 +96,9 @@ export default function AnalyticsPage() {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header />
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
-          <div className="max-w-[1400px] mx-auto space-y-10">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <SubscriptionGuard>
+            <div className="max-w-[1400px] mx-auto space-y-10">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <motion.h1 
                   initial={{ opacity: 0, x: -20 }}
@@ -284,7 +286,8 @@ export default function AnalyticsPage() {
                 </div>
               </>
             )}
-          </div>
+            </div>
+          </SubscriptionGuard>
         </div>
       </main>
     </div>

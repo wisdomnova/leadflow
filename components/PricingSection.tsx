@@ -9,7 +9,7 @@ const plans = [
   {
     id: 'starter',
     name: 'Starter',
-    price: { monthly: '$39', annual: '$39' },
+    price: { monthly: '$39', annual: '$468' },
     description: 'Perfect for individual founders and solo sales reps.',
     features: ['10,000 Monthly Emails', 'Unlimited Sending Domains', 'Warm-up & Unibox', 'Full CRM Access', 'AI Personalization (Limited)', 'Basic Analytics'],
     color: 'gray'
@@ -17,7 +17,7 @@ const plans = [
   {
     id: 'pro',
     name: 'Pro',
-    price: { monthly: '$99', annual: '$99' },
+    price: { monthly: '$99', annual: '$1,188' },
     description: 'Best for growing teams and scaling outbound efforts.',
     features: ['100,000 Monthly Emails', 'PowerSend Unlocked (Add-on)', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Priority Support'],
     popular: true,
@@ -26,9 +26,9 @@ const plans = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: { monthly: '$399', annual: '$319' },
+    price: { monthly: '$319', annual: '$3,828' },
     description: 'For large agencies and enterprise sales organizations.',
-    features: ['500,000 Monthly Emails', '3 PowerSend Nodes Included', 'Custom API Access', 'SSO & Advanced Security', 'White-labeling', 'Dedicated Manager'],
+    features: ['500,000 Monthly Emails', '1 PowerSend Node Included', 'Custom API Access', 'SSO & Advanced Security', 'White-labeling', 'Dedicated Manager'],
     color: 'black'
   }
 ];
@@ -65,7 +65,6 @@ const PricingSection = () => {
             </button>
             <div className="flex items-center gap-2">
               <span className={`text-sm font-bold transition-all ${billingCycle === 'annual' ? 'text-[#101828]' : 'text-gray-400'}`}>Annually</span>
-              <span className="bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase px-2 py-1 rounded-md border border-emerald-100">Save 20%</span>
             </div>
           </div>
         </div>
@@ -98,7 +97,9 @@ const PricingSection = () => {
                 <span className="text-4xl font-black text-[#101828] tracking-tighter">
                   {billingCycle === 'monthly' ? plan.price.monthly : plan.price.annual}
                 </span>
-                <span className="text-gray-400 font-bold text-sm">/month</span>
+                <span className="text-gray-400 font-bold text-sm">
+                  {billingCycle === 'monthly' ? '/month' : '/year'}
+                </span>
               </div>
 
               <div className="space-y-4 mb-12 flex-1">

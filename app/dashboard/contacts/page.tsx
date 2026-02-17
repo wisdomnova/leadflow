@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
+import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
 import { 
   Users, 
   UserPlus, 
@@ -417,9 +418,10 @@ export default function ContactsPage() {
         <Header />
         
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
-          <div className="max-w-[1400px] mx-auto space-y-10">
-            {/* Page Title & Actions */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <SubscriptionGuard>
+            <div className="max-w-[1400px] mx-auto space-y-10">
+              {/* Page Title & Actions */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-black text-[#101828] tracking-tight">Contacts</h1>
                 <p className="text-gray-500 font-medium mt-1">Manage your leads, segment lists, and track engagement.</p>
@@ -947,8 +949,9 @@ export default function ContactsPage() {
               )}
             </AnimatePresence>
           </div>
-        </div>
-      </main>
+        </SubscriptionGuard>
+      </div>
+    </main>
 
       {/* Upload Modal Overlay */}
       <AnimatePresence>

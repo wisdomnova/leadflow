@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
+import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
 import { 
   Zap, 
   Server, 
@@ -165,7 +166,8 @@ export default function PowerSendPage() {
         <Header />
         
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
-          <div className="max-w-[1400px] mx-auto space-y-10">
+          <SubscriptionGuard>
+            <div className="max-w-[1400px] mx-auto space-y-10">
             {isRestricted ? (
               <div className="bg-white rounded-[32px] border border-gray-100 shadow-xl p-12 text-center max-w-2xl mx-auto my-20">
                 <div className="w-20 h-20 bg-[#745DF3]/5 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-[#745DF3]/10">
@@ -417,9 +419,10 @@ export default function PowerSendPage() {
           </div>
         </>
       )}
-    </div>
-  </div>
-</main>
+            </div>
+          </SubscriptionGuard>
+        </div>
+      </main>
 
       {/* Add Smart Server Modal */}
       <AnimatePresence>

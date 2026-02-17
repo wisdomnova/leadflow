@@ -24,10 +24,14 @@ export async function GET() {
 
     // Determine effective status
     let effectiveStatus = (org as any).subscription_status || 'none';
-    const trialExpired = (org as any).trial_ends_at ? new Date((org as any).trial_ends_at) < new Date() : true;
+    const trialExpired = (org as any).trial_ends_at ? new Date((org as any).trial_ends_at) < new Date() : false;
 
-    if (effectiveStatus === 'trialing' && !trialExpired) {
-      effectiveStatus = 'active'; // Treat active trial as active
+    if (effectiveStatus === 'trialing') {
+      if (trialExpired) {
+        effectiveStatus = 'inactive';
+      } else {
+        effectiveStatus = 'active';
+      }
     }
 
     let subscription: any = null;

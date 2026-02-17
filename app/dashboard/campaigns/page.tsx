@@ -8,6 +8,7 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
 import ConfirmModal from '@/components/dashboard/ConfirmModal';
 import MissingAccountModal from '@/components/dashboard/MissingAccountModal';
+import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
 import { 
   Send, 
   Plus, 
@@ -190,9 +191,10 @@ export default function CampaignsPage() {
         <Header />
         
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
-          <div className="max-w-[1400px] mx-auto space-y-10">
-            {/* Page Title & Actions */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <SubscriptionGuard>
+            <div className="max-w-[1400px] mx-auto space-y-10">
+              {/* Page Title & Actions */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-black text-[#101828] tracking-tight">Campaigns</h1>
                 <p className="text-gray-500 font-medium mt-1">Create, manage and monitor your outbound sequences.</p>
@@ -513,8 +515,9 @@ export default function CampaignsPage() {
                 ))}
               </div>
             </div>
-          </div>
-        </main>
+          </SubscriptionGuard>
+        </div>
+      </main>
 
       <ConfirmModal
         isOpen={isDeleteModalOpen}

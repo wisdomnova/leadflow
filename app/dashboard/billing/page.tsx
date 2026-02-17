@@ -31,9 +31,9 @@ const plans = [
   {
     id: 'starter',
     name: 'Starter',
-    price: { monthly: '$49', annual: '$39' },
+    price: { monthly: '$39', annual: '$468' },
     description: 'Perfect for individual founders and solo sales reps.',
-    features: ['10,000 Monthly Emails', '3 Sending Domains', 'Basic Analytics', 'Unibox Access', 'AI Personalization (500/mo)'],
+    features: ['10,000 Monthly Emails', 'Unlimited Sending Domains', 'Warm-up & Unibox', 'Full CRM Access', 'AI Personalization (Limited)', 'Basic Analytics'],
     button: 'Switch to Starter',
     current: false,
     color: 'gray'
@@ -41,9 +41,9 @@ const plans = [
   {
     id: 'pro',
     name: 'Pro',
-    price: { monthly: '$129', annual: '$99' },
+    price: { monthly: '$99', annual: '$1,188' },
     description: 'Best for growing teams and scaling outbound efforts.',
-    features: ['50,000 Monthly Emails', '10 Sending Domains', 'Advanced Analytics', 'Unlimited Unibox', 'Unlimited AI Personalization', 'Team Dashboard'],
+    features: ['100,000 Monthly Emails', 'PowerSend Unlocked (Add-on)', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Priority Support'],
     button: 'Switch to Pro',
     current: false,
     color: 'purple'
@@ -51,9 +51,9 @@ const plans = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: { monthly: '$399', annual: '$319' },
+    price: { monthly: '$319', annual: '$3,828' },
     description: 'For large agencies and enterprise sales organizations.',
-    features: ['Unlimited Emails', 'Unlimited Domains', 'Dedicated Account Manager', 'Custom API Access', 'SSO & Advanced Security', 'White-labeling'],
+    features: ['500,000 Monthly Emails', '1 PowerSend Node Included', 'Custom API Access', 'SSO & Advanced Security', 'White-labeling', 'Dedicated Account Manager'],
     button: 'Switch to Enterprise',
     current: false,
     color: 'black'
@@ -199,12 +199,14 @@ export default function BillingPage() {
                     )}
                   </div>
                   <h2 className="text-4xl font-black text-white mb-2 tracking-tight">
-                    {subData?.subscription?.plan || (subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date() ? 'Free Trial' : 'Standard Plan')}
+                    {subData?.subscription?.plan || (subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date() ? 'Starter (14-Day Trial)' : (subData?.plan_tier ? `${subData.plan_tier.charAt(0).toUpperCase() + subData.plan_tier.slice(1)} Plan` : 'Standard Plan'))}
                   </h2>
                   <p className="text-white font-medium mb-8 opacity-70">
                     {subData?.status === 'active' && subData?.subscription?.current_period_end
                       ? `Your subscription is active. Next billing date: ${new Date(subData.subscription.current_period_end * 1000).toLocaleDateString()}`
-                      : 'You do not have an active subscription yet.'
+                      : (subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date()
+                        ? `Your free trial ends on ${new Date(subData.trial_ends_at).toLocaleDateString()}. Upgrade to a paid plan to keep access.`
+                        : 'You do not have an active subscription yet.')
                     }
                   </p>
                   <div className="flex flex-wrap gap-4">
@@ -261,7 +263,7 @@ export default function BillingPage() {
                   onClick={() => setBillingCycle('annual')}
                   className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${billingCycle === 'annual' ? 'bg-[#745DF3] text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}
                 >
-                  Yearly <span className="ml-1 text-[10px] opacity-70">(-20%)</span>
+                  Yearly
                 </button>
               </div>
             </div>
@@ -290,13 +292,17 @@ export default function BillingPage() {
                     <div className="flex items-baseline gap-1">
                       <span className="text-5xl font-black text-[#101828] tracking-tighter">
                         {(() => {
-                          const basePrice = billingCycle === 'monthly' ? parseInt(p.price.monthly.replace('$', '')) : parseInt(p.price.annual.replace('$', ''));
+                          const rawPrice = billingCycle === 'monthly' ? p.price.monthly : p.price.annual;
+                          const basePrice = parseInt(rawPrice.replace(/[$,]/g, ''));
                           const discount = subData?.discount || 0;
                           const finalPrice = Math.floor(basePrice * (1 - discount / 100));
-                          return `$${finalPrice}`;
+                          // Format with commas
+                          return `$${finalPrice.toLocaleString()}`;
                         })()}
                       </span>
-                      <span className="text-gray-400 font-bold">/mo</span>
+                      <span className="text-gray-400 font-bold">
+                        {billingCycle === 'monthly' ? '/mo' : '/yr'}
+                      </span>
                     </div>
                     {subData?.discount > 0 && (
                       <span className="text-[10px] font-bold text-[#745DF3] uppercase tracking-widest mt-1 block">

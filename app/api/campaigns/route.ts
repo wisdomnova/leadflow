@@ -27,6 +27,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Strict Subscription Check
+  const sub = await checkSubscription(context.orgId);
+  if (!sub.active) {
+    return NextResponse.json({ error: "Active subscription required" }, { status: 403 });
+  }
+
   try {
     const { name, steps, status, sender_id, config, lead_ids } = await req.json();
 
@@ -37,8 +43,7 @@ export async function POST(req: Request) {
     // Plan Gating: Check if user is allowed to use Smart Sending
     let finalConfig = config || {};
     if (finalConfig.smart_sending) {
-      const sub = await checkSubscription(context.orgId);
-      if (!sub.active || (!sub.smartEnabled && sub.tier === 'starter' && sub.usage.isOver)) {
+      if (!sub.smartEnabled && sub.tier === 'starter' && sub.usage.isOver) {
         // If not entitled, disable smart sending in the config before saving
         finalConfig.smart_sending = false;
       }

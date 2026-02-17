@@ -67,9 +67,14 @@ export async function GET() {
     // Process Services/Subscription
     const subData = (orgSubscription.data as any) || {};
     let effectiveStatus = subData.subscription_status || 'none';
-    const trialExpired = subData.trial_ends_at ? new Date(subData.trial_ends_at) < new Date() : true;
-    if (effectiveStatus === 'trialing' && !trialExpired) {
-      effectiveStatus = 'active';
+    const trialExpired = subData.trial_ends_at ? new Date(subData.trial_ends_at) < new Date() : false;
+    
+    if (effectiveStatus === 'trialing') {
+      if (trialExpired) {
+        effectiveStatus = 'inactive';
+      } else {
+        effectiveStatus = 'active';
+      }
     }
 
     return NextResponse.json({

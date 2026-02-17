@@ -1,11 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useLogout } from '@/components/providers/LogoutProvider';
 import { 
   LayoutDashboard, 
   Server, 
@@ -22,10 +21,11 @@ import {
   UserSquare2, 
   BarChart3, 
   User, 
-  LogOut,
   ChevronRight,
   Activity,
-  Bell
+  Bell,
+  ArrowUpCircle,
+  Settings2
 } from 'lucide-react';
 
 const navigation = [
@@ -75,7 +75,18 @@ const navigation = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { openLogoutModal } = useLogout();
+  const [plan, setPlan] = useState<string>('starter');
+
+  useEffect(() => {
+    fetch('/api/billing/subscription')
+      .then(res => res.json())
+      .then(data => {
+        if (data.plan_tier) setPlan(data.plan_tier.toLowerCase());
+      })
+      .catch(err => console.error('Sidebar sub fetch error:', err));
+  }, []);
+
+  const isEnterprise = plan === 'enterprise';
 
   return (
     <div className="w-72 h-screen border-r border-gray-100 bg-white flex flex-col sticky top-0 overflow-y-auto no-scrollbar">
@@ -134,15 +145,26 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Logout */}
-      <div className="p-4 border-t border-gray-100">
-        <button 
-          onClick={openLogoutModal}
-          className="flex items-center gap-3 w-full px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-all font-bold text-sm"
-        >
-          <LogOut className="w-5 h-5" />
-          Logout
-        </button>
+      {/* Footer Actions */}
+      <div className="p-4 border-t border-gray-100 mt-auto">
+        <div className="space-y-2">
+          <Link
+            href="/dashboard/billing"
+            className="flex items-center justify-center gap-2 w-full px-4 py-4 bg-[#745DF3] text-white rounded-2xl transition-all font-bold text-sm hover:bg-[#6349df] shadow-lg shadow-[#745DF3]/20 group"
+          >
+            {isEnterprise ? (
+              <>
+                <Settings2 className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                Manage Billing
+              </>
+            ) : (
+              <>
+                <ArrowUpCircle className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
+                Upgrade Plan
+              </>
+            )}
+          </Link>
+        </div>
       </div>
     </div>
   );

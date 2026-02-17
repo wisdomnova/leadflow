@@ -13,6 +13,10 @@ export async function GET() {
     const { supabase, orgId } = context;
     const sub = await checkSubscription(orgId);
 
+    if (!sub.active) {
+      return new NextResponse('Subscription inactive', { status: 403 });
+    }
+
     if (sub.tier === 'starter') {
       return NextResponse.json({ servers: [], stats: { totalNodes: 0, activeNodes: 0, avgReputation: 100, totalSends: 0 }, restricted: true });
     }

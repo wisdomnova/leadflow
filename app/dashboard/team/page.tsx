@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Users, 
   UserPlus, 
@@ -33,6 +34,7 @@ import {
 const roles = ['All', 'Admin', 'Manager', 'SDR', 'Sales'];
 
 export default function TeamPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'performance' | 'recent'>('performance');
@@ -40,6 +42,7 @@ export default function TeamPage() {
   const [members, setMembers] = useState<any[]>([]);
   const [statsData, setStatsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isRestricted, setIsRestricted] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAuditLogOpen, setIsAuditLogOpen] = useState(false);
@@ -76,8 +79,12 @@ export default function TeamPage() {
       const res = await fetch('/api/team');
       if (res.ok) {
         const data = await res.json();
-        setMembers(data.members);
-        setStatsData(data.stats);
+        if (data.restricted) {
+          setIsRestricted(true);
+        } else {
+          setMembers(data.members || []);
+          setStatsData(data.stats || null);
+        }
       }
     } catch (err) {
       console.error("Error fetching team:", err);
@@ -245,6 +252,32 @@ export default function TeamPage() {
               <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="w-10 h-10 text-[#745DF3] animate-spin mb-4" />
                 <p className="text-gray-400 font-medium">Loading organization data...</p>
+              </div>
+            ) : isRestricted ? (
+              <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm text-center px-6">
+                <div className="w-20 h-20 bg-[#745DF3]/5 rounded-3xl flex items-center justify-center mb-8">
+                  <ShieldCheck className="w-10 h-10 text-[#745DF3]" />
+                </div>
+                <h2 className="text-3xl font-black text-[#101828] mb-4 tracking-tight">Pro Feature</h2>
+                <p className="text-gray-500 font-medium max-w-md mb-10 leading-relaxed text-lg">
+                  The Team Dashboard is only available on <span className="text-[#745DF3] font-bold">Pro</span> and <span className="text-[#745DF3] font-bold">Enterprise</span> plans.
+                  Monitor individual performance and manage your outbound team at scale.
+                </p>
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => router.push('/dashboard/billing')}
+                    className="px-8 py-4 bg-[#101828] text-white rounded-2xl font-bold flex items-center gap-2 hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/10 group"
+                  >
+                    Upgrade Now
+                    <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                  <button 
+                    onClick={() => router.push('/dashboard')}
+                    className="px-8 py-4 bg-gray-50 text-[#101828] rounded-2xl font-bold hover:bg-gray-100 transition-all"
+                  >
+                    Back to Dashboard
+                  </button>
+                </div>
               </div>
             ) : (
               <>

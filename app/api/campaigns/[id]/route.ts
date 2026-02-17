@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
+import { checkSubscription } from "@/lib/subscription-check";
 
 export async function PATCH(
   req: Request,
@@ -10,6 +11,12 @@ export async function PATCH(
   if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const sub = await checkSubscription(context.orgId);
+  if (!sub.active) {
+    return NextResponse.json({ error: "Active subscription required" }, { status: 403 });
+  }
+
   const { status } = await req.json();
 
   const { error } = await context.supabase

@@ -8,6 +8,7 @@ import ConfirmModal from '@/components/dashboard/ConfirmModal';
 import WarmupSettingsModal from '@/components/dashboard/WarmupSettingsModal';
 import AddWarmupAccountModal from '@/components/dashboard/AddWarmupAccountModal';
 import WarmupStatsModal from '@/components/dashboard/WarmupStatsModal';
+import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
 import { 
   Flame, 
   TrendingUp, 
@@ -196,7 +197,8 @@ export default function WarmupPage() {
         <Header />
         
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
-          <div className="max-w-[1400px] mx-auto space-y-10">
+          <SubscriptionGuard>
+            <div className="max-w-[1400px] mx-auto space-y-10">
             {/* Page Title */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -594,9 +596,9 @@ export default function WarmupPage() {
               </div>
             </div>
           </div>
+          </SubscriptionGuard>
         </div>
       </main>
-
       <ConfirmModal 
         isOpen={deleteConfirmModal.show}
         onClose={() => setDeleteConfirmModal({ show: false, accountId: null, email: '' })}

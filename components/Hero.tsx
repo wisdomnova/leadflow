@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Zap, BarChart3, Mail, Users, Layout, Settings, Cpu, Inbox, ArrowRight } from 'lucide-react';
+import { Zap, BarChart3, Mail, Users, Layout, Settings, Cpu, Inbox, ArrowRight, Calendar, FileText, Database, UserSquare2, TrendingUp, PieChart, Send } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -81,6 +81,39 @@ const Hero = () => {
                </svg>
              </div>
              <span>No credit card required</span>
+          </motion.div>
+
+          {/* Feature Icons from Image */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.45 }}
+            className="flex flex-wrap justify-center gap-4 md:gap-10 mb-20"
+          >
+            {[
+              { name: 'Campaigns', icon: Layout },
+              { name: 'Templates', icon: FileText },
+              { name: 'Crm', icon: Database },
+              { name: 'Unibox', icon: Inbox, highlighted: true },
+              { name: 'Team Dashboard', icon: Users },
+              { name: 'Analytics', icon: BarChart3 },
+              { name: 'AI Integration', icon: Zap },
+            ].map((f) => (
+              <div key={f.name} className="flex flex-col items-center gap-3 transition-transform hover:scale-105">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm border ${
+                  f.highlighted 
+                    ? 'bg-[#745DF3] border-[#745DF3] text-white shadow-[#745DF3]/20 shadow-lg' 
+                    : 'bg-white border-gray-100/50 text-gray-400 group-hover:border-[#745DF3]/30'
+                }`}>
+                  <f.icon className={`w-6 h-6 ${f.highlighted ? 'text-white' : 'group-hover:text-[#745DF3]'}`} />
+                </div>
+                <span className={`text-[10px] font-bold transition-all ${
+                  f.highlighted ? 'text-[#745DF3]' : 'text-gray-400 group-hover:text-[#101828]'
+                }`}>
+                  {f.name}
+                </span>
+              </div>
+            ))}
           </motion.div>
 
           {/* Dashboard Preview */}

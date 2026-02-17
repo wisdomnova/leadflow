@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
+import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
 import { 
   Inbox, 
   Search, 
@@ -186,6 +187,8 @@ export default function UniboxPage() {
         <Header />
         
         <div className="flex-1 flex overflow-hidden p-6 md:p-8 gap-6">
+          <SubscriptionGuard>
+            {/* <div className="flex-1 flex overflow-hidden gap-6"> */}
           {/* Inbox Sidebar */}
           <div className="w-full md:w-[400px] flex flex-col bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden shrink-0">
             <div className="p-6 border-b border-gray-50 space-y-4">
@@ -528,6 +531,7 @@ export default function UniboxPage() {
               </div>
             )}
           </div>
+          </SubscriptionGuard>
         </div>
       </main>
 

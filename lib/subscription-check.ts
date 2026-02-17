@@ -19,7 +19,7 @@ export async function checkSubscription(orgIdParam?: string) {
 
   const { data: org } = await supabaseAdmin
     .from('organizations')
-    .select('subscription_status, plan_tier, smart_sending_enabled, ai_usage_current, ai_usage_limit')
+    .select('subscription_status, plan_tier, smart_sending_enabled, ai_usage_current, ai_usage_limit, trial_ends_at')
     .eq('id', targetOrgId)
     .single();
 
@@ -33,7 +33,8 @@ export async function checkSubscription(orgIdParam?: string) {
   };
 
   // Determine active status
-  const isActive = org.subscription_status === 'active' || org.subscription_status === 'trialing';
+  const trialExpired = org.trial_ends_at ? new Date(org.trial_ends_at) < new Date() : false;
+  const isActive = org.subscription_status === 'active' || (org.subscription_status === 'trialing' && !trialExpired);
 
   // Define limits per tier
   const tierLimits = {

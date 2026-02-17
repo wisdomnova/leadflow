@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
 import ConfirmModal from '@/components/dashboard/ConfirmModal';
+import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
 import Link from 'next/link';
 import { 
   Database, 
@@ -163,8 +164,9 @@ export default function CRMPage() {
         <Header />
         
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
-          <div className="max-w-[1400px] mx-auto space-y-10">
-            {/* Page Title & Actions */}
+          <SubscriptionGuard>
+            <div className="max-w-[1400px] mx-auto space-y-10">
+              {/* Page Title */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <motion.h1 
@@ -413,9 +415,9 @@ export default function CRMPage() {
               </div>
             </div>
           </div>
+          </SubscriptionGuard>
         </div>
       </main>
-
       <ConfirmModal 
         isOpen={!!disconnectingId}
         onClose={() => setDisconnectingId(null)}
