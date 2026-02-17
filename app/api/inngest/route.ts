@@ -7,10 +7,13 @@ import {
   accountSyncProcessor,
   activityRetentionTask,
   warmupScheduler,
-  warmupAccountProcessor
+  warmupAccountProcessor,
+  warmupRampUpScheduler,
+  warmupReplyProcessor,
+  leadEnrichmentProcessor
 } from "@/lib/inngest/functions";
 
-// Create an API that serves zero functions
+// Serve all Inngest functions
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
@@ -20,6 +23,9 @@ export const { GET, POST, PUT } = serve({
     accountSyncProcessor,
     activityRetentionTask,
     warmupScheduler,
-    warmupAccountProcessor
+    warmupAccountProcessor,
+    warmupRampUpScheduler,
+    warmupReplyProcessor,
+    leadEnrichmentProcessor
   ],
 });

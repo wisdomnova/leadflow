@@ -39,7 +39,7 @@ export async function GET() {
       supabase.from("activity_log").select("*").eq("org_id", orgId).order("created_at", { ascending: false }).limit(4),
       // Services
       supabase.from("email_accounts").select("id").eq("org_id", orgId),
-      supabase.from("organizations").select("subscription_status, trial_ends_at").eq("id", orgId).single()
+      supabase.from("organizations").select("subscription_status, trial_ends_at, plan_tier").eq("id", orgId).single()
     ]);
 
     // Process Stats
@@ -91,7 +91,8 @@ export async function GET() {
         accountsCount: emailAccounts.data?.length || 0,
         subscription: {
           status: effectiveStatus,
-          trial_ends_at: subData.trial_ends_at
+          trial_ends_at: subData.trial_ends_at,
+          tier: subData.plan_tier
         }
       }
     });

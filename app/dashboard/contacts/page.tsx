@@ -60,6 +60,7 @@ export default function ContactsPage() {
   const [bulkStatus, setBulkStatus] = useState('');
 
   const [isPushing, setIsPushing] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
   const [toast, setToast] = useState<{ show: boolean, msg: string, type: 'success' | 'error' }>({ show: false, msg: '', type: 'success' });
 
   // New Contact State
@@ -289,6 +290,7 @@ export default function ContactsPage() {
         setSelectedIds([]);
         setBulkTagName('');
         setShowTagModal(false);
+        fetchContacts(); // Refresh in case stats eventually track tags
       }
     } catch (err) {
       console.error("Failed to bulk tag:", err);
@@ -324,6 +326,7 @@ export default function ContactsPage() {
     e.preventDefault();
     if (!newContact.firstName || !newContact.email) return;
     
+    setIsAdding(true);
     try {
       const res = await fetch('/api/leads', {
         method: 'POST',
@@ -342,12 +345,17 @@ export default function ContactsPage() {
         setContacts(prev => [contact, ...prev]);
         setNewContact({ firstName: '', lastName: '', email: '', company: '', tag: 'Enterprise' });
         setShowAddModal(false);
+        showToast('Contact added successfully');
+        fetchContacts(); // Refresh stats cards
       } else {
         const err = await res.json();
-        alert(err.error || "Failed to add contact");
+        showToast(err.error || "Failed to add contact", 'error');
       }
     } catch (err) {
       console.error("Error adding contact:", err);
+      showToast("Network error. Please try again.", 'error');
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -1156,9 +1164,17 @@ export default function ContactsPage() {
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 py-4 bg-[#745DF3] text-white rounded-2xl font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-[#745DF3]/20"
+                    disabled={isAdding}
+                    className="flex-1 py-4 bg-[#745DF3] text-white rounded-2xl font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-[#745DF3]/20 flex items-center justify-center gap-2"
                   >
-                    Add Contact
+                    {isAdding ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      'Add Contact'
+                    )}
                   </button>
                 </div>
               </form>
@@ -1347,6 +1363,7 @@ export default function ContactsPage() {
                         setContacts(prev => prev.filter(c => c.id !== selectedContact.id));
                         setSelectedContact(null);
                         showToast('Contact deleted');
+                        fetchContacts(); // Refresh stats cards
                       }
                     }
                   }}

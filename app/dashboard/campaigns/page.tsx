@@ -47,11 +47,25 @@ export default function CampaignsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isMissingAccountModalOpen, setIsMissingAccountModalOpen] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ show: boolean, msg: string, type: 'success' | 'error' }>({ show: false, msg: '', type: 'success' });
   
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, msg, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
+
   useEffect(() => {
     fetchCampaigns();
+
+    // Auto-refresh stats every 15 seconds if there are active campaigns
+    const interval = setInterval(() => {
+      const hasRunning = campaigns.some(c => c.status === 'running');
+      if (hasRunning || loading) {
+        fetchCampaigns();
+      }
+    }, 15000);
 
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -59,8 +73,11 @@ export default function CampaignsPage() {
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      clearInterval(interval);
+    };
+  }, [campaigns.length, loading]);
 
   const fetchCampaigns = async () => {
     try {
@@ -106,9 +123,11 @@ export default function CampaignsPage() {
           }
           return c;
         }));
+        showToast(`Campaign ${newStatus === 'running' ? 'started' : 'paused'} successfully!`);
       }
     } catch (err) {
       console.error("Failed to toggle status", err);
+      showToast("Failed to update campaign status", "error");
     }
   };
 
@@ -122,9 +141,14 @@ export default function CampaignsPage() {
           setCampaigns(prev => prev.filter(c => c.id !== campaignToDelete));
           setCampaignToDelete(null);
           setIsDeleteModalOpen(false);
+          showToast("Campaign deleted successfully!");
+        } else {
+          const data = await resp.json();
+          showToast(data.error || "Failed to delete campaign", "error");
         }
       } catch (err) {
         console.error("Failed to delete campaign", err);
+        showToast("An unexpected error occurred", "error");
       }
     }
   };
@@ -217,6 +241,34 @@ export default function CampaignsPage() {
               </div>
             </div>
 
+            <AnimatePresence>
+              {toast.show && (
+                <motion.div
+                  initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 50, scale: 0.95 }}
+                  className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200]"
+                >
+                  <div className={`px-6 py-3 rounded-2xl shadow-2xl border ${
+                    toast.type === 'success' 
+                      ? 'bg-[#101828] border-gray-800 text-white' 
+                      : 'bg-red-600 border-red-500 text-white'
+                  } flex items-center gap-3 min-w-[300px]`}>
+                    {toast.type === 'success' ? (
+                      <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                        <AlertCircle className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                    <p className="font-bold text-sm tracking-tight text-white">{toast.msg}</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Warning Banner if no accounts */}
             {!loading && accounts.length === 0 && (
               <motion.div 
@@ -306,8 +358,8 @@ export default function CampaignsPage() {
             </div>
 
               {/* Campaign Table */}
-              <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+              <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm transition-all overflow-visible">
+                <div className="overflow-x-visible">
                   <table className="w-full text-left border-separate border-spacing-0">
                     <thead>
                       <tr>

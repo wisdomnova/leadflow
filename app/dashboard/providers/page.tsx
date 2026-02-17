@@ -97,6 +97,13 @@ export default function EmailProvidersPage() {
     name: ''
   });
 
+  const [toast, setToast] = useState<{ show: boolean, msg: string, type: 'success' | 'error' }>({ show: false, msg: '', type: 'success' });
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, msg, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -142,7 +149,7 @@ export default function EmailProvidersPage() {
 
   const handleRunDiagnostic = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSender) return alert("Select a sender");
+    if (!selectedSender) return showToast("Select a sender", "error");
     setIsTesting(true);
     
     try {
@@ -205,17 +212,18 @@ export default function EmailProvidersPage() {
         const newAcc = await res.json();
         setAccounts(prev => [newAcc, ...prev]);
         setIsSMTPModalOpen(false);
+        showToast("SMTP Account connected successfully!");
       } else {
         const err = await res.json();
         if (res.status === 409) {
-          alert(`⚠️ Duplicate Account: ${err.error}`);
+          showToast(`Duplicate Account: ${err.error}`, "error");
         } else {
-          alert(err.error || "Failed to connect SMTP");
+          showToast(err.error || "Failed to connect SMTP", "error");
         }
       }
     } catch (err) {
       console.error("Connect SMTP error:", err);
-      alert("Failed to connect SMTP account");
+      showToast("Failed to connect SMTP account", "error");
     }
   };
 
@@ -239,12 +247,14 @@ export default function EmailProvidersPage() {
         setDomains([domainObj, ...domains]);
         setNewDomain('');
         setNewTracking('');
+        showToast("Domain added successfully!");
       } else {
         const err = await res.json();
-        alert(err.message || err.error || "Failed to add domain");
+        showToast(err.message || err.error || "Failed to add domain", "error");
       }
     } catch (err) {
       console.error("Add domain error:", err);
+      showToast("Something went wrong", "error");
     }
   };
 
@@ -257,10 +267,12 @@ export default function EmailProvidersPage() {
         setAccounts(prev => prev.map(acc => 
           acc.id === id ? { ...acc, status: result.success ? 'active' : 'error' } : acc
         ));
-        if (!result.success) alert(`Connection failed: ${result.error}`);
+        if (!result.success) showToast(`Connection failed: ${result.error}`, "error");
+        else showToast("Connection verified successfully!");
       }
     } catch (err) {
       console.error("Check account error:", err);
+      showToast("Verification failed", "error");
     }
   };
 
@@ -281,15 +293,22 @@ export default function EmailProvidersPage() {
         : `/api/domains/${deleteConfirmModal.id}`;
         
       const res = await fetch(endpoint, { method: 'DELETE' });
+      const data = await res.json();
+
       if (res.ok) {
         if (deleteConfirmModal.type === 'account') {
           setAccounts(accounts.filter(a => a.id !== deleteConfirmModal.id));
+          showToast('Sender profile deleted successfully', 'success');
         } else {
           setDomains(domains.filter(d => d.id !== deleteConfirmModal.id));
+          showToast('Domain deleted successfully', 'success');
         }
+      } else {
+        showToast(data.error || `Failed to delete ${deleteConfirmModal.type}`, 'error');
       }
     } catch (err) {
       console.error(`Delete ${deleteConfirmModal.type} error:`, err);
+      showToast(`An unexpected error occurred while deleting`, 'error');
     } finally {
       setDeleteConfirmModal({ show: false, type: null, id: null, name: '' });
     }
@@ -881,6 +900,34 @@ export default function EmailProvidersPage() {
         isOpen={isDNSGuideOpen}
         onClose={() => setIsDNSGuideOpen(false)}
       />
+
+      <AnimatePresence>
+        {toast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200]"
+          >
+            <div className={`px-6 py-3 rounded-2xl shadow-2xl border ${
+              toast.type === 'success' 
+                ? 'bg-[#101828] border-gray-800 text-white' 
+                : 'bg-red-600 border-red-500 text-white'
+            } flex items-center gap-3 min-w-[300px]`}>
+              {toast.type === 'success' ? (
+                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                </div>
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                  <AlertCircle className="w-4 h-4 text-white" />
+                </div>
+              )}
+              <p className="font-bold text-sm tracking-tight text-white">{toast.msg}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ConfirmModal
         isOpen={deleteConfirmModal.show}

@@ -53,6 +53,7 @@ export async function GET(req: Request) {
       open: stats.reduce((acc, s) => acc + (s.open_count || 0), 0),
       reply: stats.reduce((acc, s) => acc + (s.reply_count || 0), 0),
       click: stats.reduce((acc, s) => acc + (s.click_count || 0), 0),
+      bounce: stats.reduce((acc, s) => acc + (s.bounce_count || 0), 0),
     });
 
     const currentData = aggregate(currentPeriodStats);
@@ -94,6 +95,14 @@ export async function GET(req: Request) {
         ...calculateChange(
             currentData.sent > 0 ? (currentData.click / currentData.sent) : 0,
             prevData.sent > 0 ? (prevData.click / prevData.sent) : 0
+        )
+      },
+      {
+        name: 'Bounce Rate',
+        value: getRate(currentData.bounce, currentData.sent),
+        ...calculateChange(
+            currentData.sent > 0 ? (currentData.bounce / currentData.sent) : 0,
+            prevData.sent > 0 ? (prevData.bounce / prevData.sent) : 0
         )
       }
     ];

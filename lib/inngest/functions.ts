@@ -93,15 +93,17 @@ export const campaignLauncher = inngest.createFunction(
     }));
 
     await step.run("init-recipients", async () => {
-      await supabase.from("campaign_recipients").upsert(recipients, { onConflict: 'campaign_id,lead_id' });
+      const { error } = await supabase.from("campaign_recipients").upsert(recipients, { onConflict: 'campaign_id,lead_id' });
+      if (error) throw new Error(`Failed to initialize recipients: ${error.message}`);
     });
 
     // 2b. Update total_leads in campaigns table
     await step.run("update-campaign-stats", async () => {
-      await (supabase as any)
+      const { error } = await (supabase as any)
         .from("campaigns")
         .update({ total_leads: leads.length })
         .eq("id", campaignId);
+      if (error) throw new Error(`Failed to update campaign stats: ${error.message}`);
     });
 
     // 3. Trigger first email for each lead
@@ -328,6 +330,18 @@ export const emailProcessor = inngest.createFunction(
           description: `Failed to send email to ${((data as any).lead as any).email}: ${err.message}`,
           metadata: { campaign_id: campaignId, error: err.message }
         }] as any);
+
+        // Increment bounce_count for permanent-looking failures
+        const msg = (err.message || '').toLowerCase();
+        const isPermanent = msg.includes('invalid') || msg.includes('not found') || msg.includes('rejected') || msg.includes('no refresh_token') || msg.includes('bad credentials');
+        if (isPermanent) {
+          await (supabase as any).rpc('increment_campaign_stat', {
+            campaign_id_param: campaignId,
+            column_param: 'bounce_count'
+          });
+          // Mark recipient as bounced so we don't retry forever
+          await (supabase as any).from("campaign_recipients").update({ status: 'bounced' }).eq("campaign_id", campaignId).eq("lead_id", leadId);
+        }
         
         // Re-throw to trigger Inngest retry if it's a transient error
         throw err;

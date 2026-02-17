@@ -12,6 +12,7 @@ import {
   ChevronRight, 
   ChevronLeft, 
   Check, 
+  CheckCircle2,
   Save,
   List,
   Type,
@@ -78,6 +79,13 @@ export default function CreateCampaignPage() {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewSource, setPreviewSource] = useState<'generate' | 'optimize'>('generate');
 
+  const [toast, setToast] = useState<{ show: boolean, msg: string, type: 'success' | 'error' }>({ show: false, msg: '', type: 'success' });
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, msg, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -89,7 +97,7 @@ export default function CreateCampaignPage() {
         
         const accData = await accRes.json();
         const tempData = await tempRes.json();
-        const leadData = await leadRes.json();
+        const leadDataRaw = await leadRes.json();
         
         const validatedAccounts = Array.isArray(accData) ? accData : [];
         setAccounts(validatedAccounts);
@@ -98,7 +106,8 @@ export default function CreateCampaignPage() {
           setSelectedAccountId(validatedAccounts[0].id);
         }
         setSavedTemplates(Array.isArray(tempData) ? tempData : []);
-        setAvailableLeads(Array.isArray(leadData) ? leadData : []);
+        // Handle the new API response structure { leads: [], total: 0, stats: {} }
+        setAvailableLeads(Array.isArray(leadDataRaw.leads) ? leadDataRaw.leads : []);
       } catch (err) {
         console.error("Error loading campaign data:", err);
       } finally {
@@ -116,7 +125,7 @@ export default function CreateCampaignPage() {
   }, [isLoadingData, accounts, router]);
 
   const handleGenerateAI = async () => {
-    if (!aiGoal || !aiAudience) return alert("Please specify your goal and audience");
+    if (!aiGoal || !aiAudience) return showToast("Please specify your goal and audience", "error");
     
     setIsGeneratingAI(true);
     try {
@@ -144,6 +153,7 @@ export default function CreateCampaignPage() {
       }
     } catch (err) {
       console.error("AI Generation error:", err);
+      showToast("AI Generation failed", "error");
     } finally {
       setIsGeneratingAI(false);
     }
@@ -152,7 +162,7 @@ export default function CreateCampaignPage() {
   const handleAIOptimize = async () => {
     const currentStepData = emailSteps[activeStepIndex];
     if (!currentStepData?.body && !currentStepData?.subject) {
-      return alert("Write a subject or body first so the AI can suggest improvements, or use 'AI Rewrite' to generate from scratch.");
+      return showToast("Write a subject or body first", "error");
     }
     
     setIsOptimizingAI(true);
@@ -183,6 +193,7 @@ export default function CreateCampaignPage() {
       }
     } catch (err) {
       console.error("AI Optimization error:", err);
+      showToast("Optimization failed", "error");
     } finally {
       setIsOptimizingAI(false);
     }
@@ -251,11 +262,11 @@ export default function CreateCampaignPage() {
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
 
   const handleLaunch = async () => {
-    if (!campaignName) return alert("Please enter a campaign name");
-    if (!selectedAccountId) return alert("Please select a sender profile");
-    if (selectedLeadIds.length === 0) return alert("Please select at least one lead");
+    if (!campaignName) return showToast("Please enter a campaign name", "error");
+    if (!selectedAccountId) return showToast("Please select a sender profile", "error");
+    if (selectedLeadIds.length === 0) return showToast("Please select at least one lead", "error");
     if (emailSteps.length === 0 || !emailSteps[0].subject || !emailSteps[0].body) {
-      return alert("Please complete at least the first email in your sequence");
+      return showToast("Please complete at least the first email in your sequence", "error");
     }
     
     setIsLaunching(true);
@@ -276,20 +287,22 @@ export default function CreateCampaignPage() {
       });
 
       if (res.ok) {
+        showToast("Campaign launched successfully!");
         router.push('/dashboard/campaigns');
       } else {
         const err = await res.json();
-        alert(err.error || "Failed to launch campaign");
+        showToast(err.error || "Failed to launch campaign", "error");
       }
     } catch (err) {
       console.error("Launch error:", err);
+      showToast("Something went wrong", "error");
     } finally {
       setIsLaunching(false);
     }
   };
 
   const handleSaveDraft = async () => {
-    if (!campaignName) return alert("Please enter a campaign name");
+    if (!campaignName) return showToast("Please enter a campaign name", "error");
 
     try {
       const res = await fetch('/api/campaigns', {
@@ -308,11 +321,11 @@ export default function CreateCampaignPage() {
       });
 
       if (res.ok) {
-        setShowDraftNotification(true);
-        setTimeout(() => setShowDraftNotification(false), 3000);
+        showToast("Campaign saved as draft");
       }
     } catch (err) {
       console.error("Save draft error:", err);
+      showToast("Failed to save draft", "error");
     }
   };
 
@@ -1330,6 +1343,37 @@ export default function CreateCampaignPage() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200]"
+          >
+            <div className={`px-6 py-4 rounded-[2rem] shadow-2xl flex items-center gap-4 min-w-[320px] backdrop-blur-xl border ${
+              toast.type === 'success' 
+                ? 'bg-emerald-500/90 border-emerald-400 text-white' 
+                : 'bg-red-500/90 border-red-400 text-white'
+            }`}>
+              <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                {toast.type === 'success' 
+                  ? <CheckCircle2 className="w-6 h-6 text-white" /> 
+                  : <AlertCircle className="w-6 h-6 text-white" />
+                }
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70">
+                  {toast.type === 'success' ? 'Success' : 'Attention'}
+                </p>
+                <p className="text-sm font-bold">{toast.msg}</p>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

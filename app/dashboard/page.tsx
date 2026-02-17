@@ -86,6 +86,7 @@ export default function DashboardPage() {
   const [activities, setActivities] = useState<any[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
   const [trialDays, setTrialDays] = useState<number>(14);
+  const [showTrialBanner, setShowTrialBanner] = useState<boolean>(false);
   const [hasAccounts, setHasAccounts] = useState(false);
   const [isMissingAccountModalOpen, setIsMissingAccountModalOpen] = useState(false);
   const [services, setServices] = useState<any[]>([
@@ -135,11 +136,17 @@ export default function DashboardPage() {
       const { accountsCount, subscription } = data.services;
       setHasAccounts(accountsCount > 0);
 
-      if (subscription.trial_ends_at) {
+      if (subscription.status === 'active' && !subscription.trial_ends_at) {
+        setShowTrialBanner(false);
+      } else if (subscription.trial_ends_at) {
         const ends = new Date(subscription.trial_ends_at);
         const now = new Date();
         const diff = Math.ceil((ends.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         setTrialDays(diff > 0 ? diff : 0);
+        setShowTrialBanner(true);
+      } else {
+        // Fallback or other statuses
+        setShowTrialBanner(subscription.status === 'active' || subscription.status === 'trialing');
       }
 
       setServices([
@@ -251,7 +258,7 @@ export default function DashboardPage() {
           <SubscriptionGuard>
             <div className="max-w-[1400px] mx-auto space-y-10">
             {/* Trial Banner */}
-            <TrialBanner daysRemaining={trialDays} />
+            {showTrialBanner && <TrialBanner daysRemaining={trialDays} />}
 
             {/* Notification Toast */}
             <AnimatePresence>

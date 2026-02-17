@@ -50,6 +50,24 @@ export async function GET(request: NextRequest) {
 
     const supabase = getAdminClient();
     
+    // Check if we already have this account (to preserve existing refresh_token if Google doesn't return a new one)
+    const { data: existingAccount } = await (supabase as any)
+      .from("email_accounts")
+      .select("config")
+      .eq("org_id", orgId)
+      .eq("email", email)
+      .single();
+
+    const existingConfig = existingAccount?.config || {};
+
+    // CRITICAL: Google only returns refresh_token on the FIRST authorization or when prompt=consent.
+    // If it's missing, preserve the old one.
+    const refreshToken = tokenData.refresh_token || existingConfig.refresh_token;
+
+    if (!refreshToken) {
+      console.error("WARNING: No refresh_token available for", email, "— token data:", JSON.stringify(tokenData));
+    }
+
     // Save to email_accounts
     const { error } = await (supabase as any)
       .from("email_accounts")
@@ -60,7 +78,7 @@ export async function GET(request: NextRequest) {
         status: "active",
         config: {
           access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
+          refresh_token: refreshToken,
           expires_at: Date.now() + tokenData.expires_in * 1000,
           google_id: userData.id
         }
