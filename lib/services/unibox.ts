@@ -5,6 +5,21 @@ import { createNotification } from '../notifications';
 import { inngest } from './inngest';
 import { refreshGoogleAccessToken } from './email-sender';
 
+/** Decode HTML entities in Gmail API snippets (server-safe, no DOM) */
+function decodeSnippet(text: string): string {
+  if (!text) return '';
+  const decoded = text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+  // Strip the quoted reply thread for a clean preview
+  const quoteIdx = decoded.search(/\bOn [\s\S]{5,80}?wrote:/);
+  return (quoteIdx > 0 ? decoded.slice(0, quoteIdx).trim() : decoded.trim()) || decoded.trim();
+}
+
 // ─── Gmail REST API Inbox Sync ───────────────────────────────────────────────
 // Uses gmail.readonly scope (which we already have) instead of IMAP.
 // Google IMAP requires the https://mail.google.com/ scope which we don't request.
@@ -183,7 +198,7 @@ async function syncGoogleInbox(accountId: string, account: any) {
           message_id: messageIdHeader,
           from_email: fromEmail,
           subject: subject || "(No Subject)",
-          snippet: snippet.substring(0, 200),
+          snippet: decodeSnippet(snippet).substring(0, 200),
           received_at: dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString(),
           is_read: false,
           direction: 'inbound',

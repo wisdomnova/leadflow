@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Papa from 'papaparse';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
 import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
@@ -54,6 +55,9 @@ export default function ContactsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStats, setUploadStats] = useState({ parsed: 0, imported: 0, errors: 0, total: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const uploadAbortRef = useRef(false);
   const [showTagModal, setShowTagModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [bulkTagName, setBulkTagName] = useState('');
@@ -361,62 +365,181 @@ export default function ContactsPage() {
 
   const filteredContacts = contacts; // Filtering is handled by API
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // ---- Header normalization map ----
+  const normalizeHeader = (raw: string): string | null => {
+    const h = raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const map: Record<string, string> = {
+      email: 'email', email_address: 'email', e_mail: 'email',
+      first_name: 'first_name', firstname: 'first_name', first: 'first_name', given_name: 'first_name',
+      last_name: 'last_name', lastname: 'last_name', last: 'last_name', surname: 'last_name', family_name: 'last_name',
+      company: 'company', company_name: 'company', organization: 'company', organisation: 'company',
+      job_title: 'job_title', jobtitle: 'job_title', title: 'job_title', position: 'job_title', role: 'job_title',
+      phone: 'phone', phone_number: 'phone', telephone: 'phone', mobile: 'phone',
+      linkedin: 'linkedin', linkedin_url: 'linkedin',
+      website: 'website', url: 'website', web: 'website',
+      city: 'city', state: 'state', country: 'country',
+      tags: 'tags', tag: 'tags', label: 'tags',
+    };
+    return map[h] || null;
+  };
+
+  // ---- Send a batch of leads to the import API ----
+  const sendBatch = async (leads: any[]): Promise<{ imported: number; errors: number }> => {
+    try {
+      const res = await fetch('/api/leads/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leads }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { imported: data.count || leads.length, errors: 0 };
+      } else {
+        return { imported: 0, errors: leads.length };
+      }
+    } catch {
+      return { imported: 0, errors: leads.length };
+    }
+  };
+
+  // ---- Core upload handler (works for both click and drag-drop) ----
+  const processFile = useCallback(async (file: File) => {
+    if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+      showToast('Please select a CSV file', 'error');
+      return;
+    }
 
     setIsUploading(true);
-    setUploadProgress(10);
+    setUploadProgress(0);
+    setUploadStats({ parsed: 0, imported: 0, errors: 0, total: 0 });
+    uploadAbortRef.current = false;
 
-    // Simple CSV parser for demo purposes (production would use a lib like PapaParse)
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const text = event.target?.result as string;
-        const lines = text.split('\n');
-        const headers = lines[0].split(',');
-        
-        const leads = lines.slice(1).filter(line => line.trim()).map(line => {
-          const values = line.split(',');
-          const lead: any = {};
-          headers.forEach((header, i) => {
-            const h = header.trim().toLowerCase();
-            const v = values[i]?.trim();
-            if (h === 'email') lead.email = v;
-            if (h === 'first name' || h === 'firstname') lead.first_name = v;
-            if (h === 'last name' || h === 'lastname') lead.last_name = v;
-            if (h === 'company') lead.company = v;
-          });
-          return lead;
-        });
+    const BATCH_SIZE = 1000;
+    let headerMap: Record<number, string> = {};
+    let batch: any[] = [];
+    let totalParsed = 0;
+    let totalImported = 0;
+    let totalErrors = 0;
+    let rowEstimate = Math.max(1, Math.round(file.size / 120)); // rough row estimate for progress
 
-        setUploadProgress(50);
+    await new Promise<void>((resolve) => {
+      Papa.parse(file, {
+        header: false,
+        skipEmptyLines: true,
+        chunkSize: 1024 * 512, // 512KB chunks — balances memory vs overhead
+        chunk: async (results: Papa.ParseResult<string[]>, parser: Papa.Parser) => {
+          if (uploadAbortRef.current) { parser.abort(); resolve(); return; }
 
-        const res = await fetch('/api/leads/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ leads })
-        });
+          const rows = results.data as string[][];
 
-        if (res.ok) {
+          for (const row of rows) {
+            // First data row = headers
+            if (Object.keys(headerMap).length === 0) {
+              row.forEach((cell, i) => {
+                const mapped = normalizeHeader(cell);
+                if (mapped) headerMap[i] = mapped;
+              });
+              if (!Object.values(headerMap).includes('email')) {
+                showToast('CSV must have an "email" column', 'error');
+                parser.abort();
+                setIsUploading(false);
+                resolve();
+                return;
+              }
+              continue;
+            }
+
+            // Map row to lead object
+            const lead: any = {};
+            row.forEach((cell, i) => {
+              const field = headerMap[i];
+              if (field && cell?.trim()) {
+                if (field === 'tags') {
+                  lead.tags = cell.split(';').map((t: string) => t.trim()).filter(Boolean);
+                } else {
+                  lead[field] = cell.trim();
+                }
+              }
+            });
+
+            if (!lead.email) continue;
+            // Basic email validation
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email)) continue;
+
+            batch.push(lead);
+            totalParsed++;
+
+            if (batch.length >= BATCH_SIZE) {
+              parser.pause();
+              const result = await sendBatch(batch);
+              totalImported += result.imported;
+              totalErrors += result.errors;
+              batch = [];
+              const progress = Math.min(95, Math.round((totalParsed / rowEstimate) * 100));
+              setUploadProgress(progress);
+              setUploadStats({ parsed: totalParsed, imported: totalImported, errors: totalErrors, total: rowEstimate });
+              parser.resume();
+            }
+          }
+        },
+        complete: async () => {
+          // Flush remaining batch
+          if (batch.length > 0) {
+            const result = await sendBatch(batch);
+            totalImported += result.imported;
+            totalErrors += result.errors;
+          }
           setUploadProgress(100);
+          setUploadStats({ parsed: totalParsed, imported: totalImported, errors: totalErrors, total: totalParsed });
+
           setTimeout(() => {
             fetchContacts();
             setIsUploading(false);
             setShowUploadModal(false);
-          }, 500);
-        } else {
-          const err = await res.json();
-          alert(err.error || "Import failed");
+            if (totalErrors > 0) {
+              showToast(`Imported ${totalImported.toLocaleString()} contacts (${totalErrors.toLocaleString()} failed)`, 'error');
+            } else {
+              showToast(`Successfully imported ${totalImported.toLocaleString()} contacts`);
+            }
+          }, 600);
+          resolve();
+        },
+        error: (err: Error) => {
+          console.error('CSV parse error:', err);
+          showToast('Failed to parse CSV file', 'error');
           setIsUploading(false);
-        }
-      } catch (err) {
-        console.error("Upload error:", err);
-        setIsUploading(false);
-      }
-    };
-    reader.readAsText(file);
+          resolve();
+        },
+      });
+    });
+  }, []);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+    e.target.value = ''; // reset so same file can be re-selected
   };
+
+  // ---- Drag-and-drop handlers ----
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  }, [processFile]);
 
   return (
     <div className="flex min-h-screen bg-[#FBFBFB] font-jakarta">
@@ -990,12 +1113,21 @@ export default function ContactsPage() {
 
               <div className="p-8 space-y-6">
                 {!isUploading ? (
-                  <label className="p-12 border-2 border-dashed border-gray-100 rounded-[2rem] flex flex-col items-center justify-center text-center group hover:border-[#745DF3]/40 transition-all cursor-pointer bg-gray-50/50">
+                  <label 
+                    className={`p-12 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center text-center group transition-all cursor-pointer ${
+                      isDragging ? 'border-[#745DF3] bg-[#745DF3]/5 scale-[1.02]' : 'border-gray-100 hover:border-[#745DF3]/40 bg-gray-50/50'
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
                     <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
                       <FileText className="w-8 h-8 text-[#745DF3]" />
                     </div>
-                    <h3 className="text-lg font-black text-[#101828] mb-1">Click to upload or drag and drop</h3>
-                    <p className="text-sm text-gray-400 font-medium">CSV files only (Max. 10MB)</p>
+                    <h3 className="text-lg font-black text-[#101828] mb-1">
+                      {isDragging ? 'Drop your file here' : 'Click to upload or drag and drop'}
+                    </h3>
+                    <p className="text-sm text-gray-400 font-medium">CSV files up to 100MB &bull; Handles large files with streaming</p>
                     <input 
                       type="file" 
                       className="hidden" 
@@ -1013,13 +1145,20 @@ export default function ContactsPage() {
                         className="absolute bottom-0 left-0 right-0 bg-[#745DF3]/10"
                       />
                     </div>
-                    <h3 className="text-lg font-black text-[#101828] mb-1">Processing File...</h3>
-                    <p className="text-sm text-gray-400 font-medium mb-6">Analyzing headers and validating records</p>
+                    <h3 className="text-lg font-black text-[#101828] mb-1">
+                      {uploadProgress < 100 ? 'Importing Contacts...' : 'Import Complete!'}
+                    </h3>
+                    <p className="text-sm text-gray-400 font-medium mb-4">
+                      {uploadStats.parsed > 0
+                        ? `${uploadStats.parsed.toLocaleString()} parsed \u2022 ${uploadStats.imported.toLocaleString()} imported${uploadStats.errors > 0 ? ` \u2022 ${uploadStats.errors.toLocaleString()} failed` : ''}`
+                        : 'Analyzing headers and validating records'}
+                    </p>
                     
                     <div className="w-full max-w-xs bg-gray-100 h-2 rounded-full overflow-hidden">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${uploadProgress}%` }}
+                        transition={{ ease: 'easeOut' }}
                         className="h-full bg-[#745DF3]"
                       />
                     </div>

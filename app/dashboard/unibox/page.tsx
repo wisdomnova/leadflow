@@ -27,6 +27,23 @@ import {
 
 const filters = ['All', 'Interested', 'Follow-up', 'Out of Office', 'Not Interested', 'Closed Won'];
 
+/** Decode HTML entities and strip the quoted reply thread */
+function cleanMessage(text: string): string {
+  if (!text) return '';
+  // Decode common HTML entities
+  const decoded = text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+  // Strip quoted reply thread: remove everything from "On [date]...wrote:" onwards
+  const quoteIdx = decoded.search(/\bOn [\s\S]{5,80}?wrote:/);
+  const stripped = quoteIdx > 0 ? decoded.slice(0, quoteIdx).trim() : decoded.trim();
+  return stripped || decoded.trim();
+}
+
 export default function UniboxPage() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<any>(null);
@@ -309,7 +326,7 @@ export default function UniboxPage() {
                         )}
                       </div>
                       <p className="text-xs text-gray-400 line-clamp-1 font-medium leading-relaxed">
-                        {conv.preview}
+                        {cleanMessage(conv.preview)}
                       </p>
                     </div>
                   </motion.div>
@@ -451,8 +468,8 @@ export default function UniboxPage() {
                           ? 'bg-[#101828] text-white rounded-[2.5rem] rounded-tr-none' 
                           : 'bg-white border border-gray-100 rounded-[2.5rem] rounded-tl-none'
                       }`}>
-                        <p className={`text-base leading-relaxed ${msg.sender === 'you' ? 'font-bold' : 'font-medium text-[#101828]'}`}>
-                          {msg.text}
+                        <p className={`text-base leading-relaxed whitespace-pre-wrap ${msg.sender === 'you' ? 'font-bold' : 'font-medium text-[#101828]'}`}>
+                          {cleanMessage(msg.text)}
                         </p>
                       </div>
                     </motion.div>
