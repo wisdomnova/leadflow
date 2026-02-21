@@ -236,10 +236,16 @@ export default function ContactsPage() {
         body: JSON.stringify({ ids: selectedIds })
       });
       
+      const data = await res.json();
       if (res.ok) {
         setContacts(prev => prev.filter(c => !selectedIds.includes(c.id)));
         setSelectedIds([]);
+        if (data.protected > 0) {
+          showToast(`Deleted contacts. ${data.protected} contact(s) in running campaigns were kept.`);
+        }
         fetchContacts();
+      } else {
+        showToast(data.error || 'Failed to delete contacts', 'error');
       }
     } catch (err) {
       console.error("Failed to delete contacts:", err);
@@ -261,7 +267,10 @@ export default function ContactsPage() {
         const data = await res.json();
         setContacts([]);
         setSelectedIds([]);
-        showToast(`Deleted ${(data.deleted || 0).toLocaleString()} contacts`);
+        const msg = data.protected > 0
+          ? `Deleted ${(data.deleted || 0).toLocaleString()} contacts. ${data.protected} in running campaigns were kept.`
+          : `Deleted ${(data.deleted || 0).toLocaleString()} contacts`;
+        showToast(msg);
         fetchContacts();
       } else {
         showToast('Failed to delete contacts', 'error');

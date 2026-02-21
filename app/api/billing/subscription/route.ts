@@ -33,6 +33,7 @@ export async function GET() {
         effectiveStatus = 'active';
       }
     }
+    // 'canceling' stays as 'canceling' — the UI handles this state
 
     let subscription: any = null;
     let invoices: any[] = [];
@@ -90,7 +91,9 @@ export async function GET() {
         status: subscription.status,
         current_period_end: subscription.current_period_end,
         cancel_at_period_end: subscription.cancel_at_period_end,
+        canceled_at: (subscription as any).canceled_at,
         plan: (subscription as any).plan?.name || (subscription.items?.data?.[0]?.price as any)?.nickname || 'Standard Plan',
+        priceId: subscription.items?.data?.[0]?.price?.id,
       } : null,
       paymentMethod,
       invoices

@@ -219,13 +219,7 @@ export default function DashboardPage() {
   };
 
   const handleBookSession = () => {
-    setIsBookingSession(true);
-    setTimeout(() => {
-      setIsBookingSession(false);
-      setNotificationMsg('Feedback session scheduled with an expert!');
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 3000);
-    }, 2000);
+    window.location.href = 'mailto:support@tryleadflow.ai?subject=Campaign%20Feedback%20Request&body=Hi%2C%20I%27d%20like%20help%20reviewing%20my%20campaign%20sequences%20and%20improving%20reply%20rates.';
   };
 
   const handleCreateCampaignClick = () => {

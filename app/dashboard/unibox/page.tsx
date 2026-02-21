@@ -10,15 +10,9 @@ import {
   Search, 
   MoreHorizontal, 
   Star,
-  Archive,
-  Trash2,
   CheckCircle2,
   Zap,
-  ChevronRight,
-  Sparkles,
-  Paperclip,
-  Smile,
-  Calendar,
+  ChevronDown,
   SquareArrowOutUpRight,
   RefreshCw,
   Send,
@@ -99,7 +93,8 @@ export default function UniboxPage() {
   };
 
   const handlePushToCRM = async () => {
-    if (!selectedId) return;
+    const conv = conversations.find(c => c.id === selectedId);
+    if (!selectedId || !conv?.isLinkedToLead) return;
     setIsPushing(true);
     try {
       const res = await fetch('/api/crm/push', {
@@ -126,9 +121,8 @@ export default function UniboxPage() {
   };
 
   const handleToggleStar = async () => {
-    if (!selectedId) return;
     const current = conversations.find(c => c.id === selectedId);
-    if (!current) return;
+    if (!selectedId || !current?.isLinkedToLead) return;
     const newStar = !current.isStarred;
     
     // Optimistic update
@@ -148,7 +142,8 @@ export default function UniboxPage() {
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
-    if (!selectedId) return;
+    const current = conversations.find(c => c.id === selectedId);
+    if (!selectedId || !current?.isLinkedToLead) return;
 
     // Optimistic update
     setConversations(prev => prev.map(c => 
@@ -168,14 +163,19 @@ export default function UniboxPage() {
   };
 
   const handleSendReply = async () => {
-    if (!replyText.trim() || !selectedId) return;
+    if (!replyText.trim() || !selectedConversation) return;
     setIsSending(true);
     
     try {
       const res = await fetch('/api/unibox/reply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId: selectedId, text: replyText })
+        body: JSON.stringify({
+          leadId: selectedConversation.isLinkedToLead ? selectedId : null,
+          email: selectedConversation.email,
+          subject: selectedConversation.subject,
+          text: replyText
+        })
       });
 
       if (res.ok) {
@@ -236,14 +236,11 @@ export default function UniboxPage() {
                           className="absolute right-0 mt-2 w-48 bg-white rounded-2xl border border-gray-100 shadow-2xl z-20 py-2"
                         >
                           <button 
+                            onClick={() => { fetchConversations(); setShowInboxesDropdown(false); }}
                             className="w-full text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 flex items-center gap-2"
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Mark all as read
-                          </button>
-                          <button className="w-full text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-                            <Archive className="w-3.5 h-3.5" />
-                            Archive sorted
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Refresh
                           </button>
                         </motion.div>
                       )}
@@ -354,18 +351,20 @@ export default function UniboxPage() {
                     <div>
                       <div className="flex items-center gap-3">
                         <h3 className="text-2xl font-black text-[#101828] tracking-tight">{selectedConversation.name}</h3>
+                        {selectedConversation.isLinkedToLead && (
                         <div className="relative">
                           <button 
                             onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                            className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all outline-none ${
-                              selectedConversation.status === 'Interested' ? 'bg-emerald-50 text-emerald-600' : 
-                              selectedConversation.status === 'Follow-up' ? 'bg-blue-50 text-blue-600' :
-                              selectedConversation.status === 'Closed Won' ? 'bg-[#745DF3] text-white' :
-                              'bg-gray-100 text-gray-500'
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all outline-none border cursor-pointer hover:shadow-md ${
+                              selectedConversation.status === 'Interested' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' : 
+                              selectedConversation.status === 'Follow-up' ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100' :
+                              selectedConversation.status === 'Closed Won' ? 'bg-[#745DF3] text-white border-[#745DF3] hover:bg-[#6349e0]' :
+                              selectedConversation.status === 'replied' ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' :
+                              'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
                             }`}
                           >
                             {selectedConversation.status}
-                            <ChevronRight className={`w-3 h-3 transition-transform ${showStatusDropdown ? 'rotate-90' : ''}`} />
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
                           </button>
 
                           <AnimatePresence>
@@ -389,6 +388,7 @@ export default function UniboxPage() {
                             )}
                           </AnimatePresence>
                         </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 mt-1.5">
                         <span className="text-sm font-bold text-gray-400">{selectedConversation.company}</span>
@@ -399,30 +399,36 @@ export default function UniboxPage() {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <button 
-                      onClick={handleToggleStar}
-                      className={`p-3.5 rounded-2xl transition-all ${
-                        selectedConversation.isStarred 
-                          ? 'bg-amber-50 text-amber-500' 
-                          : 'bg-gray-50 text-gray-400 hover:text-[#745DF3]'
-                      }`}
-                    >
-                      <Star className={`w-5 h-5 ${selectedConversation.isStarred ? 'fill-amber-500' : ''}`} />
-                    </button>
-                    <div className="w-[1px] h-8 bg-gray-100 mx-2" />
-                    <button 
-                      onClick={handlePushToCRM}
-                      disabled={isPushing}
-                      className="flex items-center gap-2 px-6 py-3.5 bg-[#101828] rounded-2xl text-[13px] font-black text-white hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/20 group disabled:opacity-50"
-                    >
-                      {isPushing ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Zap className="w-4 h-4 text-[#745DF3] fill-[#745DF3]" />
-                      )}
-                      Push to CRM
-                      <SquareArrowOutUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </button>
+                    {selectedConversation.isLinkedToLead && (
+                      <button 
+                        onClick={handleToggleStar}
+                        className={`p-3.5 rounded-2xl transition-all ${
+                          selectedConversation.isStarred 
+                            ? 'bg-amber-50 text-amber-500' 
+                            : 'bg-gray-50 text-gray-400 hover:text-[#745DF3]'
+                        }`}
+                      >
+                        <Star className={`w-5 h-5 ${selectedConversation.isStarred ? 'fill-amber-500' : ''}`} />
+                      </button>
+                    )}
+                    {selectedConversation.isLinkedToLead && (
+                      <>
+                        <div className="w-[1px] h-8 bg-gray-100 mx-2" />
+                        <button 
+                          onClick={handlePushToCRM}
+                          disabled={isPushing}
+                          className="flex items-center gap-2 px-6 py-3.5 bg-[#101828] rounded-2xl text-[13px] font-black text-white hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/20 group disabled:opacity-50"
+                        >
+                          {isPushing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Zap className="w-4 h-4 text-[#745DF3] fill-[#745DF3]" />
+                          )}
+                          Push to CRM
+                          <SquareArrowOutUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -474,24 +480,6 @@ export default function UniboxPage() {
                       </div>
                     </motion.div>
                   ))}
-                  
-                  {/* AI Suggestion */}
-                  <div className="max-w-xl mx-auto">
-                    <div className="bg-gradient-to-br from-[#745DF3] to-[#9281f7] p-[1px] rounded-[2.5rem]">
-                      <div className="bg-white rounded-[2.5rem] p-8">
-                        <div className="flex items-center gap-2 text-[#745DF3] mb-5">
-                          <Sparkles className="w-4 h-4" />
-                          <span className="text-[11px] font-black uppercase tracking-widest">AI Draft Agent</span>
-                        </div>
-                        <p className="text-[15px] font-bold text-gray-700 mb-6 leading-relaxed  text-center">
-                          "I saw your question about scaling. We actually have a dedicated enterprise portal for that. Would you like a quick walkthrough tomorrow?"
-                        </p>
-                        <button className="w-full py-4 bg-[#745DF3] text-white rounded-[1.25rem] text-[13px] font-black hover:opacity-90">
-                          Use AI Suggestion
-                        </button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="p-8 bg-white border-t border-gray-50 shrink-0">
@@ -504,17 +492,7 @@ export default function UniboxPage() {
                     />
                     
                     <div className="flex items-center justify-between mt-2 border-t border-gray-100 p-3 pt-4">
-                      <div className="flex items-center gap-1">
-                        <button className="p-3 text-gray-400 hover:text-[#745DF3] transition-all hover:bg-white rounded-xl">
-                          <Paperclip className="w-5 h-5" />
-                        </button>
-                        <button className="p-3 text-gray-400 hover:text-[#745DF3] transition-all hover:bg-white rounded-xl">
-                          <Smile className="w-5 h-5" />
-                        </button>
-                        <button className="p-3 text-gray-400 hover:text-[#745DF3] transition-all hover:bg-white rounded-xl">
-                          <Calendar className="w-5 h-5" />
-                        </button>
-                      </div>
+                      <div />
                       
                       <button 
                         onClick={handleSendReply}

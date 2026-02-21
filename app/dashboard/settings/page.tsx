@@ -9,15 +9,12 @@ import {
   User, 
   Lock, 
   Bell, 
-  Shield, 
-  Globe, 
   Zap, 
   LogOut, 
   Trash2, 
   Check, 
   ChevronRight, 
   Mail, 
-  Smartphone,
   Camera,
   Eye,
   EyeOff,
@@ -45,6 +42,10 @@ export default function SettingsPage() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
   
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
   // Media State
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
@@ -215,6 +216,30 @@ export default function SettingsPage() {
       });
     } catch (err) {
       console.error("Failed to save notification preferences", err);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch('/api/user/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'DELETE' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Clear cookies and redirect
+        window.location.href = '/signin?deleted=true';
+      } else {
+        alert(data.error || 'Failed to delete account');
+      }
+    } catch (err) {
+      console.error("Failed to delete account", err);
+      alert('Failed to delete account. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -536,52 +561,60 @@ export default function SettingsPage() {
                             )}
                           </button>
                         </div>
-
-                        <div className="mt-12 pt-12 border-t border-gray-50">
-                          <div className="flex items-center justify-between gap-10">
-                            <div className="flex-1">
-                              <h4 className="text-lg font-black text-[#101828] mb-1">Two-Factor Authentication</h4>
-                              <p className="text-gray-500 text-sm font-medium">Add an extra layer of security to your account by requiring more than just a password to log in.</p>
-                            </div>
-                            <button className="px-8 py-3.5 bg-emerald-500 text-white rounded-2xl text-sm font-black hover:bg-emerald-600 transition-all">Enable 2FA</button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Sessions Section */}
-                      <div className="bg-white rounded-[2.5rem] border border-gray-100 p-10 shadow-sm">
-                        <h3 className="text-xl font-black text-[#101828] mb-8">Active Sessions</h3>
-                        <div className="space-y-4">
-                          {[
-                            { device: 'macOS Server • San Francisco, US', browser: 'Chrome', active: true },
-                            { device: 'iPhone 15 Pro • Berlin, DE', browser: 'Safari', active: false },
-                          ].map((session, i) => (
-                            <div key={i} className="flex items-center justify-between p-6 bg-gray-50 rounded-3xl border border-gray-100">
-                              <div className="flex items-center gap-4">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${session.active ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-200 text-gray-400'}`}>
-                                  {session.device.includes('macOS') ? <Globe className="w-5 h-5" /> : <Smartphone className="w-5 h-5" />}
-                                </div>
-                                <div>
-                                  <p className="text-sm font-black text-[#101828]">{session.device}</p>
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{session.browser} • {session.active ? 'Current Session' : '2 days ago'}</p>
-                                </div>
-                              </div>
-                              {!session.active && (
-                                <button className="text-[10px] font-black text-red-500 hover:underline uppercase tracking-widest">Revoke Access</button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
                       </div>
 
                       {/* Danger Zone */}
                       <div className="bg-red-50/50 rounded-[2.5rem] border border-red-100 p-10 shadow-sm">
                         <h3 className="text-xl font-black text-red-600 mb-2">Danger Zone</h3>
-                        <p className="text-gray-500 text-sm font-medium mb-8">Once you delete your account, there is no going back. Please be certain.</p>
-                        <button className="px-8 py-4 bg-red-600 text-white rounded-2xl text-sm font-black hover:bg-red-700 transition-all shadow-xl shadow-red-600/10 flex items-center gap-2">
-                          <Trash2 className="w-5 h-5" />
-                          Delete Account Permanentally
-                        </button>
+                        <p className="text-gray-500 text-sm font-medium mb-4">Once you delete your account, there is no going back. All your data, campaigns, leads, and team members will be permanently removed.</p>
+                        
+                        {!showDeleteConfirm ? (
+                          <button 
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="px-8 py-4 bg-red-600 text-white rounded-2xl text-sm font-black hover:bg-red-700 transition-all shadow-xl shadow-red-600/10 flex items-center gap-2"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                            Delete Account Permanently
+                          </button>
+                        ) : (
+                          <div className="space-y-4 max-w-md">
+                            <div className="p-4 bg-red-100 rounded-2xl border border-red-200">
+                              <p className="text-sm font-bold text-red-700">Type <span className="font-black">DELETE</span> to confirm account deletion. This action cannot be undone.</p>
+                            </div>
+                            <input
+                              type="text"
+                              value={deleteConfirmText}
+                              onChange={(e) => setDeleteConfirmText(e.target.value)}
+                              placeholder="Type DELETE to confirm"
+                              className="w-full px-6 py-4 bg-white border border-red-200 rounded-2xl text-sm font-bold text-[#101828] focus:ring-2 focus:ring-red-300 transition-all font-inter"
+                            />
+                            <div className="flex gap-3">
+                              <button
+                                onClick={handleDeleteAccount}
+                                disabled={deleteConfirmText !== 'DELETE' || isDeleting}
+                                className={`px-8 py-3.5 bg-red-600 text-white rounded-2xl text-sm font-black transition-all flex items-center gap-2 ${deleteConfirmText !== 'DELETE' || isDeleting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-700'}`}
+                              >
+                                {isDeleting ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="w-4 h-4" />
+                                    Confirm Delete
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
+                                className="px-8 py-3.5 bg-gray-100 text-gray-600 rounded-2xl text-sm font-black hover:bg-gray-200 transition-all"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   )}

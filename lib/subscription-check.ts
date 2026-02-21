@@ -34,12 +34,12 @@ export async function checkSubscription(orgIdParam?: string) {
 
   // Determine active status
   const trialExpired = org.trial_ends_at ? new Date(org.trial_ends_at) < new Date() : false;
-  const isActive = org.subscription_status === 'active' || (org.subscription_status === 'trialing' && !trialExpired);
+  const isActive = org.subscription_status === 'active' || org.subscription_status === 'canceling' || (org.subscription_status === 'trialing' && !trialExpired);
 
   // Define limits per tier
   const tierLimits = {
     starter: { emails: 10000, ai: 500, powersend: 0 },
-    pro: { emails: 100000, ai: 1000000, powersend: 1 },
+    pro: { emails: 100000, ai: 1000000, powersend: 0 },
     enterprise: { emails: 500000, ai: 1000000, powersend: 3 }
   };
 

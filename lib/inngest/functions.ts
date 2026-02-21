@@ -209,38 +209,48 @@ export const emailProcessor = inngest.createFunction(
       // Check for PowerSend (Smart Server rotation)
       const isPowerSend = (campaignRes.data as any)?.use_powersend;
       let account;
+      let powersendNodeId: string | null = null;
 
       if (isPowerSend) {
-        // Use PowerSend rotation logic
+        // Use PowerSend rotation logic — pick best available node
         const { data: node, error: nodeError } = await (supabase as any)
           .rpc('get_next_powersend_node', { org_id_param: orgId })
           .single();
         
         if (node && !nodeError) {
-          // IMPORTANT: According to Mailreef architecture: 
-          // 1. We pick an active Server Node (1 API Key = 1 Server)
-          // 2. We use a Mailbox attached to that server (Domains/Mailboxes handled later)
-          const { data: attachedAccount } = await (supabase as any)
-            .from("email_accounts")
-            .select("*")
-            .eq("server_id", node.id)
-            .eq("status", "active")
-            .limit(1)
-            .single();
-
-          if (attachedAccount) {
-            account = {
-              ...(attachedAccount as any),
-              provider: 'custom_smtp', // Force SMTP for PowerSend rotation
-              config: {
-                ...((attachedAccount as any).config || {}),
-                smtpHost: node.provider === 'mailreef' ? 'smtp.mailreef.com' : ((attachedAccount as any).config?.smtpHost || 'smtp.custom.com'),
-                smtpPort: '465',
-                smtpUser: node.ip_address, 
-                smtpPass: node.api_key 
-              }
-            };
+          powersendNodeId = node.id;
+          const smtpConfig = node.smtp_config || {};
+          
+          // Construct a virtual sender account from the node's SMTP config
+          // The sender_id email account is still used for the "From" address
+          const senderId = (campaignRes.data as any)?.sender_id;
+          let fromEmail = smtpConfig.from_email || 'outreach@' + (node.domain_name || 'mail.example.com');
+          let fromName = null;
+          
+          if (senderId) {
+            const { data: senderAccount } = await supabase
+              .from("email_accounts")
+              .select("email, from_name")
+              .eq("id", senderId)
+              .single();
+            if (senderAccount) {
+              fromEmail = (senderAccount as any).email;
+              fromName = (senderAccount as any).from_name;
+            }
           }
+
+          account = {
+            id: node.id,
+            email: fromEmail,
+            from_name: fromName,
+            provider: 'custom_smtp',
+            config: {
+              smtpHost: smtpConfig.host || (node.provider === 'mailreef' ? 'smtp.mailreef.com' : 'smtp.custom.com'),
+              smtpPort: smtpConfig.port || '465',
+              smtpUser: smtpConfig.username || node.api_key,
+              smtpPass: smtpConfig.password || node.api_key,
+            }
+          };
         }
       }
 
@@ -271,9 +281,12 @@ export const emailProcessor = inngest.createFunction(
         lead: (leadRes as any).data,
         recipient: (recipientRes as any).data,
         account,
-        org: (orgRes as any).data
+        org: (orgRes as any).data,
+        powersendNodeId
       } as any;
     });
+
+    const powersendNodeId = (data as any).powersendNodeId;
 
     if (!data.campaign || !data.lead || !data.recipient || !data.account || !data.org) return { error: "Missing campaign, lead, recipient, org or sending account" };
     
@@ -405,6 +418,11 @@ export const emailProcessor = inngest.createFunction(
           subject: subject
         }
       });
+
+      // Track PowerSend node usage for rotation fairness
+      if (powersendNodeId) {
+        await (supabase as any).rpc('increment_server_usage', { server_id_param: powersendNodeId });
+      }
     });
 
     const nextStepIdx = stepIdx + 1;
@@ -462,6 +480,11 @@ export const activityRetentionTask = inngest.createFunction(
   async ({ step }) => {
     const supabase = getAdminClient();
     
+    // Reset PowerSend daily usage counters
+    await step.run("reset-powersend-usage", async () => {
+      await supabase.rpc('reset_daily_server_usage');
+    });
+
     const count = await step.run("delete-old-logs", async () => {
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);

@@ -32,7 +32,8 @@ export async function GET(req: Request) {
           avatar_url,
           organizations (
             name,
-            plan
+            plan,
+            plan_tier
           )
         `)
         .eq("id", payload.userId)
@@ -65,6 +66,7 @@ export async function GET(req: Request) {
           organizations (
             name,
             plan,
+            plan_tier,
             subscription_status,
             trial_ends_at
           )

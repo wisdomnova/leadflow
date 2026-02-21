@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth-utils';
-import { stripe, getOrCreateOrgCoupon } from '@/lib/stripe-billing';
+import { stripe, getOrCreateOrgCoupon, PLAN_PRICES } from '@/lib/stripe-billing';
 import { getAdminClient } from '@/lib/supabase';
 
 export async function POST(req: Request) {
@@ -12,23 +12,7 @@ export async function POST(req: Request) {
   try {
     const { planId, billingCycle } = await req.json();
 
-    // 1. Get price ID from Plan ID
-    const prices: Record<string, any> = {
-      starter: {
-        monthly: 'price_1Swi5eA7EYxH7wgxnMaixU3D', // replace with real IDs
-        annual: 'price_1SwiAJA7EYxH7wgxeuygG8R1'
-      },
-      pro: {
-        monthly: 'price_1Swi6KA7EYxH7wgxP8ry7ngN',
-        annual: 'price_1SwiBAA7EYxH7wgxuLtQ57aQ'
-      },
-      enterprise: {
-        monthly: 'price_1Swi6pA7EYxH7wgx5eiwVE50',
-        annual: 'price_1SwiBqA7EYxH7wgxQVU5kZtf'
-      }
-    };
-
-    const priceId = prices[planId]?.[billingCycle];
+    const priceId = PLAN_PRICES[planId]?.[billingCycle];
     if (!priceId) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
     }

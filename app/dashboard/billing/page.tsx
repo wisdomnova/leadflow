@@ -43,7 +43,7 @@ const plans = [
     name: 'Pro',
     price: { monthly: '$99', annual: '$1,188' },
     description: 'Best for growing teams and scaling outbound efforts.',
-    features: ['100,000 Monthly Emails', 'PowerSend Unlocked (Add-on)', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Priority Support'],
+    features: ['100,000 Monthly Emails', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Priority Support', 'Custom Tracking Domains'],
     button: 'Switch to Pro',
     current: false,
     color: 'purple'
@@ -53,7 +53,7 @@ const plans = [
     name: 'Enterprise',
     price: { monthly: '$319', annual: '$3,828' },
     description: 'For large agencies and enterprise sales organizations.',
-    features: ['500,000 Monthly Emails', '1 PowerSend Node Included', 'Custom API Access', 'SSO & Advanced Security', 'White-labeling', 'Dedicated Account Manager'],
+    features: ['500,000 Monthly Emails', '1 PowerSend Node Included', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Dedicated Account Manager'],
     button: 'Switch to Enterprise',
     current: false,
     color: 'black'
@@ -104,20 +104,76 @@ export default function BillingPage() {
   };
 
   const handlePlanSwitch = async (planId: string) => {
+    const currentTier = subData?.plan_tier;
+    const isCurrent = currentTier === planId;
+    if (isCurrent) return;
+
+    // If user has an active subscription, use the change-plan API
+    // Otherwise (first-time, trial, or no sub), use checkout
+    const hasActiveSub = !!subData?.subscription;
+    
     setIsSwitchingPlan(planId);
     try {
-      const res = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, billingCycle })
-      });
-      const { url, error } = await res.json();
-      if (error) throw new Error(error);
-      window.location.href = url;
+      if (hasActiveSub) {
+        // Determine if upgrade or downgrade for confirmation
+        const planOrder = ['starter', 'pro', 'enterprise'];
+        const currentIdx = planOrder.indexOf(currentTier);
+        const targetIdx = planOrder.indexOf(planId);
+        const isDowngrade = targetIdx < currentIdx;
+        const targetName = planId.charAt(0).toUpperCase() + planId.slice(1);
+
+        if (isDowngrade) {
+          const confirmed = confirm(`Are you sure you want to downgrade to ${targetName}? Your current plan features will remain active until the end of your billing period.`);
+          if (!confirmed) {
+            setIsSwitchingPlan(null);
+            return;
+          }
+        }
+
+        const res = await fetch('/api/billing/change-plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ planId, billingCycle })
+        });
+        const data = await res.json();
+        
+        if (data.redirect === 'checkout') {
+          // Fallback: no active sub, use checkout flow
+          const checkoutRes = await fetch('/api/billing/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ planId, billingCycle })
+          });
+          const checkoutData = await checkoutRes.json();
+          if (checkoutData.error) throw new Error(checkoutData.error);
+          window.location.href = checkoutData.url;
+          return;
+        }
+
+        if (data.error) throw new Error(data.error);
+        
+        setNotificationMsg(data.message);
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 5000);
+        
+        // Refresh subscription data
+        await fetchSubscription();
+      } else {
+        // No existing subscription — redirect to Stripe Checkout
+        const res = await fetch('/api/billing/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ planId, billingCycle })
+        });
+        const { url, error } = await res.json();
+        if (error) throw new Error(error);
+        window.location.href = url;
+      }
     } catch (err: any) {
-      setNotificationMsg(err.message || 'Error redirecting to checkout');
+      setNotificationMsg(err.message || 'Error changing plan');
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
+    } finally {
       setIsSwitchingPlan(null);
     }
   };
@@ -128,15 +184,56 @@ export default function BillingPage() {
     setTimeout(() => setShowNotification(false), 2000);
   };
 
-  const handleCancelSubscription = () => {
-    setIsCanceling(true); 
-    setTimeout(() => {
-      setIsCanceling(false);
+  const handleCancelSubscription = async () => {
+    setIsCanceling(true);
+    try {
+      const res = await fetch('/api/billing/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
       setIsCancelModalOpen(false);
-      setNotificationMsg('Subscription cancellation request sent.');
+      setNotificationMsg(data.message);
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 5000);
+      
+      // Refresh to show canceling state
+      await fetchSubscription();
+    } catch (err: any) {
+      setNotificationMsg(err.message || 'Error canceling subscription');
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
-    }, 2000);
+    } finally {
+      setIsCanceling(false);
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    setIsManagingPlan(true);
+    try {
+      const res = await fetch('/api/billing/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reactivate' })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setNotificationMsg(data.message);
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 5000);
+      
+      await fetchSubscription();
+    } catch (err: any) {
+      setNotificationMsg(err.message || 'Error reactivating subscription');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    } finally {
+      setIsManagingPlan(false);
+    }
   };
 
   if (loading) {
@@ -189,9 +286,22 @@ export default function BillingPage() {
               <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
                 <div>
                   <div className="flex items-center gap-3 mb-6">
-                    <span className={`px-3 py-1 ${subData?.status === 'active' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'} rounded-lg text-[10px] font-black uppercase tracking-widest`}>
-                      {(subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date()) ? 'Free Trial' : (subData?.status || 'No Active Plan')}
+                    <span className={`px-3 py-1 ${
+                      subData?.status === 'active' ? 'bg-emerald-500/20 text-emerald-500' 
+                      : subData?.status === 'canceling' ? 'bg-orange-500/20 text-orange-400'
+                      : 'bg-amber-500/20 text-amber-500'
+                    } rounded-lg text-[10px] font-black uppercase tracking-widest`}>
+                      {(subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date()) 
+                        ? 'Free Trial' 
+                        : subData?.status === 'canceling' 
+                          ? 'Cancels at Period End'
+                          : (subData?.status || 'No Active Plan')}
                     </span>
+                    {subData?.subscription?.cancel_at_period_end && (
+                      <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                        Canceling
+                      </span>
+                    )}
                     {subData?.discount > 0 && (
                       <span className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-lg text-[10px] font-black uppercase tracking-widest">
                         {subData.discount}% Affiliate Discount Applied
@@ -202,14 +312,16 @@ export default function BillingPage() {
                     {subData?.subscription?.plan || (subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date() ? 'Starter (14-Day Trial)' : (subData?.plan_tier ? `${subData.plan_tier.charAt(0).toUpperCase() + subData.plan_tier.slice(1)} Plan` : 'Standard Plan'))}
                   </h2>
                   <p className="text-white font-medium mb-8 opacity-70">
-                    {subData?.status === 'active' && subData?.subscription?.current_period_end
-                      ? `Your subscription is active. Next billing date: ${new Date(subData.subscription.current_period_end * 1000).toLocaleDateString()}`
-                      : (subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date()
-                        ? `Your free trial ends on ${new Date(subData.trial_ends_at).toLocaleDateString()}. Upgrade to a paid plan to keep access.`
-                        : 'You do not have an active subscription yet.')
+                    {subData?.subscription?.cancel_at_period_end && subData?.subscription?.current_period_end
+                      ? `Your subscription will end on ${new Date(subData.subscription.current_period_end * 1000).toLocaleDateString()}. You retain full access until then.`
+                      : subData?.status === 'active' && subData?.subscription?.current_period_end
+                        ? `Your subscription is active. Next billing date: ${new Date(subData.subscription.current_period_end * 1000).toLocaleDateString()}`
+                        : (subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date()
+                          ? `Your free trial ends on ${new Date(subData.trial_ends_at).toLocaleDateString()}. Upgrade to a paid plan to keep access.`
+                          : 'You do not have an active subscription yet.')
                     }
                   </p>
-                  <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-wrap gap-3">
                     <button 
                       onClick={handleOpenPortal}
                       disabled={isManagingPlan}
@@ -218,6 +330,25 @@ export default function BillingPage() {
                       {isManagingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Manage Subscription'}
                       <ArrowRight className="w-4 h-4" />
                     </button>
+                    
+                    {/* Cancel / Reactivate Button */}
+                    {(subData?.status === 'active' || subData?.status === 'canceling') && !subData?.subscription?.cancel_at_period_end && subData?.subscription && (
+                      <button 
+                        onClick={() => setIsCancelModalOpen(true)}
+                        className="px-8 py-3.5 border-2 border-red-500/30 text-red-400 rounded-2xl text-sm font-black hover:bg-red-500/10 transition-all"
+                      >
+                        Cancel Subscription
+                      </button>
+                    )}
+                    {subData?.subscription?.cancel_at_period_end && (
+                      <button 
+                        onClick={handleReactivateSubscription}
+                        disabled={isManagingPlan}
+                        className="px-8 py-3.5 bg-emerald-500 text-white rounded-2xl text-sm font-black hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                      >
+                        {isManagingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Reactivate Subscription'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -273,8 +404,10 @@ export default function BillingPage() {
               {plans.map((p) => {
                 // A plan is only "Current" if the user has an active Stripe subscription for it.
                 // Trial users see their limits (Starter), but haven't "selected" a paid plan yet.
-                const isCurrent = !!subData?.subscription && subData?.plan_tier === p.id;
-                const buttonText = isCurrent ? 'Current Plan' : p.button;
+                const isCurrent = subData?.plan_tier === p.id && (subData?.status === 'active' || !!subData?.subscription);
+                const isDowngrade = !isCurrent && subData?.plan_tier && plans.findIndex(x => x.id === subData.plan_tier) > plans.findIndex(x => x.id === p.id);
+                const isUpgrade = !isCurrent && subData?.plan_tier && plans.findIndex(x => x.id === subData.plan_tier) < plans.findIndex(x => x.id === p.id);
+                const buttonText = isCurrent ? 'Current Plan' : isUpgrade ? `Upgrade to ${p.name}` : isDowngrade ? `Downgrade to ${p.name}` : p.button;
                 
                 return (
                 <div 
@@ -480,16 +613,31 @@ export default function BillingPage() {
                 </div>
                 
                 <h3 className="text-2xl font-black text-[#101828] mb-2 leading-tight">Wait, don't leave yet!</h3>
-                <p className="text-gray-500 font-medium mb-8 leading-relaxed">
-                  Canceling your <span className="text-[#101828] font-bold">Growth Plan</span> will disable your automated outreach and Unibox AI features at the end of this billing cycle.
+                <p className="text-gray-500 font-medium mb-4 leading-relaxed">
+                  Canceling your <span className="text-[#101828] font-bold">{subData?.plan_tier ? `${subData.plan_tier.charAt(0).toUpperCase() + subData.plan_tier.slice(1)} Plan` : 'subscription'}</span> will disable premium features at the end of this billing cycle.
                 </p>
+                
+                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-8">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-bold mb-1">What happens when you cancel:</p>
+                      <ul className="space-y-1 text-xs font-medium text-amber-700">
+                        <li>• You keep full access until the end of your billing period</li>
+                        <li>• Active campaigns will continue running until then</li>
+                        <li>• After cancellation, your account reverts to limited access</li>
+                        <li>• You can reactivate anytime before the period ends</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="space-y-3">
                   <button
                     onClick={() => setIsCancelModalOpen(false)}
                     className="w-full py-4 bg-[#101828] text-white rounded-2xl font-black text-sm hover:bg-black transition-all shadow-xl shadow-gray-200"
                   >
-                    Keep My Growth Plan
+                    Keep My {subData?.plan_tier ? `${subData.plan_tier.charAt(0).toUpperCase() + subData.plan_tier.slice(1)}` : ''} Plan
                   </button>
                   <button
                     onClick={handleCancelSubscription}

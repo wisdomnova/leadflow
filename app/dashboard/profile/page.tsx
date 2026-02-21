@@ -91,7 +91,7 @@ export default function ProfilePage() {
     twitterUrl: '',
     linkedinUrl: '',
     websiteUrl: '',
-    plan: 'free',
+    plan: 'starter',
     status: 'trialing',
     monthlyTargetGoal: 1000,
     responseRateGoal: 10,
@@ -139,7 +139,7 @@ export default function ProfilePage() {
           twitterUrl: data.user.twitter_url || '',
           linkedinUrl: data.user.linkedin_url || '',
           websiteUrl: data.user.website_url || '',
-          plan: data.user.organizations?.plan || 'free',
+          plan: data.user.organizations?.plan_tier || data.user.organizations?.plan || 'starter',
           status: data.user.organizations?.subscription_status || 'trialing',
           monthlyTargetGoal: data.user.monthly_target_goal || 1000,
           responseRateGoal: data.user.response_rate_goal || 10,
@@ -498,19 +498,21 @@ export default function ProfilePage() {
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <span className="px-3 py-1 bg-[#745DF3] rounded-lg text-[10px] font-black uppercase tracking-widest">Active Plan</span>
-                        <h4 className="text-xl font-black capitalize">{profile.plan} {profile.status === 'active' ? 'Pro' : 'Trial'}</h4>
+                        <h4 className="text-xl font-black capitalize">{profile.plan}{profile.status === 'trialing' ? ' (Trial)' : ''}</h4>
                       </div>
                       <p className="text-gray-400 text-sm font-medium">
                         {profile.plan === 'enterprise' 
                           ? 'You are on the highest tier. Contact support for custom limits.' 
-                          : 'Unlock enterprise features and unlimited sending.'}
+                          : profile.plan === 'pro'
+                            ? 'Unlock PowerSend and dedicated support with Enterprise.'
+                            : 'Upgrade to Pro for team dashboard, advanced analytics, and more.'}
                       </p>
                     </div>
                     <button 
                       onClick={() => router.push('/dashboard/billing')}
                       className="px-8 py-3.5 bg-white text-[#101828] rounded-2xl text-xs font-black shadow-xl hover:scale-105 transition-all whitespace-nowrap"
                     >
-                      {profile.plan === 'enterprise' ? 'Manage Billing' : 'Upgrade My Account'}
+                      {profile.plan === 'enterprise' ? 'Manage Billing' : profile.plan === 'pro' ? 'Upgrade to Enterprise' : 'Upgrade My Account'}
                     </button>
                   </div>
                 </div>

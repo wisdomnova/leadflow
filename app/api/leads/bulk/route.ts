@@ -72,13 +72,52 @@ export async function DELETE(req: Request) {
   try {
     const { ids, deleteAll } = await req.json();
 
-    // Delete ALL contacts for the org
+    // Delete ALL contacts for the org (excluding leads in running campaigns)
     if (deleteAll === true) {
-      const { error, count } = await context.supabase
+      // Find leads in active/sending campaigns to protect them
+      const { data: protectedLeads } = await context.supabase
+        .from("campaign_recipients")
+        .select("lead_id, campaigns!inner(status)")
+        .in("campaigns.status", ["active", "sending", "scheduled"])
+        .eq("campaigns.org_id", context.orgId);
+
+      const protectedIds = [...new Set((protectedLeads || []).map((r: any) => r.lead_id))];
+
+      let query = context.supabase
         .from("leads")
         .delete({ count: 'exact' })
         .eq("org_id", context.orgId);
 
+      // Exclude protected leads from deletion
+      if (protectedIds.length > 0) {
+        // Delete in batches excluding protected IDs
+        // Supabase doesn't have "not in" for delete easily, so we select IDs first
+        const { data: allLeads } = await context.supabase
+          .from("leads")
+          .select("id")
+          .eq("org_id", context.orgId);
+
+        const deletableIds = (allLeads || []).map((l: any) => l.id).filter((id: string) => !protectedIds.includes(id));
+
+        if (deletableIds.length === 0) {
+          return NextResponse.json({ success: true, deleted: 0, protected: protectedIds.length });
+        }
+
+        // Delete in chunks of 500
+        let totalDeleted = 0;
+        for (let i = 0; i < deletableIds.length; i += 500) {
+          const chunk = deletableIds.slice(i, i + 500);
+          const { count } = await context.supabase
+            .from("leads")
+            .delete({ count: 'exact' })
+            .in("id", chunk)
+            .eq("org_id", context.orgId);
+          totalDeleted += count || 0;
+        }
+        return NextResponse.json({ success: true, deleted: totalDeleted, protected: protectedIds.length });
+      }
+
+      const { error, count } = await query;
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
@@ -89,17 +128,34 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Lead IDs are required" }, { status: 400 });
     }
 
+    // Check if any of the selected leads are in running campaigns
+    const { data: activeRecipients } = await context.supabase
+      .from("campaign_recipients")
+      .select("lead_id, campaigns!inner(status)")
+      .in("lead_id", ids)
+      .in("campaigns.status", ["active", "sending", "scheduled"]);
+
+    const protectedIds = [...new Set((activeRecipients || []).map((r: any) => r.lead_id))];
+    const deletableIds = ids.filter((id: string) => !protectedIds.includes(id));
+
+    if (deletableIds.length === 0 && protectedIds.length > 0) {
+      return NextResponse.json(
+        { error: `All ${protectedIds.length} selected contact(s) are in running campaigns and cannot be deleted.` },
+        { status: 400 }
+      );
+    }
+
     const { error } = await context.supabase
       .from("leads")
       .delete()
-      .in("id", ids)
+      .in("id", deletableIds)
       .eq("org_id", context.orgId);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, deleted: deletableIds.length, protected: protectedIds.length });
   } catch (err) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }

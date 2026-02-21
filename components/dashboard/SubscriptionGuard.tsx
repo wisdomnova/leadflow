@@ -14,8 +14,9 @@ export default function SubscriptionGuard({ children }: { children: React.ReactN
       try {
         const res = await fetch('/api/billing/subscription');
         const data = await res.json();
-        if (data.status === 'active' || data.status === 'trialing') {
-          setStatus(data.status);
+        // 'canceling' users still have access until end of billing period
+        if (data.status === 'active' || data.status === 'trialing' || data.status === 'canceling') {
+          setStatus('active');
         } else {
           setStatus('inactive');
         }

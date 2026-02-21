@@ -19,7 +19,7 @@ const plans = [
     name: 'Pro',
     price: { monthly: '$99', annual: '$1,188' },
     description: 'Best for growing teams and scaling outbound efforts.',
-    features: ['100,000 Monthly Emails', 'PowerSend Unlocked (Add-on)', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Priority Support'],
+    features: ['100,000 Monthly Emails', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Priority Support', 'Custom Tracking Domains'],
     popular: true,
     color: 'purple'
   },
@@ -28,7 +28,7 @@ const plans = [
     name: 'Enterprise',
     price: { monthly: '$319', annual: '$3,828' },
     description: 'For large agencies and enterprise sales organizations.',
-    features: ['500,000 Monthly Emails', '1 PowerSend Node Included', 'Custom API Access', 'SSO & Advanced Security', 'White-labeling', 'Dedicated Manager'],
+    features: ['500,000 Monthly Emails', '1 PowerSend Node Included', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Dedicated Account Manager'],
     color: 'black'
   }
 ];

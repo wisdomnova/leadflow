@@ -182,28 +182,34 @@ async function syncGoogleInbox(accountId: string, account: any) {
         } as any).eq("email", fromEmail).eq("org_id", account.org_id);
       }
 
-      // ── Store in unibox_messages ─────────────────────────────────────
-      if (messageIdHeader) {
-        const { data: lead } = await (supabase as any)
-          .from("leads")
-          .select("id")
-          .eq("email", fromEmail)
-          .eq("org_id", account.org_id)
-          .single();
+      // ── Store in unibox_messages (only for campaign leads) ───────────
+      // Skip random inbound emails (Supabase alerts, newsletters, etc.)
+      // Only store messages from senders that are campaign recipients.
+      if (messageIdHeader && !isSelfEmail) {
+        const { data: campaignLead } = await (supabase as any)
+          .from("campaign_recipients")
+          .select("lead_id, leads!inner(id, email)")
+          .eq("leads.email", fromEmail)
+          .eq("leads.org_id", account.org_id)
+          .limit(1)
+          .maybeSingle();
 
-        await (supabase as any).from("unibox_messages").upsert([{
-          account_id: accountId,
-          org_id: account.org_id,
-          lead_id: (lead as any)?.id || null,
-          message_id: messageIdHeader,
-          from_email: fromEmail,
-          subject: subject || "(No Subject)",
-          snippet: decodeSnippet(snippet).substring(0, 200),
-          received_at: dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString(),
-          is_read: false,
-          direction: 'inbound',
-          sender_name: fromName
-        }], { onConflict: 'message_id' }) as any;
+        if (campaignLead) {
+          await (supabase as any).from("unibox_messages").upsert([{
+            account_id: accountId,
+            org_id: account.org_id,
+            lead_id: (campaignLead as any).lead_id,
+            message_id: messageIdHeader,
+            from_email: fromEmail,
+            subject: subject || "(No Subject)",
+            snippet: decodeSnippet(snippet).substring(0, 200),
+            received_at: dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString(),
+            is_read: false,
+            direction: 'inbound',
+            sender_name: fromName
+          }], { onConflict: 'message_id' }) as any;
+        }
+        // else: sender is not a campaign lead — skip storing
       }
     } catch (msgErr) {
       console.error(`[Gmail Sync] Error processing message ${msgId}:`, msgErr);

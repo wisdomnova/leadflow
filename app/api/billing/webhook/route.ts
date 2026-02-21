@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
   switch (event.type) {
     case 'checkout.session.completed': {
-      const { org_id } = session.metadata;
+      const { org_id, plan_id } = session.metadata;
       const subscriptionId = session.subscription;
       const customerId = session.customer;
 
@@ -38,7 +38,9 @@ export async function POST(req: Request) {
         .update({
           subscription_id: subscriptionId,
           stripe_customer_id: customerId,
-          subscription_status: 'active'
+          subscription_status: 'active',
+          // Set plan_tier from checkout metadata
+          ...(plan_id ? { plan_tier: plan_id, plan: plan_id } : {})
         })
         .eq('id', org_id);
 
@@ -57,18 +59,32 @@ export async function POST(req: Request) {
     case 'customer.subscription.deleted': {
       const subscriptionId = session.id;
       const status = session.status; // active, past_due, canceled, etc.
+      const cancelAtPeriodEnd = session.cancel_at_period_end;
+
+      // Determine the effective status for our DB
+      // If subscription is active but set to cancel at period end, mark as 'canceling'
+      const effectiveStatus = (status === 'active' && cancelAtPeriodEnd) ? 'canceling' : status;
+
+      const updatePayload: any = {
+        subscription_status: effectiveStatus
+      };
+
+      // If the subscription was deleted (actually canceled), reset plan to starter
+      if (event.type === 'customer.subscription.deleted') {
+        updatePayload.plan_tier = 'starter';
+        updatePayload.plan = 'free';
+        updatePayload.subscription_id = null;
+      }
 
       const { data: org } = await (supabaseAdmin as any)
         .from('organizations')
-        .update({
-          subscription_status: status
-        })
+        .update(updatePayload)
         .eq('subscription_id', subscriptionId)
         .select('id')
         .single();
 
       if (org) {
-        if (status === 'active') {
+        if (effectiveStatus === 'active') {
           await createNotification({
             orgId: org.id,
             title: "Subscription Renewed",
@@ -76,11 +92,20 @@ export async function POST(req: Request) {
             type: "success",
             category: "billing_alerts"
           });
-        } else if (status === 'canceled') {
+        } else if (effectiveStatus === 'canceling') {
+          await createNotification({
+            orgId: org.id,
+            title: "Cancellation Scheduled",
+            description: "Your subscription will end at the close of your current billing period.",
+            type: "warning",
+            category: "billing_alerts",
+            link: "/dashboard/billing"
+          });
+        } else if (status === 'canceled' || event.type === 'customer.subscription.deleted') {
           await createNotification({
             orgId: org.id,
             title: "Subscription Canceled",
-            description: "Your subscription has been canceled. We're sorry to see you go!",
+            description: "Your subscription has ended. Upgrade anytime to regain access to premium features.",
             type: "warning",
             category: "billing_alerts",
             link: "/dashboard/billing"

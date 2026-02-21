@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { name, steps, status, sender_id, config, lead_ids } = await req.json();
+    const { name, steps, status, sender_id, config, lead_ids, use_powersend } = await req.json();
 
     if (!name || !steps || !Array.isArray(steps)) {
       return NextResponse.json({ error: "Name and steps are required" }, { status: 400 });
@@ -57,6 +57,7 @@ export async function POST(req: Request) {
         steps, // JSONB array of steps
         status: status || "draft",
         sender_id: sender_id || null,
+        use_powersend: use_powersend || false,
         config: finalConfig
       }] as any)
       .select()

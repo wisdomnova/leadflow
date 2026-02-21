@@ -12,75 +12,106 @@ export async function GET(req: Request) {
     const filter = searchParams.get("filter") || "All";
     const searchQuery = searchParams.get("q") || "";
 
-    // 1. Fetch leads who have messages in unibox_messages
-    // We join with unibox_messages to find active conversations
-    const { data: leads, error } = await (context.supabase as any)
-      .from("leads")
+    // Query unibox_messages — only show conversations from campaign leads
+    // Double-check: even if sync let something through, filter here too
+    const { data: messages, error } = await (context.supabase as any)
+      .from("unibox_messages")
       .select(`
         id,
-        first_name,
-        last_name,
-        email,
-        company,
-        status,
-        tags,
-        is_starred,
-        sentiment,
-        last_message_received_at,
-        unibox_messages!lead_id (
+        message_id,
+        from_email,
+        sender_name,
+        subject,
+        snippet,
+        received_at,
+        is_read,
+        direction,
+        lead_id,
+        leads (
           id,
-          subject,
-          snippet,
-          received_at,
-          is_read,
-          direction,
-          message_id
+          first_name,
+          last_name,
+          email,
+          company,
+          status,
+          tags,
+          is_starred,
+          sentiment
         )
       `)
       .eq("org_id", context.orgId)
-      .order("last_message_received_at", { ascending: false });
+      .not("lead_id", "is", null)
+      .order("received_at", { ascending: false });
 
     if (error) {
       console.error("Unibox API Error:", error);
       return NextResponse.json({ error: error.message, details: error }, { status: 500 });
     }
 
-    // 2. Filter and Format for UI
-    let formatted = ((leads as any) || [])
-      .filter((l: any) => l.unibox_messages && l.unibox_messages.length > 0)
-      .map((l: any) => {
-        // Sort individual messages by received_at
-        const sortedMessages = l.unibox_messages.sort((a: any, b: any) => 
-          new Date(a.received_at).getTime() - new Date(b.received_at).getTime()
-        );
-        
-        const lastMsg = sortedMessages[sortedMessages.length - 1];
+    // Group messages by conversation key (lead_id if linked, else from_email for inbound)
+    const conversationMap = new Map<string, any>();
 
-        return {
-          id: l.id,
-          name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || l.email,
-          email: l.email,
-          company: l.company || "Unknown",
-          subject: lastMsg?.subject || "(No Subject)",
-          preview: lastMsg?.snippet || "",
-          time: lastMsg?.received_at,
-          status: l.status,
-          unread: l.unibox_messages.some((m: any) => !m.is_read && m.direction === 'inbound'),
-          avatar: l.first_name ? l.first_name[0] : (l.email ? l.email[0].toUpperCase() : "?"),
-          sentiment: l.sentiment || "Neutral",
-          isStarred: l.is_starred || false,
-          tags: l.tags || [],
-          messages: sortedMessages.map((m: any) => ({
-            id: m.id,
-            sender: m.direction === 'inbound' ? 'them' : 'you',
-            text: m.snippet, // In real app, we might need full body
-            time: m.received_at,
-            is_read: m.is_read
-          }))
-        };
+    for (const msg of (messages || [])) {
+      // Determine conversation key
+      const lead = msg.leads;
+      const convKey = lead?.id || msg.from_email;
+
+      if (!conversationMap.has(convKey)) {
+        conversationMap.set(convKey, {
+          id: lead?.id || msg.from_email, // Use lead id if available, else email as id
+          name: lead
+            ? `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.email
+            : msg.sender_name || msg.from_email,
+          email: lead?.email || msg.from_email,
+          company: lead?.company || "Unknown",
+          subject: msg.subject || "(No Subject)",
+          preview: msg.snippet || "",
+          time: msg.received_at,
+          status: lead?.status || "new",
+          unread: false,
+          avatar: lead?.first_name
+            ? lead.first_name[0].toUpperCase()
+            : (msg.sender_name ? msg.sender_name[0].toUpperCase() : "?"),
+          sentiment: lead?.sentiment || "Neutral",
+          isStarred: lead?.is_starred || false,
+          tags: lead?.tags || [],
+          isLinkedToLead: !!lead,
+          messages: []
+        });
+      }
+
+      const conv = conversationMap.get(convKey)!;
+      conv.messages.push({
+        id: msg.id,
+        sender: msg.direction === 'inbound' ? 'them' : 'you',
+        text: msg.snippet,
+        time: msg.received_at,
+        is_read: msg.is_read
       });
 
-    // Apply Filter
+      // Track unread
+      if (!msg.is_read && msg.direction === 'inbound') {
+        conv.unread = true;
+      }
+    }
+
+    // Sort messages within each conversation by time ascending
+    let formatted = Array.from(conversationMap.values()).map(conv => {
+      conv.messages.sort((a: any, b: any) =>
+        new Date(a.time).getTime() - new Date(b.time).getTime()
+      );
+      // Update preview/time to latest message
+      const lastMsg = conv.messages[conv.messages.length - 1];
+      if (lastMsg) {
+        conv.time = lastMsg.time;
+      }
+      return conv;
+    });
+
+    // Sort conversations by latest message (newest first)
+    formatted.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+    // Apply Filter (only on lead-linked conversations)
     if (filter !== "All") {
       formatted = formatted.filter((conv: any) => conv.status === filter);
     }
@@ -88,9 +119,9 @@ export async function GET(req: Request) {
     // Apply Search
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      formatted = formatted.filter((conv: any) => 
-        conv.name.toLowerCase().includes(q) || 
-        conv.company.toLowerCase().includes(q) || 
+      formatted = formatted.filter((conv: any) =>
+        conv.name.toLowerCase().includes(q) ||
+        conv.company.toLowerCase().includes(q) ||
         conv.subject.toLowerCase().includes(q) ||
         conv.email.toLowerCase().includes(q)
       );

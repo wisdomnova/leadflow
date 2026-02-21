@@ -73,6 +73,11 @@ export default function CreateCampaignPage() {
   const [savedTemplates, setSavedTemplates] = useState<any[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   
+  // PowerSend States
+  const [usePowerSend, setUsePowerSend] = useState(false);
+  const [hasPowerSendNodes, setHasPowerSendNodes] = useState(false);
+  const [showPowerSendInfo, setShowPowerSendInfo] = useState(false);
+  
   // AI States
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isOptimizingAI, setIsOptimizingAI] = useState(false);
@@ -119,9 +124,10 @@ export default function CreateCampaignPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [accRes, tempRes] = await Promise.all([
+        const [accRes, tempRes, psRes] = await Promise.all([
           fetch('/api/accounts'),
-          fetch('/api/templates')
+          fetch('/api/templates'),
+          fetch('/api/powersend')
         ]);
         
         const accData = await accRes.json();
@@ -134,6 +140,14 @@ export default function CreateCampaignPage() {
           setSelectedAccountId(validatedAccounts[0].id);
         }
         setSavedTemplates(Array.isArray(tempData) ? tempData : []);
+        
+        // Check if user has PowerSend nodes available
+        try {
+          const psData = await psRes.json();
+          if (psData.servers && psData.servers.length > 0) {
+            setHasPowerSendNodes(true);
+          }
+        } catch {}
         
         // Initial leads fetch
         await fetchLeads(1, '', '');
@@ -319,6 +333,7 @@ export default function CreateCampaignPage() {
           lead_ids: selectedLeadIds,
           steps: emailSteps,
           status: 'running',
+          use_powersend: usePowerSend,
           config: {
             smart_sending: isSmartSending
           }
@@ -353,6 +368,7 @@ export default function CreateCampaignPage() {
           lead_ids: selectedLeadIds,
           steps: emailSteps,
           status: 'draft',
+          use_powersend: usePowerSend,
           config: {
             smart_sending: isSmartSending
           }
@@ -561,6 +577,52 @@ export default function CreateCampaignPage() {
                           )}
                         </AnimatePresence>
                       </div>
+
+                      {/* PowerSend Toggle */}
+                      {hasPowerSendNodes && (
+                        <div className="pt-4 border-t border-gray-50">
+                          <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-3 cursor-pointer">
+                              <div 
+                                onClick={() => setUsePowerSend(!usePowerSend)}
+                                className={`w-12 h-6 rounded-full relative transition-all ${usePowerSend ? 'bg-emerald-500' : 'bg-gray-200'}`}
+                              >
+                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${usePowerSend ? 'right-1' : 'left-1'}`} />
+                              </div>
+                              <span className="text-sm font-bold text-[#101828]">Use PowerSend (Server Rotation)</span>
+                            </label>
+                            <button 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setShowPowerSendInfo(!showPowerSendInfo);
+                              }}
+                              className="p-1 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-emerald-500"
+                            >
+                              <HelpCircle className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <AnimatePresence>
+                            {showPowerSendInfo && (
+                              <motion.div 
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="mt-4 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                                  <p className="text-[11px] leading-relaxed text-emerald-700 font-medium">
+                                    <span className="font-black uppercase tracking-widest block mb-1">What is PowerSend?</span>
+                                    PowerSend routes emails through your dedicated Smart Server infrastructure instead of your personal mailbox. 
+                                    Traffic is distributed across nodes using reputation-weighted rotation, protecting your sender reputation and enabling high-volume delivery. 
+                                    Your Sender Profile's "From" address is still used — only the SMTP relay changes.
+                                  </p>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>

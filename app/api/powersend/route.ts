@@ -17,7 +17,7 @@ export async function GET() {
       return new NextResponse('Subscription inactive', { status: 403 });
     }
 
-    if (sub.tier === 'starter') {
+    if (sub.tier !== 'enterprise') {
       return NextResponse.json({ servers: [], stats: { totalNodes: 0, activeNodes: 0, avgReputation: 100, totalSends: 0 }, restricted: true });
     }
 
@@ -57,15 +57,16 @@ export async function POST(req: Request) {
     const { supabase, orgId } = context;
     const sub = await checkSubscription(orgId);
 
-    // Gating
-    if (sub.tier === 'starter') {
-       return new NextResponse('PowerSend is not available on the Starter plan. Please upgrade to Pro.', { status: 403 });
+    // Gating — PowerSend is Enterprise-only
+    if (sub.tier !== 'enterprise') {
+       return new NextResponse('PowerSend is only available on the Enterprise plan. Please upgrade to continue.', { status: 403 });
     }
 
-    // Check limits
+    // Check limits (scoped to this org)
     const { count } = await supabase
       .from('smart_servers')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('org_id', orgId);
     
     const limits = sub.limits || { powersend: 0 };
     if (count && count >= limits.powersend) {

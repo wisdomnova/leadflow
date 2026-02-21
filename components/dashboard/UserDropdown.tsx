@@ -74,7 +74,7 @@ export default function UserDropdown() {
         <div className="hidden sm:block text-left">
           <p className="text-sm font-bold text-[#101828] leading-tight">{profile?.full_name || 'User Profile'}</p>
           <p className="text-xs font-medium text-gray-500 leading-tight italic capitalize">
-            {profile?.organizations?.plan ? `${profile.organizations.plan} Plan` : 'Free Plan'}
+            {(profile?.organizations?.plan_tier || profile?.organizations?.plan) ? `${profile.organizations.plan_tier || profile.organizations.plan} Plan` : 'Free Plan'}
           </p>
         </div>
         <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />

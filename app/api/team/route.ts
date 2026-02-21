@@ -100,8 +100,8 @@ export async function GET() {
       org: {
         name: (org as any)?.name,
         slug: (org as any)?.slug,
-        plan: (org as any)?.plan || 'free',
-        memberLimit: (org as any)?.plan === 'pro' ? 50 : (org as any)?.plan === 'enterprise' ? 500 : 5,
+        plan: (org as any)?.plan_tier || (org as any)?.plan || 'starter',
+        memberLimit: ((org as any)?.plan_tier || (org as any)?.plan) === 'enterprise' ? 500 : ((org as any)?.plan_tier || (org as any)?.plan) === 'pro' ? 50 : 5,
         joinToken: (org as any)?.join_token,
         autoJoinEnabled: (org as any)?.auto_join_enabled
       },

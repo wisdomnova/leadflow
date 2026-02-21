@@ -65,9 +65,17 @@ export default function PowerSendPage() {
   const [formData, setFormData] = useState({
     name: '',
     provider: 'mailreef',
+    domain_name: '',
     ip_address: '',
     daily_limit: 500,
-    api_key: ''
+    api_key: '',
+    smtp_config: {
+      host: '',
+      port: '465',
+      username: '',
+      password: '',
+      from_email: ''
+    }
   });
 
   useEffect(() => {
@@ -119,9 +127,17 @@ export default function PowerSendPage() {
       setFormData({
         name: '',
         provider: 'mailreef',
+        domain_name: '',
         ip_address: '',
         daily_limit: 500,
-        api_key: ''
+        api_key: '',
+        smtp_config: {
+          host: '',
+          port: '465',
+          username: '',
+          password: '',
+          from_email: ''
+        }
       });
     } catch (error: any) {
       console.error('Add server error:', error);
@@ -175,7 +191,7 @@ export default function PowerSendPage() {
                 </div>
                 <h2 className="text-2xl font-black text-[#101828] mb-3">PowerSend is Locked</h2>
                 <p className="text-gray-500 font-medium mb-8 leading-relaxed">
-                  Infrastructure-level IP rotation is only available on <b>Pro</b> and <b>Enterprise</b> plans. Upgrade today to scale your deliverability with dedicated Nodes.
+                  Infrastructure-level IP rotation is only available on the <b>Enterprise</b> plan. Upgrade today to scale your deliverability with dedicated Nodes.
                 </p>
                 <Link 
                   href="/dashboard/billing"
@@ -472,12 +488,22 @@ export default function PowerSendPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">IP Address</label>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Sending Domain</label>
                         <input
                           type="text"
                           required
+                          placeholder="mail.yourdomain.com"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                          value={formData.domain_name}
+                          onChange={e => setFormData({ ...formData, domain_name: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">IP Address <span className="normal-case text-gray-300">(optional)</span></label>
+                        <input
+                          type="text"
                           placeholder="1.2.3.4"
                           className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
                           value={formData.ip_address}
@@ -515,6 +541,69 @@ export default function PowerSendPage() {
                         value={formData.api_key}
                         onChange={e => setFormData({ ...formData, api_key: e.target.value })}
                       />
+                    </div>
+
+                    {/* SMTP Configuration */}
+                    <div className="pt-4 border-t border-gray-100">
+                      <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-4">SMTP Configuration</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Host</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="smtp.mailreef.com"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={formData.smtp_config.host}
+                            onChange={e => setFormData({ ...formData, smtp_config: { ...formData.smtp_config, host: e.target.value } })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Port</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="465"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={formData.smtp_config.port}
+                            onChange={e => setFormData({ ...formData, smtp_config: { ...formData.smtp_config, port: e.target.value } })}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Username</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="user@domain.com"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={formData.smtp_config.username}
+                            onChange={e => setFormData({ ...formData, smtp_config: { ...formData.smtp_config, username: e.target.value } })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Password</label>
+                          <input
+                            type="password"
+                            required
+                            placeholder="••••••••••••••••"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={formData.smtp_config.password}
+                            onChange={e => setFormData({ ...formData, smtp_config: { ...formData.smtp_config, password: e.target.value } })}
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">From Email (on this node)</label>
+                        <input
+                          type="email"
+                          placeholder="outreach@yourdomain.com"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                          value={formData.smtp_config.from_email}
+                          onChange={e => setFormData({ ...formData, smtp_config: { ...formData.smtp_config, from_email: e.target.value } })}
+                        />
+                      </div>
                     </div>
                   </div>
 
