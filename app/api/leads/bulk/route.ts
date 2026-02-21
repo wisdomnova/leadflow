@@ -70,7 +70,20 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    const { ids } = await req.json();
+    const { ids, deleteAll } = await req.json();
+
+    // Delete ALL contacts for the org
+    if (deleteAll === true) {
+      const { error, count } = await context.supabase
+        .from("leads")
+        .delete({ count: 'exact' })
+        .eq("org_id", context.orgId);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, deleted: count || 0 });
+    }
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: "Lead IDs are required" }, { status: 400 });

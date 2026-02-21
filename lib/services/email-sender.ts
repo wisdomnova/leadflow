@@ -1,6 +1,46 @@
 import nodemailer from "nodemailer";
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 
+// ============================================================
+// Connection & Token Caching (critical at 1k-5k scale)
+// ============================================================
+
+// Google OAuth token cache — avoids re-refreshing on every send
+const googleTokenCache = new Map<string, { token: string; expiresAt: number }>();
+
+// SES client cache — one client per region
+const sesClientCache = new Map<string, SESv2Client>();
+
+// SMTP transporter cache — reuse TCP connections per account
+const smtpTransporterCache = new Map<string, { transporter: any; createdAt: number }>();
+const SMTP_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCachedSESClient(region: string, accessKeyId: string, secretAccessKey: string): SESv2Client {
+  const key = `${region}:${accessKeyId}`;
+  if (sesClientCache.has(key)) return sesClientCache.get(key)!;
+  const client = new SESv2Client({
+    region,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+  sesClientCache.set(key, client);
+  return client;
+}
+
+function getCachedSMTPTransporter(accountId: string, transportConfig: any): any {
+  const cached = smtpTransporterCache.get(accountId);
+  if (cached && Date.now() - cached.createdAt < SMTP_CACHE_TTL) {
+    return cached.transporter;
+  }
+  const transporter = nodemailer.createTransport({
+    ...transportConfig,
+    pool: true,       // Enable connection pooling
+    maxConnections: 3, // Max 3 parallel connections per account
+    maxMessages: 100,  // Reuse a connection for up to 100 messages
+  });
+  smtpTransporterCache.set(accountId, { transporter, createdAt: Date.now() });
+  return transporter;
+}
+
 export interface SendEmailParams {
   to: string;
   subject: string;
@@ -115,14 +155,11 @@ export async function sendOutreachEmail({ to, subject, bodyHtml, fromName, accou
     .replace(/&nbsp;/g, ' ');
 
   if (account.provider === 'aws_ses') {
-    // Use the SES configuration from account.config or env if it's the master account
-    const sesClient = new SESv2Client({
-      region: account.config?.region || process.env.AWS_REGION || "us-east-1",
-      credentials: {
-        accessKeyId: account.config?.accessKeyId || process.env.AWS_ACCESS_KEY_ID!,
-        secretAccessKey: account.config?.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY!,
-      },
-    });
+    const region = account.config?.region || process.env.AWS_REGION || "us-east-1";
+    const accessKeyId = account.config?.accessKeyId || process.env.AWS_ACCESS_KEY_ID!;
+    const secretAccessKey = account.config?.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY!;
+    
+    const sesClient = getCachedSESClient(region, accessKeyId, secretAccessKey);
 
     const fromEmail = account.email;
     const source = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
@@ -151,10 +188,24 @@ export async function sendOutreachEmail({ to, subject, bodyHtml, fromName, accou
       throw new Error(`No refresh_token found for Google account: ${account.email}. Please reconnect the account.`);
     }
 
-    // Always get a fresh access_token from the refresh_token
-    console.log(`[Gmail API] Refreshing token for ${account.email}...`);
-    const { access_token: freshToken } = await refreshGoogleAccessToken(config.refresh_token);
-    console.log(`[Gmail API] Token refreshed. Sending to ${to}...`);
+    // Use cached token if still valid (saves thousands of HTTP calls at scale)
+    const cacheKey = account.email;
+    const cached = googleTokenCache.get(cacheKey);
+    let freshToken: string;
+
+    if (cached && cached.expiresAt > Date.now() + 60_000) {
+      // Token is still valid (with 60s buffer)
+      freshToken = cached.token;
+    } else {
+      console.log(`[Gmail API] Refreshing token for ${account.email}...`);
+      const { access_token, expires_in } = await refreshGoogleAccessToken(config.refresh_token);
+      freshToken = access_token;
+      googleTokenCache.set(cacheKey, {
+        token: access_token,
+        expiresAt: Date.now() + expires_in * 1000,
+      });
+      console.log(`[Gmail API] Token refreshed & cached (expires in ${expires_in}s). Sending to ${to}...`);
+    }
 
     const result = await sendViaGmailApi({
       to,
@@ -213,7 +264,7 @@ export async function sendOutreachEmail({ to, subject, bodyHtml, fromName, accou
       greetingTimeout: 10000,
     };
 
-    const transporter = nodemailer.createTransport(transportConfig);
+    const transporter = getCachedSMTPTransporter(account.id, transportConfig);
 
     const fromEmail = account.email;
     const source = fromName ? `${fromName} <${fromEmail}>` : fromEmail;

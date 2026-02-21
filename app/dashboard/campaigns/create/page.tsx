@@ -25,7 +25,10 @@ import {
   RotateCcw,
   ArrowRight,
   X,
-  HelpCircle
+  HelpCircle,
+  Search,
+  Filter,
+  Tag as TagIcon
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
@@ -56,6 +59,11 @@ export default function CreateCampaignPage() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [availableLeads, setAvailableLeads] = useState<any[]>([]);
   const [isLoadingLeads, setIsLoadingLeads] = useState(false);
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const leadsPerPage = 10;
   
   // Real Data States
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -86,18 +94,38 @@ export default function CreateCampaignPage() {
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
   };
 
+  const fetchLeads = async (page: number, search: string, tag: string) => {
+    setIsLoadingLeads(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: leadsPerPage.toString(),
+      });
+      if (search) params.append('search', search);
+      if (tag) params.append('tag', tag);
+      
+      const res = await fetch(`/api/leads?${params.toString()}`);
+      const data = await res.json();
+      setAvailableLeads(data.leads || []);
+      setTotalLeads(data.total || 0);
+    } catch (err) {
+      console.error("Error fetching leads:", err);
+      showToast("Failed to load leads", "error");
+    } finally {
+      setIsLoadingLeads(false);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [accRes, tempRes, leadRes] = await Promise.all([
+        const [accRes, tempRes] = await Promise.all([
           fetch('/api/accounts'),
-          fetch('/api/templates'),
-          fetch('/api/leads')
+          fetch('/api/templates')
         ]);
         
         const accData = await accRes.json();
         const tempData = await tempRes.json();
-        const leadDataRaw = await leadRes.json();
         
         const validatedAccounts = Array.isArray(accData) ? accData : [];
         setAccounts(validatedAccounts);
@@ -106,8 +134,9 @@ export default function CreateCampaignPage() {
           setSelectedAccountId(validatedAccounts[0].id);
         }
         setSavedTemplates(Array.isArray(tempData) ? tempData : []);
-        // Handle the new API response structure { leads: [], total: 0, stats: {} }
-        setAvailableLeads(Array.isArray(leadDataRaw.leads) ? leadDataRaw.leads : []);
+        
+        // Initial leads fetch
+        await fetchLeads(1, '', '');
       } catch (err) {
         console.error("Error loading campaign data:", err);
       } finally {
@@ -117,6 +146,16 @@ export default function CreateCampaignPage() {
     
     fetchData();
   }, []);
+
+  // Sync leads when filters change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!isLoadingData) {
+        fetchLeads(currentPage, searchQuery, tagFilter);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery, tagFilter, currentPage]);
 
   useEffect(() => {
     if (!isLoadingData && accounts.length === 0) {
@@ -541,13 +580,54 @@ export default function CreateCampaignPage() {
                         <h2 className="text-2xl font-black text-[#101828]">Select Contacts</h2>
                         <p className="text-gray-500 text-sm font-medium">Choose who will receive this campaign.</p>
                       </div>
-                      <div className="px-4 py-2 bg-[#745DF3]/10 text-[#745DF3] rounded-xl text-xs font-black">
-                        {selectedLeadIds.length} Selected
+                      <div className="flex items-center gap-3">
+                        <div className="px-4 py-2 bg-[#745DF3]/10 text-[#745DF3] rounded-xl text-xs font-black">
+                          {selectedLeadIds.length} Selected
+                        </div>
                       </div>
                     </div>
 
-                    <div className="space-y-4 max-h-[500px] overflow-y-auto pr-4 no-scrollbar">
-                      {availableLeads.length === 0 ? (
+                    {/* Search and Filters */}
+                    <div className="flex flex-col md:flex-row gap-4 mb-8">
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search leads by name, email, company or tag..."
+                          value={searchQuery}
+                          onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl text-xs font-bold placeholder:text-gray-400 focus:ring-2 focus:ring-[#745DF3]/20 transition-all text-[#101828]"
+                        />
+                      </div>
+                      <div className="relative">
+                        <TagIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Filter by tag..."
+                          value={tagFilter}
+                          onChange={(e) => {
+                            setTagFilter(e.target.value);
+                            setCurrentPage(1);
+                          }}
+                          className="pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl text-xs font-bold placeholder:text-gray-400 focus:ring-2 focus:ring-[#745DF3]/20 transition-all text-[#101828] w-full md:w-[200px]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 max-h-[500px] overflow-y-auto pr-4 no-scrollbar relative min-h-[200px]">
+                      {isLoadingLeads ? (
+                        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-3xl">
+                          <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="w-8 h-8 text-[#745DF3] animate-spin" />
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Loading leads...</p>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {availableLeads.length === 0 && !isLoadingLeads ? (
                         <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
                           <UserPlus className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                           <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">No contacts found</h3>
@@ -577,8 +657,20 @@ export default function CreateCampaignPage() {
                                 {lead.first_name?.[0] || lead.email[0].toUpperCase()}
                               </div>
                               <div>
-                                <p className="text-sm font-black text-[#101828]">{lead.first_name} {lead.last_name}</p>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{lead.email}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-black text-[#101828]">{lead.first_name} {lead.last_name}</p>
+                                  {lead.tags && lead.tags.length > 0 && (
+                                    <div className="flex gap-1">
+                                      {lead.tags.slice(0, 2).map((tag: string) => (
+                                        <span key={tag} className="px-1.5 py-0.5 bg-gray-100 text-[8px] font-black text-gray-500 rounded-md uppercase tracking-wider">
+                                          {tag}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-0.5">{lead.email}</p>
+                                {lead.company && <p className="text-[9px] font-medium text-gray-400 mt-0.5">@{lead.company}</p>}
                               </div>
                             </div>
                             <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
@@ -591,16 +683,71 @@ export default function CreateCampaignPage() {
                       )}
                     </div>
                     
+                    {/* Simplified Pagination */}
+                    {totalLeads > leadsPerPage && (
+                      <div className="flex items-center justify-center gap-4 mt-8 pb-4">
+                        <button
+                          disabled={currentPage === 1 || isLoadingLeads}
+                          onClick={() => setCurrentPage(prev => prev - 1)}
+                          className="p-2 rounded-xl bg-gray-50 text-[#101828] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100 transition-all font-black text-xs uppercase"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                          Page {currentPage} of {Math.ceil(totalLeads / leadsPerPage)}
+                        </span>
+                        <button
+                          disabled={currentPage >= Math.ceil(totalLeads / leadsPerPage) || isLoadingLeads}
+                          onClick={() => setCurrentPage(prev => prev + 1)}
+                          className="p-2 rounded-xl bg-gray-50 text-[#101828] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100 transition-all font-black text-xs uppercase"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    
                     <div className="mt-8 flex items-center justify-between pt-8 border-t border-gray-50">
-                      <button 
-                         onClick={() => setSelectedLeadIds(availableLeads.map(l => l.id))}
-                         className="text-xs font-black text-gray-400 hover:text-[#745DF3] transition-all"
-                      >
-                         Select All Leads ({availableLeads.length})
-                      </button>
+                      <div className="flex items-center gap-4">
+                        <button 
+                           onClick={() => {
+                             const newSelection = [...selectedLeadIds];
+                             availableLeads.forEach(l => {
+                               if (!newSelection.includes(l.id)) newSelection.push(l.id);
+                             });
+                             setSelectedLeadIds(newSelection);
+                           }}
+                           className="text-xs font-black text-gray-400 hover:text-[#745DF3] transition-all uppercase tracking-widest"
+                        >
+                           Select Page ({availableLeads.length})
+                        </button>
+                        <button 
+                           onClick={async () => {
+                             setIsLoadingLeads(true);
+                             try {
+                               // Fetch ALL leads IDs matching current filters
+                               const params = new URLSearchParams({ limit: '1000' });
+                               if (searchQuery) params.append('search', searchQuery);
+                               if (tagFilter) params.append('tag', tagFilter);
+                               
+                               const res = await fetch(`/api/leads?${params.toString()}`);
+                               const data = await res.json();
+                               const allIds = (data.leads || []).map((l: any) => l.id);
+                               setSelectedLeadIds(allIds);
+                               showToast(`Selected all ${allIds.length} matching leads`);
+                             } catch (err) {
+                               showToast("Failed to select all", "error");
+                             } finally {
+                               setIsLoadingLeads(false);
+                             }
+                           }}
+                           className="text-xs font-black text-[#745DF3] hover:underline transition-all uppercase tracking-widest"
+                        >
+                           Select All Matching ({totalLeads})
+                        </button>
+                      </div>
                       <button 
                          onClick={() => setSelectedLeadIds([])}
-                         className="text-xs font-black text-gray-400 hover:text-red-500 transition-all"
+                         className="text-xs font-black text-gray-400 hover:text-red-500 transition-all uppercase tracking-widest"
                       >
                          Clear Selection
                       </button>

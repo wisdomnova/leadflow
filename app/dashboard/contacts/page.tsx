@@ -239,10 +239,36 @@ export default function ContactsPage() {
       if (res.ok) {
         setContacts(prev => prev.filter(c => !selectedIds.includes(c.id)));
         setSelectedIds([]);
-        fetchContacts(); // Refresh stats
+        fetchContacts();
       }
     } catch (err) {
       console.error("Failed to delete contacts:", err);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    const count = stats?.total || contacts.length;
+    if (!confirm(`Are you sure you want to permanently delete ALL ${count.toLocaleString()} contacts? This cannot be undone.`)) return;
+
+    try {
+      const res = await fetch('/api/leads/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteAll: true })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setContacts([]);
+        setSelectedIds([]);
+        showToast(`Deleted ${(data.deleted || 0).toLocaleString()} contacts`);
+        fetchContacts();
+      } else {
+        showToast('Failed to delete contacts', 'error');
+      }
+    } catch (err) {
+      console.error("Failed to delete all contacts:", err);
+      showToast('Failed to delete contacts', 'error');
     }
   };
 
@@ -558,6 +584,13 @@ export default function ContactsPage() {
                 <p className="text-gray-500 font-medium mt-1">Manage your leads, segment lists, and track engagement.</p>
               </div>
               <div className="flex items-center gap-3">
+                <button 
+                  onClick={handleDeleteAll}
+                  className="flex items-center gap-2 px-5 py-3 bg-white border border-red-100 rounded-2xl text-sm font-bold text-red-500 hover:bg-red-50 transition-all shadow-sm"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete All
+                </button>
                 <button 
                   onClick={() => setShowUploadModal(true)}
                   className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-[#101828] hover:bg-gray-50 transition-all shadow-sm"

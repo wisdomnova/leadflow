@@ -1,0 +1,15 @@
+-- 1. Find your organization and upgrade the plan
+UPDATE organizations
+SET 
+  plan_tier = 'enterprise',
+  subscription_status = 'active',
+  trial_ends_at = NULL -- Remove trial expiry since it's now a full account
+FROM users
+WHERE users.org_id = organizations.id
+  AND users.email = 'contact@tryleadflow.ai';
+
+-- 2. Verify the update
+SELECT o.name, o.plan_tier, o.subscription_status
+FROM organizations o
+JOIN users u ON u.org_id = o.id
+WHERE u.email = 'contact@tryleadflow.ai';

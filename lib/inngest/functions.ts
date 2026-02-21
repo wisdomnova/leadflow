@@ -65,11 +65,18 @@ export const campaignLauncher = inngest.createFunction(
     const leads = await step.run("fetch-leads", async () => {
       // If specific leadIds provided, use them. Otherwise, fetch all 'new' leads (legacy behavior)
       if (leadIds && leadIds.length > 0) {
-        const { data } = await supabase
-          .from("leads")
-          .select("id, email")
-          .in("id", leadIds);
-        return data || [];
+        // Supabase .in() has a practical limit ~1000 items — batch for safety
+        const allLeads: any[] = [];
+        const IN_BATCH = 500;
+        for (let i = 0; i < leadIds.length; i += IN_BATCH) {
+          const batch = leadIds.slice(i, i + IN_BATCH);
+          const { data: batchData } = await supabase
+            .from("leads")
+            .select("id, email")
+            .in("id", batch);
+          if (batchData) allLeads.push(...batchData);
+        }
+        return allLeads;
       } else {
         const { data } = await supabase
           .from("leads")
@@ -82,7 +89,7 @@ export const campaignLauncher = inngest.createFunction(
 
     if (leads.length === 0) return { message: "No leads found" };
 
-    // 2. Initialize campaign_recipients for each lead
+    // 2. Initialize campaign_recipients for each lead (batched for scale)
     const recipients = (leads as any).map((lead: any) => ({
       org_id: orgId,
       campaign_id: campaignId,
@@ -93,8 +100,13 @@ export const campaignLauncher = inngest.createFunction(
     }));
 
     await step.run("init-recipients", async () => {
-      const { error } = await supabase.from("campaign_recipients").upsert(recipients, { onConflict: 'campaign_id,lead_id' });
-      if (error) throw new Error(`Failed to initialize recipients: ${error.message}`);
+      // Batch upserts in chunks of 200 to prevent payload/timeout issues
+      const BATCH_SIZE = 200;
+      for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+        const batch = recipients.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase.from("campaign_recipients").upsert(batch, { onConflict: 'campaign_id,lead_id' });
+        if (error) throw new Error(`Failed to initialize recipients batch ${i}: ${error.message}`);
+      }
     });
 
     // 2b. Update total_leads in campaigns table
@@ -106,8 +118,8 @@ export const campaignLauncher = inngest.createFunction(
       if (error) throw new Error(`Failed to update campaign stats: ${error.message}`);
     });
 
-    // 3. Trigger first email for each lead
-    const events = (leads as any).map((lead: any) => ({
+    // 3. Trigger first email for each lead (batched — Inngest limits events per sendEvent call)
+    const allEvents = (leads as any).map((lead: any) => ({
       name: "campaign/email.process",
       data: {
         campaignId,
@@ -117,7 +129,11 @@ export const campaignLauncher = inngest.createFunction(
       }
     }));
 
-    await step.sendEvent("queue-first-steps", events);
+    const EVENT_BATCH_SIZE = 100;
+    for (let i = 0; i < allEvents.length; i += EVENT_BATCH_SIZE) {
+      const batch = allEvents.slice(i, i + EVENT_BATCH_SIZE);
+      await step.sendEvent(`queue-batch-${i}`, batch);
+    }
 
     // 4. Create Notification
     await step.run("create-launch-notification", async () => {
@@ -140,7 +156,7 @@ export const campaignLauncher = inngest.createFunction(
  * Handles variable replacement, sending via SES, and scheduling follow-ups.
  */
 export const emailProcessor = inngest.createFunction(
-  { id: "email-processor" },
+  { id: "email-processor", concurrency: 10 },
   { event: "campaign/email.process" },
   async ({ event, step }) => {
     const { campaignId, leadId, stepIdx, orgId } = event.data;
@@ -312,11 +328,17 @@ export const emailProcessor = inngest.createFunction(
     // 3. Send Email
     const sendResult = await step.run("send-email", async () => {
       try {
+        // Pull fromName from account or org settings — never hardcode
+        const senderName = (data as any).account?.from_name 
+          || (data as any).org?.name 
+          || (data as any).account?.email?.split('@')[0] 
+          || 'Support';
+
         const result = await sendOutreachEmail({
           to: ((data as any).lead as any).email,
           subject: subject,
           bodyHtml: finalBody,
-          fromName: "LeadFlow Support", // In prod, pull from organization/sender settings
+          fromName: senderName,
           account: data.account
         });
         return { success: true, messageId: result.messageId };
@@ -408,6 +430,9 @@ export const emailProcessor = inngest.createFunction(
         }
       }
 
+      // Sleep for the calculated delay BEFORE sending the next event
+      await step.sleep("wait-for-next-step", delayValue);
+
       await step.sendEvent("schedule-next", {
         name: "campaign/email.process",
         data: {
@@ -415,9 +440,7 @@ export const emailProcessor = inngest.createFunction(
           leadId,
           stepIdx: nextStepIdx,
           orgId
-        },
-        // Dynamic delay based on Smart Sending optimizations
-        delay: delayValue 
+        }
       });
     } else {
       await step.run("mark-completed", async () => {
