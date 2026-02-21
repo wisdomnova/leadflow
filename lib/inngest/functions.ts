@@ -415,7 +415,8 @@ export const emailProcessor = inngest.createFunction(
         metadata: {
           campaign_id: campaignId,
           step_idx: stepIdx,
-          subject: subject
+          subject: subject,
+          ...(powersendNodeId ? { powersend_node_id: powersendNodeId } : {})
         }
       });
 
@@ -529,6 +530,123 @@ export const warmupScheduler = inngest.createFunction(
     await step.sendEvent("fan-out-warmup", events);
     
     return { count: accounts.length };
+  }
+);
+
+/**
+ * 4b. PowerSend Reputation Monitor
+ * Runs every 15 minutes to health-check all active smart server nodes.
+ * Calculates reputation from delivery metrics and enforces the Reputation Guard
+ * (auto-demoting nodes below 70% to warming, restoring those above 85%).
+ */
+export const powersendReputationMonitor = inngest.createFunction(
+  { id: "powersend-reputation-monitor" },
+  { cron: "*/15 * * * *" },
+  async ({ step }) => {
+    const supabase = getAdminClient();
+
+    // 1. Fetch all active/warming nodes across all orgs
+    const servers = await step.run("fetch-active-nodes", async () => {
+      const { data, error } = await supabase
+        .from("smart_servers")
+        .select("id, org_id, name, status, reputation_score")
+        .in("status", ["active", "warming"]);
+      if (error) throw error;
+      return data || [];
+    });
+
+    if (servers.length === 0) return { message: "No active nodes to monitor" };
+
+    // 2. Calculate metrics and update reputation for each node
+    const results = await step.run("update-reputations", async () => {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const checkResults: any[] = [];
+
+      for (const server of servers as any[]) {
+        // Count sends, bounces, complaints for this node in last 24h
+        const [sentRes, bounceRes, complaintRes] = await Promise.all([
+          supabase.from("activity_log").select("*", { count: "exact", head: true })
+            .eq("metadata->>powersend_node_id", server.id)
+            .gte("created_at", twentyFourHoursAgo),
+          supabase.from("activity_log").select("*", { count: "exact", head: true })
+            .eq("metadata->>powersend_node_id", server.id)
+            .eq("action_type", "email_bounced")
+            .gte("created_at", twentyFourHoursAgo),
+          supabase.from("activity_log").select("*", { count: "exact", head: true })
+            .eq("metadata->>powersend_node_id", server.id)
+            .eq("action_type", "email_complaint")
+            .gte("created_at", twentyFourHoursAgo),
+        ]);
+
+        const sent = sentRes.count || 0;
+        const bounces = bounceRes.count || 0;
+        const complaints = complaintRes.count || 0;
+
+        const bounceRate = sent > 0 ? (bounces / sent) * 100 : 0;
+        const complaintRate = sent > 0 ? (complaints / sent) * 100 : 0;
+        const deliveryRate = sent > 0 ? ((sent - bounces) / sent) * 100 : 100;
+
+        const { data: newScore } = await (supabase as any).rpc("update_server_reputation", {
+          server_id_param: server.id,
+          new_bounce_rate: parseFloat(bounceRate.toFixed(2)),
+          new_complaint_rate: parseFloat(complaintRate.toFixed(2)),
+          new_delivery_rate: parseFloat(deliveryRate.toFixed(2)),
+          check_source: "system"
+        });
+
+        checkResults.push({
+          serverId: server.id,
+          name: server.name,
+          oldScore: server.reputation_score,
+          newScore,
+          sent, bounces, complaints,
+        });
+      }
+
+      return checkResults;
+    });
+
+    // 3. Enforce the reputation guard (auto-warmup / restore)
+    const guardActions = await step.run("enforce-reputation-guard", async () => {
+      const { data, error } = await (supabase as any).rpc("enforce_reputation_guard", {
+        low_threshold: 70,
+        restore_threshold: 85,
+      });
+      if (error) throw error;
+      return data || [];
+    });
+
+    // 4. Notify orgs if any nodes were demoted
+    if (guardActions && (guardActions as any[]).length > 0) {
+      await step.run("notify-demotions", async () => {
+        for (const action of guardActions as any[]) {
+          if (action.action === "demoted") {
+            // Look up the org for this server
+            const { data: server } = await supabase
+              .from("smart_servers")
+              .select("org_id, name")
+              .eq("id", action.server_id)
+              .single();
+
+            if (server) {
+              await createNotification({
+                orgId: (server as any).org_id,
+                title: "Reputation Guard Triggered",
+                description: `Node "${(server as any).name}" dropped to ${action.reputation}% reputation and has been moved to Auto-Warmup mode. Daily limit reduced to protect your deliverability.`,
+                type: "warning",
+                category: "system" as any,
+                link: "/dashboard/powersend",
+              });
+            }
+          }
+        }
+      });
+    }
+
+    return {
+      checked: results.length,
+      guardActions: (guardActions as any[])?.length || 0,
+    };
   }
 );
 

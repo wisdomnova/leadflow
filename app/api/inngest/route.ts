@@ -10,7 +10,8 @@ import {
   warmupAccountProcessor,
   warmupRampUpScheduler,
   warmupReplyProcessor,
-  leadEnrichmentProcessor
+  leadEnrichmentProcessor,
+  powersendReputationMonitor
 } from "@/lib/inngest/functions";
 
 // Serve all Inngest functions
@@ -26,6 +27,7 @@ export const { GET, POST, PUT } = serve({
     warmupAccountProcessor,
     warmupRampUpScheduler,
     warmupReplyProcessor,
-    leadEnrichmentProcessor
+    leadEnrichmentProcessor,
+    powersendReputationMonitor
   ],
 });

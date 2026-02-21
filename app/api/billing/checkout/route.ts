@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth-utils';
-import { stripe, getOrCreateOrgCoupon, PLAN_PRICES } from '@/lib/stripe-billing';
+import { stripe, PLAN_PRICES } from '@/lib/stripe-billing';
 import { getAdminClient } from '@/lib/supabase';
 
 export async function POST(req: Request) {
@@ -17,23 +17,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
     }
 
-    // 2. Check for affiliate discount
     const adminSupabase = getAdminClient();
     const { data: org } = await (adminSupabase as any)
       .from('organizations')
-      .select('current_discount_percent, stripe_customer_id')
+      .select('stripe_customer_id')
       .eq('id', context.orgId)
       .single();
 
-    let discounts: any[] = [];
-    if (org && (org as any).current_discount_percent > 0) {
-      const couponId = await getOrCreateOrgCoupon(context.orgId, (org as any).current_discount_percent);
-      if (couponId) {
-        discounts = [{ coupon: couponId }];
-      }
-    }
-
-    // 3. Create Checkout Session
+    // Create Checkout Session
+    // Note: Referral discounts (20% for both parties) are applied via webhook
+    // after the first successful payment, not at checkout time.
     const session = await stripe.checkout.sessions.create({
       customer: (org as any)?.stripe_customer_id || undefined,
       customer_email: (org as any)?.stripe_customer_id ? undefined : context.email,
@@ -42,7 +35,6 @@ export async function POST(req: Request) {
       mode: 'subscription',
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription/failed`,
-      discounts,
       metadata: {
         org_id: context.orgId,
         user_id: context.userId,

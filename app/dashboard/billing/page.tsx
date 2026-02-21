@@ -302,11 +302,7 @@ export default function BillingPage() {
                         Canceling
                       </span>
                     )}
-                    {subData?.discount > 0 && (
-                      <span className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                        {subData.discount}% Affiliate Discount Applied
-                      </span>
-                    )}
+
                   </div>
                   <h2 className="text-4xl font-black text-white mb-2 tracking-tight">
                     {subData?.subscription?.plan || (subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date() ? 'Starter (14-Day Trial)' : (subData?.plan_tier ? `${subData.plan_tier.charAt(0).toUpperCase() + subData.plan_tier.slice(1)} Plan` : 'Standard Plan'))}
@@ -426,22 +422,14 @@ export default function BillingPage() {
                       <span className="text-5xl font-black text-[#101828] tracking-tighter">
                         {(() => {
                           const rawPrice = billingCycle === 'monthly' ? p.price.monthly : p.price.annual;
-                          const basePrice = parseInt(rawPrice.replace(/[$,]/g, ''));
-                          const discount = subData?.discount || 0;
-                          const finalPrice = Math.floor(basePrice * (1 - discount / 100));
-                          // Format with commas
-                          return `$${finalPrice.toLocaleString()}`;
+                          return rawPrice;
                         })()}
                       </span>
                       <span className="text-gray-400 font-bold">
                         {billingCycle === 'monthly' ? '/mo' : '/yr'}
                       </span>
                     </div>
-                    {subData?.discount > 0 && (
-                      <span className="text-[10px] font-bold text-[#745DF3] uppercase tracking-widest mt-1 block">
-                        Inclusive of {subData.discount}% referral discount
-                      </span>
-                    )}
+
                   </div>
 
                   <div className="flex-1 space-y-4 mb-10">

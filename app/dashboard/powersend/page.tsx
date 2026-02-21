@@ -43,6 +43,11 @@ interface SmartServer {
   current_usage: number;
   total_sends: number;
   last_sent_at: string | null;
+  last_health_check: string | null;
+  bounce_rate: number;
+  complaint_rate: number;
+  delivery_rate: number;
+  auto_warmup_at: string | null;
   created_at: string;
 }
 
@@ -60,8 +65,25 @@ export default function PowerSendPage() {
   
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isHealthChecking, setIsHealthChecking] = useState(false);
+  const [editingServer, setEditingServer] = useState<SmartServer | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    ip_address: '',
+    daily_limit: 500,
+    api_key: '',
+    status: 'active' as string,
+    smtp_config: {
+      host: '',
+      port: '465',
+      username: '',
+      password: '',
+      from_email: ''
+    }
+  });
   const [formData, setFormData] = useState({
     name: '',
     provider: 'mailreef',
@@ -162,6 +184,80 @@ export default function PowerSendPage() {
     }
   };
 
+  const openEditModal = (server: SmartServer) => {
+    setEditingServer(server);
+    setEditFormData({
+      name: server.name,
+      ip_address: server.ip_address || '',
+      daily_limit: server.daily_limit,
+      api_key: '',
+      status: server.status,
+      smtp_config: {
+        host: '',
+        port: '465',
+        username: '',
+        password: '',
+        from_email: ''
+      }
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditServer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingServer) return;
+    try {
+      setIsSubmitting(true);
+      // Only send fields that have values (don't overwrite SMTP with blanks)
+      const payload: any = {
+        name: editFormData.name,
+        ip_address: editFormData.ip_address || null,
+        daily_limit: editFormData.daily_limit,
+        status: editFormData.status,
+      };
+      if (editFormData.api_key) payload.api_key = editFormData.api_key;
+      if (editFormData.smtp_config.host) payload.smtp_config = editFormData.smtp_config;
+
+      const res = await fetch(`/api/powersend/${editingServer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errData = await res.text();
+        throw new Error(errData || 'Failed to update server');
+      }
+
+      await fetchData();
+      setIsEditModalOpen(false);
+      setEditingServer(null);
+    } catch (error: any) {
+      console.error('Edit server error:', error);
+      alert(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const runHealthCheck = async () => {
+    try {
+      setIsHealthChecking(true);
+      const res = await fetch('/api/powersend/health-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) throw new Error('Health check failed');
+      // Refresh data to show updated scores
+      await fetchData();
+    } catch (error) {
+      console.error('Health check error:', error);
+    } finally {
+      setIsHealthChecking(false);
+    }
+  };
+
   const filteredServers = servers.filter(s => 
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.ip_address.includes(searchQuery) ||
@@ -224,6 +320,14 @@ export default function PowerSendPage() {
                     >
                       <HelpCircle className="w-4 h-4" />
                       Guide
+                    </button>
+                    <button 
+                      onClick={runHealthCheck}
+                      disabled={isHealthChecking}
+                      className="flex items-center gap-2 px-4 py-2.5 text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl text-sm font-bold hover:bg-emerald-100 transition-all shadow-sm"
+                    >
+                      <Activity className={`w-4 h-4 ${isHealthChecking ? 'animate-pulse' : ''}`} />
+                      {isHealthChecking ? 'Checking...' : 'Health Check'}
                     </button>
                     <button 
                       onClick={fetchData}
@@ -329,11 +433,15 @@ export default function PowerSendPage() {
                         <td className="px-6 py-6">
                           <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest w-fit shadow-sm border ${
                             server.status === 'active' ? 'bg-green-50 text-green-600 border-green-100' :
-                            server.status === 'warming' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                            server.status === 'warming' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                            server.status === 'paused' ? 'bg-gray-50 text-gray-500 border-gray-100' :
                             'bg-red-50 text-red-600 border-red-100'
                           }`}>
-                            {server.status}
+                            {server.status === 'warming' ? 'Auto-Warmup' : server.status}
                           </div>
+                          {server.status === 'warming' && server.auto_warmup_at && (
+                            <p className="text-[9px] text-amber-500 font-bold mt-1 uppercase tracking-wider">Since {new Date(server.auto_warmup_at).toLocaleDateString()}</p>
+                          )}
                         </td>
                         <td className="px-6 py-6">
                           <div className="flex flex-col gap-1.5">
@@ -368,7 +476,10 @@ export default function PowerSendPage() {
                         </td>
                         <td className="px-8 py-6 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button className="p-2.5 hover:bg-gray-50 rounded-xl transition-all text-gray-400 hover:text-[#101828] border border-transparent hover:border-gray-100">
+                            <button 
+                              onClick={() => openEditModal(server)}
+                              className="p-2.5 hover:bg-gray-50 rounded-xl transition-all text-gray-400 hover:text-[#101828] border border-transparent hover:border-gray-100"
+                            >
                               <Settings2 className="w-4 h-4" />
                             </button>
                             <button 
@@ -408,7 +519,7 @@ export default function PowerSendPage() {
               <div>
                 <h4 className="font-bold text-gray-900 text-sm mb-1">Reputation Guard</h4>
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  Automatic protection is active. Nodes with reputation below 70% are automatically shifted to 'Auto-Warmup' mode.
+                  Active nodes that drop below 70% reputation are automatically demoted to Auto-Warmup with reduced daily limits. They restore to full capacity when reputation recovers above 85%.
                 </p>
               </div>
             </div>
@@ -418,7 +529,7 @@ export default function PowerSendPage() {
               <div>
                 <h4 className="font-bold text-gray-900 text-sm mb-1">Distributed Rotation</h4>
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  Traffic is balanced across {stats.activeNodes} active nodes using reputation-weighted round robin.
+                  Traffic is balanced across {stats.activeNodes} active node{stats.activeNodes !== 1 ? 's' : ''} using reputation-weighted round robin. Nodes with lower <code className="text-[10px] bg-orange-100 px-1 py-0.5 rounded">last_sent_at</code> and higher reputation are prioritized.
                 </p>
               </div>
             </div>
@@ -426,9 +537,9 @@ export default function PowerSendPage() {
             <div className="bg-green-50 border border-green-100 p-6 rounded-2xl flex items-start gap-4">
               <Globe className="w-6 h-6 text-green-600 shrink-0" />
               <div>
-                <h4 className="font-bold text-gray-900 text-sm mb-1">Mailreef Integration</h4>
+                <h4 className="font-bold text-gray-900 text-sm mb-1">Health Monitoring</h4>
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  Connected to the primary Mailreef API. Low-level IP health monitoring is synchronized every 15 minutes.
+                  Reputation is recalculated every 15 minutes from actual delivery metrics (bounce rate, complaint rate, delivery rate). Run a manual check anytime with the Health Check button above.
                 </p>
               </div>
             </div>
@@ -626,6 +737,213 @@ export default function PowerSendPage() {
                         <CheckCircle2 className="w-4 h-4" />
                       )}
                       {isSubmitting ? 'Provisioning...' : 'Provision Node'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Smart Server Modal */}
+      <AnimatePresence>
+        {isEditModalOpen && editingServer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setIsEditModalOpen(false); setEditingServer(null); }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100"
+            >
+              <button 
+                onClick={() => { setIsEditModalOpen(false); setEditingServer(null); }}
+                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="text-xl font-black text-[#101828]">Edit Node</h3>
+                    <p className="text-sm text-gray-500 font-medium">Update configuration for <span className="font-bold text-[#101828]">{editingServer.name}</span></p>
+                  </div>
+                  <div className="w-12 h-12 bg-[#745DF3]/5 rounded-2xl flex items-center justify-center text-[#745DF3]">
+                    <Settings2 className="w-6 h-6" />
+                  </div>
+                </div>
+
+                {/* Current Status Banner */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2.5 h-2.5 rounded-full ${editingServer.status === 'active' ? 'bg-green-500' : editingServer.status === 'warming' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Current Status</p>
+                      <p className="text-sm font-bold text-[#101828] capitalize">{editingServer.status === 'warming' ? 'Auto-Warmup' : editingServer.status}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reputation</p>
+                    <p className={`text-sm font-black ${editingServer.reputation_score > 80 ? 'text-green-600' : editingServer.reputation_score > 50 ? 'text-amber-600' : 'text-red-600'}`}>{editingServer.reputation_score}%</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleEditServer} className="space-y-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Node Name</label>
+                      <input
+                        type="text"
+                        required
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                        value={editFormData.name}
+                        onChange={e => setEditFormData({ ...editFormData, name: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">IP Address</label>
+                        <input
+                          type="text"
+                          placeholder="1.2.3.4"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                          value={editFormData.ip_address}
+                          onChange={e => setEditFormData({ ...editFormData, ip_address: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Daily Limit</label>
+                        <input
+                          type="number"
+                          required
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                          value={editFormData.daily_limit}
+                          onChange={e => setEditFormData({ ...editFormData, daily_limit: parseInt(e.target.value) })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Status Override</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['active', 'paused', 'warming'] as const).map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setEditFormData({ ...editFormData, status: s })}
+                            className={`py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border transition-all ${
+                              editFormData.status === s
+                                ? s === 'active' ? 'bg-green-50 text-green-600 border-green-200'
+                                : s === 'warming' ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                : 'bg-gray-100 text-gray-600 border-gray-200'
+                                : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'
+                            }`}
+                          >
+                            {s === 'warming' ? 'Warmup' : s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">New API Key <span className="normal-case text-gray-300">(leave blank to keep current)</span></label>
+                      <input
+                        type="password"
+                        placeholder="••••••••••••••••"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                        value={editFormData.api_key}
+                        onChange={e => setEditFormData({ ...editFormData, api_key: e.target.value })}
+                      />
+                    </div>
+
+                    {/* SMTP Override */}
+                    <div className="pt-4 border-t border-gray-100">
+                      <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-1">SMTP Configuration</p>
+                      <p className="text-[10px] font-bold text-gray-400 mb-4">Leave fields blank to keep current credentials.</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Host</label>
+                          <input
+                            type="text"
+                            placeholder="smtp.mailreef.com"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={editFormData.smtp_config.host}
+                            onChange={e => setEditFormData({ ...editFormData, smtp_config: { ...editFormData.smtp_config, host: e.target.value } })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Port</label>
+                          <input
+                            type="text"
+                            placeholder="465"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={editFormData.smtp_config.port}
+                            onChange={e => setEditFormData({ ...editFormData, smtp_config: { ...editFormData.smtp_config, port: e.target.value } })}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Username</label>
+                          <input
+                            type="text"
+                            placeholder="user@domain.com"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={editFormData.smtp_config.username}
+                            onChange={e => setEditFormData({ ...editFormData, smtp_config: { ...editFormData.smtp_config, username: e.target.value } })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Password</label>
+                          <input
+                            type="password"
+                            placeholder="••••••••••••••••"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={editFormData.smtp_config.password}
+                            onChange={e => setEditFormData({ ...editFormData, smtp_config: { ...editFormData.smtp_config, password: e.target.value } })}
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">From Email</label>
+                        <input
+                          type="text"
+                          placeholder="outreach@yourdomain.com"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                          value={editFormData.smtp_config.from_email}
+                          onChange={e => setEditFormData({ ...editFormData, smtp_config: { ...editFormData.smtp_config, from_email: e.target.value } })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => { setIsEditModalOpen(false); setEditingServer(null); }}
+                      className="flex-1 px-6 py-3 border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-[2] px-6 py-3 bg-[#101828] text-white rounded-xl text-sm font-bold hover:bg-[#101828]/90 transition-all shadow-xl shadow-gray-200 flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4" />
+                      )}
+                      {isSubmitting ? 'Saving...' : 'Save Changes'}
                     </button>
                   </div>
                 </form>

@@ -9,11 +9,15 @@ import { resend } from "@/lib/resend";
 
 export async function POST(req: Request) {
   try {
-    const { email, password, fullName, orgName, referralCode } = await req.json();
+    const { email, password, fullName, orgName, referralCode, fingerprint } = await req.json();
 
     if (!email || !password || !fullName || !orgName) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    // Capture anti-abuse signals from request
+    const signupIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || '0.0.0.0';
+    const signupUserAgent = req.headers.get('user-agent') || '';
 
     const supabase = getAdminClient();
 
@@ -53,7 +57,12 @@ export async function POST(req: Request) {
     // 4. Process Referral if code exists
     if (referralCode) {
       try {
-        await processReferral((org as any).id, referralCode);
+        await processReferral((org as any).id, referralCode, {
+          email,
+          ip: signupIp,
+          fingerprint: fingerprint || null,
+          userAgent: signupUserAgent,
+        });
       } catch (err) {
         console.error("Referral processing error:", err);
       }

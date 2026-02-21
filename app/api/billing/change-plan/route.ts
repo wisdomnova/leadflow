@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth-utils';
-import { stripe, getOrCreateOrgCoupon, PLAN_PRICES, PLAN_ORDER } from '@/lib/stripe-billing';
+import { stripe, PLAN_PRICES, PLAN_ORDER } from '@/lib/stripe-billing';
 import { getAdminClient } from '@/lib/supabase';
 import { createNotification } from '@/lib/notifications';
 
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     const adminSupabase = getAdminClient();
     const { data: org } = await (adminSupabase as any)
       .from('organizations')
-      .select('subscription_id, stripe_customer_id, plan_tier, current_discount_percent')
+      .select('subscription_id, stripe_customer_id, plan_tier')
       .eq('id', context.orgId)
       .single();
 
@@ -52,16 +52,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Could not find subscription item' }, { status: 500 });
     }
 
-    // Apply affiliate discount if applicable
-    let discounts: any[] | undefined = undefined;
-    if ((org as any).current_discount_percent > 0) {
-      const couponId = await getOrCreateOrgCoupon(context.orgId, (org as any).current_discount_percent);
-      if (couponId) {
-        discounts = [{ coupon: couponId }];
-      }
-    }
-
     // Update the subscription
+    // Note: Stripe preserves existing referral coupons on plan changes automatically.
     const updateParams: any = {
       items: [{
         id: subscriptionItemId,
@@ -74,13 +66,7 @@ export async function POST(req: Request) {
 
     // For downgrades, don't apply until end of period
     if (!isUpgrade) {
-      // Schedule the downgrade for end of billing period by using billing_cycle_anchor
-      // Stripe handles this: the new price takes effect on next invoice
       updateParams.proration_behavior = 'none';
-    }
-
-    if (discounts) {
-      updateParams.discounts = discounts;
     }
 
     await stripe.subscriptions.update((org as any).subscription_id, updateParams);

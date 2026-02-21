@@ -22,6 +22,38 @@ function SignUpContent() {
     }
   }, [searchParams]);
 
+  // Generate a simple browser fingerprint for anti-abuse
+  const getFingerprint = (): string => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.textBaseline = 'top';
+        ctx.font = '14px Arial';
+        ctx.fillText('LeadFlow fingerprint', 2, 2);
+      }
+      const canvasData = canvas.toDataURL();
+      const components = [
+        navigator.language,
+        screen.colorDepth,
+        screen.width + 'x' + screen.height,
+        Intl.DateTimeFormat().resolvedOptions().timeZone,
+        navigator.hardwareConcurrency || 0,
+        canvasData.slice(-50),
+      ].join('|');
+      // Simple hash
+      let hash = 0;
+      for (let i = 0; i < components.length; i++) {
+        const char = components.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0;
+      }
+      return Math.abs(hash).toString(36);
+    } catch {
+      return '';
+    }
+  };
+
   const [formData, setFormData] = useState({
     fullName: '',
     orgName: '',
@@ -40,7 +72,8 @@ function SignUpContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          referralCode
+          referralCode,
+          fingerprint: getFingerprint(),
         })
       });
 
@@ -102,7 +135,7 @@ function SignUpContent() {
                   <Ticket className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[10px] uppercase tracking-widest opacity-60 leading-none mb-1">Affiliate Referral Applied</span>
+                  <span className="text-[10px] uppercase tracking-widest opacity-60 leading-none mb-1">Referral Applied — You Both Get 20% Off</span>
                   <span className="text-base font-black tracking-tight leading-none">{referralCode}</span>
                 </div>
               </motion.div>

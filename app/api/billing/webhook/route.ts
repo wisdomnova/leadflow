@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { stripe } from '@/lib/stripe-billing';
 import { createClient } from '@supabase/supabase-js';
 import { createNotification } from '@/lib/notifications';
+import { activateReferralReward } from '@/lib/affiliate-utils';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,6 +53,13 @@ export async function POST(req: Request) {
         category: "billing_alerts",
         link: "/dashboard/billing"
       });
+
+      // Activate referral reward — if this org was referred, both parties get 20% off
+      try {
+        await activateReferralReward(org_id);
+      } catch (err) {
+        console.error('Referral reward activation error:', err);
+      }
       break;
     }
 
