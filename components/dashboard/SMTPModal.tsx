@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Server, Shield, Mail, Key, Settings2, Loader2, CheckCircle2 } from 'lucide-react';
+import { X, Server, Shield, Mail, Key, Settings2, Loader2, CheckCircle2, ChevronDown, ToggleLeft, ToggleRight } from 'lucide-react';
 
 interface SMTPModalProps {
   isOpen: boolean;
@@ -13,8 +13,13 @@ interface SMTPModalProps {
 export default function SMTPModal({ isOpen, onClose, onConnect }: SMTPModalProps) {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [smtpProviders, setSmtpProviders] = useState<any[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState('');
+  const [overrideSmtp, setOverrideSmtp] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
+    password: '',
     smtpHost: '',
     smtpPort: '465',
     smtpUser: '',
@@ -25,21 +30,49 @@ export default function SMTPModal({ isOpen, onClose, onConnect }: SMTPModalProps
     imapPass: '',
   });
 
+  // Fetch SMTP provider presets when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/accounts/smtp-providers')
+        .then(res => res.ok ? res.json() : [])
+        .then(providers => {
+          setSmtpProviders(providers);
+          const defaultProvider = providers.find((p: any) => p.is_default);
+          if (defaultProvider) setSelectedProviderId(defaultProvider.id);
+          else if (providers.length > 0) setSelectedProviderId(providers[0].id);
+        })
+        .catch(() => setSmtpProviders([]));
+    }
+  }, [isOpen]);
+
+  const selectedProvider = smtpProviders.find((p: any) => p.id === selectedProviderId);
+  const useProviderDefaults = !!selectedProviderId && !overrideSmtp;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
+      // Determine effective SMTP/IMAP settings
+      const smtpHost = useProviderDefaults ? selectedProvider?.smtp_host : formData.smtpHost;
+      const smtpPort = useProviderDefaults ? String(selectedProvider?.smtp_port || '587') : formData.smtpPort;
+      const imapHost = useProviderDefaults ? selectedProvider?.imap_host : formData.imapHost;
+      const imapPort = useProviderDefaults ? String(selectedProvider?.imap_port || '993') : formData.imapPort;
+      const smtpUser = overrideSmtp ? formData.smtpUser : (formData.email);
+      const smtpPass = overrideSmtp ? formData.smtpPass : formData.password;
+      const imapUser = overrideSmtp ? formData.imapUser : (formData.email);
+      const imapPass = overrideSmtp ? formData.imapPass : formData.password;
+
       // 1. Test SMTP
       const smtpRes = await fetch('/api/accounts/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'smtp',
-          host: formData.smtpHost,
-          port: formData.smtpPort,
-          user: formData.smtpUser,
-          pass: formData.smtpPass,
+          host: smtpHost,
+          port: smtpPort,
+          user: smtpUser,
+          pass: smtpPass,
         })
       });
 
@@ -54,10 +87,10 @@ export default function SMTPModal({ isOpen, onClose, onConnect }: SMTPModalProps
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'imap',
-          host: formData.imapHost,
-          port: formData.imapPort,
-          user: formData.imapUser,
-          pass: formData.imapPass,
+          host: imapHost,
+          port: imapPort,
+          user: imapUser,
+          pass: imapPass,
         })
       });
 
@@ -66,12 +99,24 @@ export default function SMTPModal({ isOpen, onClose, onConnect }: SMTPModalProps
         throw new Error(`IMAP Error: ${imapData.error}`);
       }
 
-      // Both successful
-      onConnect(formData);
+      // Both successful — build connect data
+      const connectData: any = {
+        email: formData.email,
+        smtpHost, smtpPort, smtpUser, smtpPass,
+        imapHost, imapPort, imapUser, imapPass,
+      };
+      if (useProviderDefaults && selectedProviderId) {
+        connectData.smtp_provider_id = selectedProviderId;
+      }
+
+      onConnect(connectData);
       // Reset for next time
       setStep(1);
+      setOverrideSmtp(false);
+      setErrorMsg(null);
+      setFormData({ email: '', password: '', smtpHost: '', smtpPort: '465', smtpUser: '', smtpPass: '', imapHost: '', imapPort: '993', imapUser: '', imapPass: '' });
     } catch (err: any) {
-      alert(err.message || "Failed to connect to mail server");
+      setErrorMsg(err.message || "Failed to connect to mail server");
     } finally {
       setIsLoading(false);
     }
@@ -80,6 +125,9 @@ export default function SMTPModal({ isOpen, onClose, onConnect }: SMTPModalProps
   const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  // Determine if we need step 2 (server details)
+  const needsStep2 = !useProviderDefaults || overrideSmtp;
 
   return (
     <AnimatePresence>
@@ -107,7 +155,12 @@ export default function SMTPModal({ isOpen, onClose, onConnect }: SMTPModalProps
                 </div>
                 <div>
                   <h3 className="text-xl font-black text-[#101828] tracking-tight">Custom SMTP Setup</h3>
-                  <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-0.5">Step {step} of 2: {step === 1 ? 'Account Details' : 'Server Configuration'}</p>
+                  <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-0.5">
+                    {needsStep2 
+                      ? `Step ${step} of 2: ${step === 1 ? 'Account Details' : 'Server Configuration'}`
+                      : 'Account Details'
+                    }
+                  </p>
                 </div>
               </div>
               <button 
@@ -117,6 +170,15 @@ export default function SMTPModal({ isOpen, onClose, onConnect }: SMTPModalProps
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
+
+            {errorMsg && (
+              <div className="mx-10 mt-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-red-100 flex items-center justify-center text-red-500">
+                  <X className="w-4 h-4" />
+                </div>
+                <p className="text-sm font-bold text-red-600">{errorMsg}</p>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="p-10">
               <div className="space-y-8">
@@ -140,6 +202,68 @@ export default function SMTPModal({ isOpen, onClose, onConnect }: SMTPModalProps
                         />
                       </div>
                     </div>
+
+                    {/* Provider Preset Selection */}
+                    {smtpProviders.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">SMTP Provider Preset</label>
+                          <select
+                            value={selectedProviderId}
+                            onChange={(e) => { setSelectedProviderId(e.target.value); if (e.target.value) setOverrideSmtp(false); }}
+                            className="w-full px-6 py-4 bg-gray-50 border border-transparent focus:border-[#745DF3] focus:bg-white rounded-2xl text-sm font-black outline-none transition-all appearance-none"
+                          >
+                            <option value="">— No preset (enter manually) —</option>
+                            {smtpProviders.map((p: any) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} — {p.smtp_host}:{p.smtp_port} {p.is_default ? '(Default)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {selectedProviderId && selectedProvider && (
+                          <div className="p-6 bg-emerald-50 rounded-[2rem] border border-emerald-100">
+                            <div className="grid grid-cols-2 gap-4 text-[10px] font-black uppercase tracking-widest">
+                              <div><span className="text-gray-400">SMTP:</span> <span className="text-emerald-600 font-mono ml-1">{selectedProvider.smtp_host}:{selectedProvider.smtp_port}</span></div>
+                              <div><span className="text-gray-400">Security:</span> <span className="text-emerald-600 ml-1">{selectedProvider.smtp_security}</span></div>
+                              <div><span className="text-gray-400">IMAP:</span> <span className="text-emerald-600 font-mono ml-1">{selectedProvider.imap_host}:{selectedProvider.imap_port}</span></div>
+                              <div><span className="text-gray-400">Security:</span> <span className="text-emerald-600 ml-1">{selectedProvider.imap_security}</span></div>
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedProviderId && (
+                          <button
+                            type="button"
+                            onClick={() => setOverrideSmtp(!overrideSmtp)}
+                            className="flex items-center gap-2 text-[10px] font-black text-gray-400 hover:text-[#745DF3] uppercase tracking-widest transition-colors pl-1 mt-2"
+                          >
+                            {overrideSmtp ? <ToggleRight className="w-5 h-5 text-[#745DF3]" /> : <ToggleLeft className="w-5 h-5" />}
+                            Override SMTP/IMAP settings
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Password field when using provider defaults */}
+                    {useProviderDefaults && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Server Password</label>
+                        <div className="relative">
+                          <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input 
+                            required
+                            type="password" 
+                            value={formData.password}
+                            onChange={(e) => updateField('password', e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full pl-12 pr-6 py-4 bg-gray-50 border border-transparent focus:border-[#745DF3] focus:bg-white rounded-2xl text-sm font-black outline-none transition-all"
+                          />
+                        </div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 mt-1 opacity-60">Credentials for both SMTP and IMAP</p>
+                      </div>
+                    )}
 
                     <div className="p-6 bg-[#745DF3]/5 rounded-[2rem] border border-[#745DF3]/10">
                       <div className="flex gap-4">
@@ -303,8 +427,8 @@ export default function SMTPModal({ isOpen, onClose, onConnect }: SMTPModalProps
                     </button>
                   )}
                   <button
-                    type={step === 1 ? 'button' : 'submit'}
-                    onClick={() => step === 1 && setStep(2)}
+                    type={step === 1 && needsStep2 ? 'button' : 'submit'}
+                    onClick={() => { if (step === 1 && needsStep2) setStep(2); }}
                     disabled={isLoading}
                     className="px-10 py-4 bg-[#101828] text-white rounded-2xl text-sm font-black hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/20 flex items-center gap-3 active:scale-95 disabled:opacity-50"
                   >
@@ -315,7 +439,7 @@ export default function SMTPModal({ isOpen, onClose, onConnect }: SMTPModalProps
                       </>
                     ) : (
                       <>
-                        {step === 1 ? 'Next: Server Details' : 'Connect Account'}
+                        {step === 1 && needsStep2 ? 'Next: Server Details' : 'Connect Account'}
                       </>
                     )}
                   </button>

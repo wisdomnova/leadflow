@@ -72,8 +72,16 @@ export default function WarmupPage() {
 
   const [auditState, setAuditState] = useState<'idle' | 'scanning'>('idle');
   const [searchQuery, setSearchQuery] = useState('');
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [removingFromWarmupId, setRemovingFromWarmupId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
 
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
 
   useEffect(() => {
     fetchAccounts();
@@ -103,8 +111,14 @@ export default function WarmupPage() {
   };
 
   const handleToggleStatus = async (id: string, currentEnabled: boolean) => {
+    setTogglingId(id);
     try {
       const newStatus = currentEnabled ? 'Paused' : 'Warming';
+      // Optimistic update
+      setAccounts(prev => prev.map(acc => 
+        acc.id === id ? { ...acc, warmup_enabled: !currentEnabled, warmup_status: newStatus } : acc
+      ));
+      
       const res = await fetch('/api/warmup', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -116,12 +130,19 @@ export default function WarmupPage() {
       });
 
       if (res.ok) {
+        showToast(currentEnabled ? 'Warmup paused' : 'Warmup resumed');
+      } else {
+        // Revert optimistic update
         setAccounts(prev => prev.map(acc => 
-          acc.id === id ? { ...acc, warmup_enabled: !currentEnabled, warmup_status: newStatus } : acc
+          acc.id === id ? { ...acc, warmup_enabled: currentEnabled, warmup_status: currentEnabled ? 'Warming' : 'Paused' } : acc
         ));
+        showToast('Failed to update warmup status', 'error');
       }
     } catch (err) {
       console.error("Failed to toggle warmup status:", err);
+      showToast('Failed to update warmup status', 'error');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -132,10 +153,44 @@ export default function WarmupPage() {
         if (res.ok) {
           setAccounts(prev => prev.filter(a => a.id !== deleteConfirmModal.accountId));
           setDeleteConfirmModal({ show: false, accountId: null, email: '' });
+          showToast('Account deleted successfully');
+        } else {
+          showToast('Failed to delete account', 'error');
         }
       } catch (err) {
         console.error("Failed to delete account:", err);
+        showToast('Failed to delete account', 'error');
       }
+    }
+  };
+
+  const handleRemoveFromWarmup = async (id: string, email: string) => {
+    setActiveMenuId(null);
+    setRemovingFromWarmupId(id);
+    try {
+      const res = await fetch('/api/warmup', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          id, 
+          warmup_enabled: false,
+          warmup_status: 'Disabled'
+        })
+      });
+
+      if (res.ok) {
+        setAccounts(prev => prev.map(acc => 
+          acc.id === id ? { ...acc, warmup_enabled: false, warmup_status: 'Disabled' } : acc
+        ));
+        showToast(`${email} removed from warmup`);
+      } else {
+        showToast('Failed to remove from warmup', 'error');
+      }
+    } catch (err) {
+      console.error("Failed to remove from warmup:", err);
+      showToast('Failed to remove from warmup', 'error');
+    } finally {
+      setRemovingFromWarmupId(null);
     }
   };
 
@@ -363,13 +418,22 @@ export default function WarmupPage() {
                                 <div className="flex items-center justify-end gap-2">
                                   <button 
                                     onClick={() => handleToggleStatus(account.id, account.warmup_enabled)}
+                                    disabled={togglingId === account.id}
                                     className={`p-2 rounded-xl transition-all ${
-                                      account.warmup_status === 'Warming' 
-                                        ? 'text-amber-600 hover:bg-amber-50' 
-                                        : 'text-emerald-600 hover:bg-emerald-50'
+                                      togglingId === account.id
+                                        ? 'text-[#745DF3]'
+                                        : account.warmup_status === 'Warming' 
+                                          ? 'text-amber-600 hover:bg-amber-50' 
+                                          : 'text-emerald-600 hover:bg-emerald-50'
                                     }`}
                                   >
-                                    {account.warmup_status === 'Warming' ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
+                                    {togglingId === account.id ? (
+                                      <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : account.warmup_status === 'Warming' ? (
+                                      <Pause className="w-5 h-5 fill-current" />
+                                    ) : (
+                                      <Play className="w-5 h-5 fill-current" />
+                                    )}
                                   </button>
                                   
                                   <div className="relative">
@@ -421,6 +485,18 @@ export default function WarmupPage() {
                                             </button>
                                             <div className="my-1 border-t border-gray-50" />
                                             <button 
+                                              onClick={() => handleRemoveFromWarmup(account.id, account.email)}
+                                              disabled={removingFromWarmupId === account.id}
+                                              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                                            >
+                                              {removingFromWarmupId === account.id ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                              ) : (
+                                                <Flame className="w-4 h-4" />
+                                              )}
+                                              Remove from Warmup
+                                            </button>
+                                            <button 
                                               onClick={() => {
                                                 setDeleteConfirmModal({
                                                   show: true,
@@ -432,7 +508,7 @@ export default function WarmupPage() {
                                               className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
                                             >
                                               <Trash2 className="w-4 h-4" />
-                                              Remove Account
+                                              Delete Account
                                             </button>
                                           </motion.div>
                                         </>
@@ -619,6 +695,7 @@ export default function WarmupPage() {
         account={selectedAccountForSettings}
         onSave={(updated) => {
           setAccounts(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a));
+          showToast('Warmup settings saved');
         }}
       />
 
@@ -637,6 +714,30 @@ export default function WarmupPage() {
         }}
         account={selectedAccountForStats}
       />
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: 40, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-8 right-8 z-[70] flex items-center gap-3 px-5 py-3.5 bg-white rounded-2xl shadow-2xl border border-gray-100"
+          >
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${toast.type === 'success' ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
+              {toast.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-red-500" />
+              )}
+            </div>
+            <p className="text-sm font-bold text-[#101828]">{toast.message}</p>
+            <button onClick={() => setToast({ show: false, message: '', type: 'success' })} className="ml-2 p-1 text-gray-300 hover:text-gray-500 transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -25,6 +25,12 @@ export default function CRMHistoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'failed'>('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [toast, setToast] = useState<{ show: boolean, msg: string, type: 'success' | 'error' }>({ show: false, msg: '', type: 'success' });
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, msg, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
 
   useEffect(() => {
     fetchHistory();
@@ -81,14 +87,14 @@ export default function CRMHistoryPage() {
         body: JSON.stringify({ leadId })
       });
       if (res.ok) {
-        alert("Push retried successfully!");
+        showToast("Push retried successfully!");
         fetchHistory();
       } else {
         const err = await res.json();
-        alert(`Failed to retry push: ${err.error}`);
+        showToast(`Failed to retry push: ${err.error}`, 'error');
       }
     } catch (e) {
-      alert("An error occurred during retry.");
+      showToast("An error occurred during retry.", 'error');
     }
   };
 
@@ -309,6 +315,22 @@ export default function CRMHistoryPage() {
           </div>
         </div>
       </main>
+
+      <AnimatePresence>
+        {toast.show && (
+          <motion.div 
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 100 }}
+            className={`fixed bottom-8 right-8 z-[100] ${toast.type === 'success' ? 'bg-[#101828]' : 'bg-red-600'} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3`}
+          >
+            <div className={`w-8 h-8 rounded-full ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-white/20'} flex items-center justify-center`}>
+              {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-white" /> : <XCircle className="w-4 h-4 text-white" />}
+            </div>
+            <span className="text-sm font-bold">{toast.msg}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

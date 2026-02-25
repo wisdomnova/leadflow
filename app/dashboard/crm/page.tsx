@@ -56,10 +56,10 @@ export default function CRMPage() {
     : '0.0';
 
   const crmStats = [
-    { name: 'Total Synced Leads', value: stats.total.toLocaleString(), change: stats.total > 0 ? `+${stats.total}` : '0', icon: Database },
-    { name: 'Active Automations', value: connectedIds.size.toString(), change: `+${connectedIds.size}`, icon: Zap },
-    { name: 'Data Health', value: `${stats.efficiency}%`, change: '0%', icon: ShieldCheck },
-    { name: 'Avg. Sync Time', value: `${avgSyncTime}s`, change: activities.length > 0 ? '-0.1s' : '0s', icon: Clock },
+    { name: 'Total Synced Leads', value: stats.total.toLocaleString(), change: stats.importedLeads > 0 ? `${stats.importedLeads} imported` : '0', icon: Database },
+    { name: 'Active Integrations', value: connectedIds.size.toString(), change: `${connectedIds.size} connected`, icon: Zap },
+    { name: 'Data Health', value: `${stats.efficiency}%`, change: `${stats.failed} failed`, icon: ShieldCheck },
+    { name: 'Avg. Sync Time', value: `${avgSyncTime}s`, change: activities.length > 0 ? `${activities.length} syncs` : '0 syncs', icon: Clock },
   ];
 
   const providers = [
@@ -77,7 +77,7 @@ export default function CRMPage() {
       setIsLoading(true);
       const [crmRes, activityRes, statsRes] = await Promise.all([
         fetch('/api/crm'),
-        fetch('/api/activity?type=crm.push'),
+        fetch('/api/activity?type=crm.push&type=crm.import'),
         fetch('/api/crm/stats')
       ]);
       
@@ -85,7 +85,7 @@ export default function CRMPage() {
       const activityData = await activityRes.json();
       const statsData = await statsRes.json();
       
-      setActivities(activityData);
+      setActivities(Array.isArray(activityData) ? activityData : []);
       setStats(statsData);
       
       const connected = new Set<string>(data.map((i: any) => i.provider));
@@ -115,20 +115,30 @@ export default function CRMPage() {
     window.location.href = `/api/crm/oauth/${id}`;
   };
 
-  const simulateSync = async (id: string) => {
+  const [syncResult, setSyncResult] = useState<any>(null);
+
+  const handleSync = async (id: string) => {
     setSyncingProvider(id);
+    setSyncResult(null);
     try {
-      // In production this would trigger a background sync job
-      // For now we simulate it and create a real activity log entry
-      await new Promise(r => setTimeout(r, 2000));
-      
-      // We could add an API for manual sync trigger that logs activity
-      // For now we just refresh logs which might show the result of a real background sync
+      const res = await fetch('/api/crm/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: id })
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setSyncResult({ success: true, message: result.message || `Imported ${result.imported} contacts` });
+      } else {
+        setSyncResult({ success: false, message: result.error || 'Import failed' });
+      }
       await fetchIntegrations();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Sync failed:", error);
+      setSyncResult({ success: false, message: error.message || 'Sync failed' });
     } finally {
       setSyncingProvider(null);
+      setTimeout(() => setSyncResult(null), 5000);
     }
   };
 
@@ -320,12 +330,12 @@ export default function CRMPage() {
                       {crm.connected ? (
                         <>
                           <button 
-                            onClick={() => simulateSync(crm.id)}
+                            onClick={() => handleSync(crm.id)}
                             disabled={syncingProvider === crm.id}
                             className="flex items-center gap-3 px-8 py-4 bg-gray-50 rounded-[1.5rem] text-[13px] font-black text-[#101828] hover:bg-gray-100 transition-all disabled:opacity-50 group grow sm:grow-0 justify-center"
                           >
                             <RefreshCw className={`w-4 h-4 text-[#745DF3] ${syncingProvider === crm.id ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-                            {syncingProvider === crm.id ? 'Syncing...' : 'Sync Now'}
+                            {syncingProvider === crm.id ? 'Importing...' : 'Import Contacts'}
                           </button>
                           <button 
                             onClick={() => setDisconnectingId(crm.id)}
@@ -357,6 +367,25 @@ export default function CRMPage() {
               </AnimatePresence>
             </div>
 
+            {/* Sync Result Toast */}
+            <AnimatePresence>
+              {syncResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className={`fixed bottom-8 right-8 z-50 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 ${
+                    syncResult.success ? 'bg-[#101828] text-white' : 'bg-red-600 text-white'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${syncResult.success ? 'bg-emerald-500' : 'bg-red-400'}`}>
+                    {syncResult.success ? <CheckCircle2 className="w-4 h-4 text-white" /> : <XCircle className="w-4 h-4 text-white" />}
+                  </div>
+                  <span className="text-sm font-bold">{syncResult.message}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Integration Logs / History Section */}
             <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm p-10">
               <div className="flex items-center justify-between mb-8">
@@ -375,6 +404,7 @@ export default function CRMPage() {
                     <div key={log.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-3xl border border-gray-50">
                       <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          log.action_type === 'crm.import' ? 'bg-blue-100 text-blue-600' :
                           log.action_type === 'crm.push' ? 'bg-emerald-100 text-emerald-600' : 
                           log.action_type.includes('failed') || log.action_type.includes('error') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
                         }`}>
@@ -386,7 +416,8 @@ export default function CRMPage() {
                         </div>
                         <div>
                           <p className="text-sm font-black text-[#101828]">
-                            {log.action_type === 'crm.push' ? 'Direct CRM Export' : 
+                            {log.action_type === 'crm.push' ? 'CRM Export' : 
+                             log.action_type === 'crm.import' ? 'CRM Import' :
                              log.action_type === 'sync.failed' ? 'Sync Failure' : 'System Activity'}
                           </p>
                           <p className="text-xs text-gray-500 font-bold tracking-tight">

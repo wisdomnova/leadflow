@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
+import ConfirmModal from '@/components/dashboard/ConfirmModal';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Users, 
@@ -28,6 +29,7 @@ import {
   Trash2,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Loader2
 } from 'lucide-react';
 
@@ -56,6 +58,13 @@ export default function TeamPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', role: '' });
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{ show: boolean; title: string; description: string; onConfirm: () => void; type: 'danger' | 'warning' | 'info' }>({ show: false, title: '', description: '', onConfirm: () => {}, type: 'info' });
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
 
   useEffect(() => {
     fetchMembers();
@@ -146,21 +155,31 @@ export default function TeamPage() {
     }
   };
 
-  const deleteMember = async (id: string) => {
-    if (confirm('Are you sure you want to remove this team member?')) {
-      try {
-        const res = await fetch(`/api/team?id=${id}`, { method: 'DELETE' });
-        if (res.ok) {
-          setMembers(members.filter(m => m.id !== id));
-          if (selectedMember?.id === id) setShowMemberDetails(false);
-        } else {
-          const data = await res.json();
-          alert(data.error || 'Failed to delete member');
+  const deleteMember = (id: string) => {
+    const member = members.find(m => m.id === id);
+    setConfirmModal({
+      show: true,
+      title: 'Remove Team Member?',
+      description: `Are you sure you want to remove ${member?.full_name || member?.name || 'this member'}? They will lose access to the team and all associated data.`,
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, show: false }));
+        try {
+          const res = await fetch(`/api/team?id=${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            setMembers(members.filter(m => m.id !== id));
+            if (selectedMember?.id === id) setShowMemberDetails(false);
+            showToast('Member removed successfully');
+          } else {
+            const data = await res.json();
+            showToast(data.error || 'Failed to delete member', 'error');
+          }
+        } catch (err) {
+          console.error("Failed to delete member:", err);
+          showToast('Failed to delete member', 'error');
         }
-      } catch (err) {
-        console.error("Failed to delete member:", err);
       }
-    }
+    });
   };
 
   const handleUpdateMember = async (e: React.FormEvent) => {
@@ -184,12 +203,14 @@ export default function TeamPage() {
           name: editForm.name,
           role: editForm.role
         });
+        showToast('Member updated successfully');
       } else {
         const data = await res.json();
-        alert(data.error || 'Failed to update member');
+        showToast(data.error || 'Failed to update member', 'error');
       }
     } catch (err) {
       console.error("Failed to update member:", err);
+      showToast('Failed to update member', 'error');
     }
   };
 
@@ -983,7 +1004,7 @@ export default function TeamPage() {
                         <button 
                           onClick={() => {
                             navigator.clipboard.writeText(selectedMember.email);
-                            alert('Email copied to clipboard');
+                            showToast('Email copied to clipboard');
                           }}
                           className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest hover:underline"
                         >
@@ -1044,6 +1065,39 @@ export default function TeamPage() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={confirmModal.show}
+        onClose={() => setConfirmModal(prev => ({ ...prev, show: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        type={confirmModal.type as any}
+      />
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: 40, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-8 right-8 z-[70] flex items-center gap-3 px-5 py-3.5 bg-white rounded-2xl shadow-2xl border border-gray-100"
+          >
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${toast.type === 'success' ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
+              {toast.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+              )}
+            </div>
+            <p className="text-sm font-bold text-[#101828]">{toast.message}</p>
+            <button onClick={() => setToast({ show: false, message: '', type: 'success' })} className="ml-2 p-1 text-gray-300 hover:text-gray-500 transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

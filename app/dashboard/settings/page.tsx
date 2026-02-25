@@ -21,6 +21,7 @@ import {
   Plus,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   Image as ImageIcon
 } from 'lucide-react';
 
@@ -40,8 +41,14 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
-  const [notificationMsg, setNotificationMsg] = useState('');
-  
+  const [notificationMsg, setNotificationMsg] = useState('');  const [notificationType, setNotificationType] = useState<'success' | 'error'>('success');
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setNotificationMsg(msg);
+    setNotificationType(type);
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 3000);
+  };  
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -163,6 +170,7 @@ export default function SettingsPage() {
         });
 
         setNotificationMsg(`${type === 'avatar' ? 'Avatar' : 'Banner'} updated successfully!`);
+        setNotificationType('success');
         setShowNotification(true);
         setTimeout(() => setShowNotification(false), 3000);
       }
@@ -176,7 +184,7 @@ export default function SettingsPage() {
 
   const handleUpdatePassword = async () => {
     if (passwordForm.new !== passwordForm.confirm) {
-      alert("Passwords do not match!");
+      showToast("Passwords do not match!", 'error');
       return;
     }
 
@@ -193,12 +201,10 @@ export default function SettingsPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setNotificationMsg('Password changed securely.');
-        setShowNotification(true);
+        showToast('Password changed securely.');
         setPasswordForm({ current: '', new: '', confirm: '' });
-        setTimeout(() => setShowNotification(false), 3000);
       } else {
-        alert(data.error || "Failed to update password");
+        showToast(data.error || "Failed to update password", 'error');
       }
     } catch (err) {
       console.error("Failed to update password", err);
@@ -233,11 +239,11 @@ export default function SettingsPage() {
         // Clear cookies and redirect
         window.location.href = '/signin?deleted=true';
       } else {
-        alert(data.error || 'Failed to delete account');
+        showToast(data.error || 'Failed to delete account', 'error');
       }
     } catch (err) {
       console.error("Failed to delete account", err);
-      alert('Failed to delete account. Please try again.');
+      showToast('Failed to delete account. Please try again.', 'error');
     } finally {
       setIsDeleting(false);
     }
@@ -283,10 +289,10 @@ export default function SettingsPage() {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
-                    className="bg-[#101828] text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10"
+                    className={`${notificationType === 'success' ? 'bg-[#101828]' : 'bg-red-600'} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10`}
                   >
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500">
-                      <Check className="w-4 h-4" />
+                    <div className={`w-8 h-8 rounded-xl ${notificationType === 'success' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-white/20 text-white'} flex items-center justify-center`}>
+                      {notificationType === 'success' ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                     </div>
                     <p className="text-sm font-bold tracking-tight">{notificationMsg}</p>
                   </motion.div>

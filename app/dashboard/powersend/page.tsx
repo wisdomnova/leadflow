@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
 import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
+import ConfirmModal from '@/components/dashboard/ConfirmModal';
 import { 
   Zap, 
   Server, 
@@ -40,7 +41,8 @@ import {
   ChevronRight,
   Download,
   Copy,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
 
 interface ServerMailbox {
@@ -118,6 +120,9 @@ export default function PowerSendPage() {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isHealthChecking, setIsHealthChecking] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ show: boolean; title: string; description: string; onConfirm: () => void; type: 'danger' | 'warning' }>({ show: false, title: '', description: '', onConfirm: () => {}, type: 'danger' });
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const [isWarmupModalOpen, setIsWarmupModalOpen] = useState(false);
   const [warmupTarget, setWarmupTarget] = useState<SmartServer | null>(null);
   const [warmupTargetLimit, setWarmupTargetLimit] = useState(500);
@@ -185,6 +190,11 @@ export default function PowerSendPage() {
     fetchData();
   }, []);
 
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
+
   const fetchData = async () => {
     try {
       setIsLoading(true);
@@ -210,6 +220,18 @@ export default function PowerSendPage() {
     }
   };
 
+  const refreshData = async () => {
+    try {
+      const res = await fetch('/api/powersend');
+      const data = await res.json();
+      if (data.restricted) { setIsRestricted(true); return; }
+      setServers(data.servers || []);
+      setStats(data.stats || { totalNodes: 0, activeNodes: 0, avgReputation: 0, totalSends: 0 });
+    } catch (error) {
+      console.error('Failed to refresh PowerSend data:', error);
+    }
+  };
+
   const handleAddServer = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -225,7 +247,6 @@ export default function PowerSendPage() {
         throw new Error(errData || 'Failed to add server');
       }
 
-      await fetchData();
       setIsAddModalOpen(false);
       setFormData({
         name: '',
@@ -246,27 +267,43 @@ export default function PowerSendPage() {
           from_email: ''
         }
       });
+      showToast('Smart server added successfully');
+      await refreshData();
     } catch (error: any) {
       console.error('Add server error:', error);
-      alert(error.message);
+      showToast(error.message || 'Failed to add server', 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteServer = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this smart server?')) return;
-    
-    try {
-      const res = await fetch(`/api/powersend/${id}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        await fetchData();
+  const handleDeleteServer = (id: string) => {
+    const server = servers.find(s => s.id === id);
+    setConfirmModal({
+      show: true,
+      title: 'Remove Smart Server?',
+      description: `Are you sure you want to remove "${server?.name || 'this server'}"? All associated mailboxes and warmup data will be lost.`,
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, show: false }));
+        setActionLoadingId(id);
+        try {
+          const res = await fetch(`/api/powersend/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            setServers(prev => prev.filter(s => s.id !== id));
+            showToast('Server removed successfully');
+            await refreshData();
+          } else {
+            showToast('Failed to remove server', 'error');
+          }
+        } catch (error) {
+          console.error('Delete server error:', error);
+          showToast('Failed to remove server', 'error');
+        } finally {
+          setActionLoadingId(null);
+        }
       }
-    } catch (error) {
-      console.error('Delete server error:', error);
-    }
+    });
   };
 
   const openEditModal = (server: SmartServer) => {
@@ -314,12 +351,13 @@ export default function PowerSendPage() {
         throw new Error(errData || 'Failed to update server');
       }
 
-      await fetchData();
       setIsEditModalOpen(false);
       setEditingServer(null);
+      showToast('Server updated successfully');
+      await refreshData();
     } catch (error: any) {
       console.error('Edit server error:', error);
-      alert(error.message);
+      showToast(error.message || 'Failed to update server', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -335,9 +373,11 @@ export default function PowerSendPage() {
       });
       if (!res.ok) throw new Error('Health check failed');
       // Refresh data to show updated scores
-      await fetchData();
+      showToast('Health check complete');
+      await refreshData();
     } catch (error) {
       console.error('Health check error:', error);
+      showToast('Health check failed', 'error');
     } finally {
       setIsHealthChecking(false);
     }
@@ -366,30 +406,49 @@ export default function PowerSendPage() {
         const errText = await res.text();
         throw new Error(errText || 'Failed to start warmup');
       }
-      await fetchData();
+      // Optimistic update
+      setServers(prev => prev.map(s => s.id === warmupTarget.id ? { ...s, warmup_enabled: true, status: 'warming' as const, warmup_day: 1, daily_limit: 10 } : s));
       setIsWarmupModalOpen(false);
       setWarmupTarget(null);
+      showToast(`Warmup started for ${warmupTarget.name}`);
+      await refreshData();
     } catch (error: any) {
       console.error('Warmup start error:', error);
-      alert(error.message);
+      showToast(error.message || 'Failed to start warmup', 'error');
     } finally {
       setIsWarmupSubmitting(false);
     }
   };
 
-  const handleStopWarmup = async (serverId: string) => {
-    if (!confirm('Stop warmup and restore full sending capacity?')) return;
-    try {
-      const res = await fetch('/api/powersend/warmup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serverId, action: 'stop' })
-      });
-      if (!res.ok) throw new Error('Failed to stop warmup');
-      await fetchData();
-    } catch (error: any) {
-      console.error('Warmup stop error:', error);
-    }
+  const handleStopWarmup = (serverId: string) => {
+    const server = servers.find(s => s.id === serverId);
+    setConfirmModal({
+      show: true,
+      title: 'Stop Warmup?',
+      description: `Stop warmup for "${server?.name || 'this node'}" and restore full sending capacity? The node will return to active status.`,
+      type: 'warning',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, show: false }));
+        setActionLoadingId(serverId);
+        try {
+          const res = await fetch('/api/powersend/warmup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ serverId, action: 'stop' })
+          });
+          if (!res.ok) throw new Error('Failed to stop warmup');
+          // Optimistic update
+          setServers(prev => prev.map(s => s.id === serverId ? { ...s, warmup_enabled: false, status: 'active' as const } : s));
+          showToast('Warmup stopped — node restored to active');
+          await refreshData();
+        } catch (error: any) {
+          console.error('Warmup stop error:', error);
+          showToast('Failed to stop warmup', 'error');
+        } finally {
+          setActionLoadingId(null);
+        }
+      }
+    });
   };
 
   // --- Mailbox Pool Functions ---
@@ -450,32 +509,45 @@ export default function PowerSendPage() {
         throw new Error(errText || 'Failed to add mailbox');
       }
       await fetchMailboxes(mailboxServer.id);
-      await fetchData();
+      await refreshData();
       setIsMailboxModalOpen(false);
       setMailboxServer(null);
+      showToast('Mailbox added successfully');
     } catch (error: any) {
       console.error('Add mailbox error:', error);
-      alert(error.message);
+      showToast(error.message || 'Failed to add mailbox', 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteMailbox = async (mailboxId: string, serverId: string) => {
-    if (!confirm('Remove this mailbox from the pool?')) return;
-    try {
-      const res = await fetch('/api/powersend/mailboxes', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mailboxIds: [mailboxId] })
-      });
-      if (res.ok) {
-        await fetchMailboxes(serverId);
-        await fetchData();
+  const handleDeleteMailbox = (mailboxId: string, serverId: string) => {
+    setConfirmModal({
+      show: true,
+      title: 'Remove Mailbox?',
+      description: 'Remove this mailbox from the pool? It will no longer participate in send rotation.',
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, show: false }));
+        try {
+          const res = await fetch('/api/powersend/mailboxes', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mailboxIds: [mailboxId] })
+          });
+          if (res.ok) {
+            await fetchMailboxes(serverId);
+            await refreshData();
+            showToast('Mailbox removed');
+          } else {
+            showToast('Failed to remove mailbox', 'error');
+          }
+        } catch (error) {
+          console.error('Delete mailbox error:', error);
+          showToast('Failed to remove mailbox', 'error');
+        }
       }
-    } catch (error) {
-      console.error('Delete mailbox error:', error);
-    }
+    });
   };
 
   const openCSVModal = (server: SmartServer) => {
@@ -520,14 +592,14 @@ export default function PowerSendPage() {
         throw new Error(errText || 'CSV import failed');
       }
       const result = await res.json();
-      alert(`Successfully imported ${result.imported} mailbox${result.imported !== 1 ? 'es' : ''}`);
       await fetchMailboxes(mailboxServer.id);
-      await fetchData();
+      await refreshData();
       setIsCSVModalOpen(false);
       setMailboxServer(null);
+      showToast(`Successfully imported ${result.imported} mailbox${result.imported !== 1 ? 'es' : ''}`);
     } catch (error: any) {
       console.error('CSV upload error:', error);
-      alert(error.message);
+      showToast(error.message || 'CSV import failed', 'error');
     } finally {
       setIsImporting(false);
     }
@@ -812,35 +884,43 @@ export default function PowerSendPage() {
                         </td>
                         <td className="px-8 py-6 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {server.warmup_enabled && server.status === 'warming' ? (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleStopWarmup(server.id); }}
-                                className="p-2 hover:bg-amber-50 rounded-xl transition-all text-amber-500 hover:text-amber-700 border border-transparent hover:border-amber-100"
-                                title="Stop Warmup"
-                              >
-                                <Pause className="w-4 h-4" />
-                              </button>
-                            ) : server.status === 'active' || server.status === 'paused' ? (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openWarmupModal(server); }}
-                                className="p-2 hover:bg-amber-50 rounded-xl transition-all text-gray-400 hover:text-amber-600 border border-transparent hover:border-amber-100"
-                                title="Start Warmup"
-                              >
-                                <Flame className="w-4 h-4" />
-                              </button>
-                            ) : null}
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); openEditModal(server); }}
-                              className="p-2 hover:bg-gray-50 rounded-xl transition-all text-gray-400 hover:text-[#101828] border border-transparent hover:border-gray-100"
-                            >
-                              <Settings2 className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleDeleteServer(server.id); }}
-                              className="p-2 hover:bg-red-50 rounded-xl transition-all text-gray-400 hover:text-red-600 border border-transparent hover:border-red-100"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {actionLoadingId === server.id ? (
+                              <div className="p-2">
+                                <Loader2 className="w-4 h-4 text-[#745DF3] animate-spin" />
+                              </div>
+                            ) : (
+                              <>
+                                {server.warmup_enabled && server.status === 'warming' ? (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleStopWarmup(server.id); }}
+                                    className="p-2 hover:bg-amber-50 rounded-xl transition-all text-amber-500 hover:text-amber-700 border border-transparent hover:border-amber-100"
+                                    title="Stop Warmup"
+                                  >
+                                    <Pause className="w-4 h-4" />
+                                  </button>
+                                ) : server.status === 'active' || server.status === 'paused' ? (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openWarmupModal(server); }}
+                                    className="p-2 hover:bg-amber-50 rounded-xl transition-all text-gray-400 hover:text-amber-600 border border-transparent hover:border-amber-100"
+                                    title="Start Warmup"
+                                  >
+                                    <Flame className="w-4 h-4" />
+                                  </button>
+                                ) : null}
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); openEditModal(server); }}
+                                  className="p-2 hover:bg-gray-50 rounded-xl transition-all text-gray-400 hover:text-[#101828] border border-transparent hover:border-gray-100"
+                                >
+                                  <Settings2 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteServer(server.id); }}
+                                  className="p-2 hover:bg-red-50 rounded-xl transition-all text-gray-400 hover:text-red-600 border border-transparent hover:border-red-100"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1057,8 +1137,10 @@ export default function PowerSendPage() {
                       <div className="shrink-0">
                         <button
                           onClick={() => handleStopWarmup(node.id)}
-                          className="px-3 py-1.5 text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-100 rounded-xl hover:bg-amber-100 transition-all uppercase tracking-widest"
+                          disabled={actionLoadingId === node.id}
+                          className="px-3 py-1.5 text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-100 rounded-xl hover:bg-amber-100 transition-all uppercase tracking-widest disabled:opacity-50 flex items-center gap-1.5"
                         >
+                          {actionLoadingId === node.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                           Stop
                         </button>
                       </div>
@@ -2147,6 +2229,41 @@ export default function PowerSendPage() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={confirmModal.show}
+        onClose={() => setConfirmModal(prev => ({ ...prev, show: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        type={confirmModal.type as any}
+        confirmText="Confirm"
+        cancelText="Cancel"
+      />
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: 40, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-8 right-8 z-[70] flex items-center gap-3 px-5 py-3.5 bg-white rounded-2xl shadow-2xl border border-gray-100"
+          >
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${toast.type === 'success' ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
+              {toast.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+              )}
+            </div>
+            <p className="text-sm font-bold text-[#101828]">{toast.message}</p>
+            <button onClick={() => setToast({ show: false, message: '', type: 'success' })} className="ml-2 p-1 text-gray-300 hover:text-gray-500 transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

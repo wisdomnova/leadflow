@@ -32,5 +32,16 @@ export async function GET(
     return NextResponse.redirect(url);
   }
 
+  if (provider === 'salesforce') {
+    const clientId = process.env.SALESFORCE_CLIENT_ID;
+    const redirectUri = process.env.SALESFORCE_REDIRECT_URI;
+    const loginUrl = process.env.SALESFORCE_LOGIN_URL || 'https://login.salesforce.com';
+    const scopes = "api refresh_token";
+    
+    const url = `${loginUrl}/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri!)}&scope=${encodeURIComponent(scopes)}&state=${state}`;
+    
+    return NextResponse.redirect(url);
+  }
+
   return NextResponse.json({ error: "Unsupported provider" }, { status: 400 });
 }

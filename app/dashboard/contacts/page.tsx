@@ -28,8 +28,10 @@ import {
   Star,
   Zap,
   Clock,
-  Activity
+  Activity,
+  AlertTriangle,
 } from 'lucide-react';
+import ConfirmModal from '@/components/dashboard/ConfirmModal';
 
 const contactStatsMapping = [
   { name: 'Total Contacts', icon: Users, status: null },
@@ -66,6 +68,20 @@ export default function ContactsPage() {
   const [isPushing, setIsPushing] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [toast, setToast] = useState<{ show: boolean, msg: string, type: 'success' | 'error' }>({ show: false, msg: '', type: 'success' });
+
+  const [confirmModal, setConfirmModal] = useState<{
+    show: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'warning' | 'info' | 'success';
+  }>({
+    show: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+    type: 'danger'
+  });
 
   // New Contact State
   const [newContact, setNewContact] = useState({ firstName: '', lastName: '', email: '', company: '', tag: 'Enterprise' });
@@ -227,58 +243,70 @@ export default function ContactsPage() {
   };
 
   const handleDeleteSelected = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedIds.length} contacts?`)) return;
-
-    try {
-      const res = await fetch('/api/leads/bulk', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: selectedIds })
-      });
-      
-      const data = await res.json();
-      if (res.ok) {
-        setContacts(prev => prev.filter(c => !selectedIds.includes(c.id)));
-        setSelectedIds([]);
-        if (data.protected > 0) {
-          showToast(`Deleted contacts. ${data.protected} contact(s) in running campaigns were kept.`);
+    setConfirmModal({
+      show: true,
+      title: 'Delete Contacts?',
+      description: `Are you sure you want to delete ${selectedIds.length} contacts? This will remove them from the system.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/leads/bulk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: selectedIds })
+          });
+          
+          const data = await res.json();
+          if (res.ok) {
+            setContacts(prev => prev.filter(c => !selectedIds.includes(c.id)));
+            setSelectedIds([]);
+            if (data.protected > 0) {
+              showToast(`Deleted contacts. ${data.protected} contact(s) in running campaigns were kept.`);
+            }
+            fetchContacts();
+          } else {
+            showToast(data.error || 'Failed to delete contacts', 'error');
+          }
+        } catch (err) {
+          console.error("Failed to delete contacts:", err);
         }
-        fetchContacts();
-      } else {
-        showToast(data.error || 'Failed to delete contacts', 'error');
       }
-    } catch (err) {
-      console.error("Failed to delete contacts:", err);
-    }
+    });
   };
 
   const handleDeleteAll = async () => {
     const count = stats?.total || contacts.length;
-    if (!confirm(`Are you sure you want to permanently delete ALL ${count.toLocaleString()} contacts? This cannot be undone.`)) return;
-
-    try {
-      const res = await fetch('/api/leads/bulk', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleteAll: true })
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setContacts([]);
-        setSelectedIds([]);
-        const msg = data.protected > 0
-          ? `Deleted ${(data.deleted || 0).toLocaleString()} contacts. ${data.protected} in running campaigns were kept.`
-          : `Deleted ${(data.deleted || 0).toLocaleString()} contacts`;
-        showToast(msg);
-        fetchContacts();
-      } else {
-        showToast('Failed to delete contacts', 'error');
+    setConfirmModal({
+      show: true,
+      title: 'Delete ALL Contacts?',
+      description: `Are you sure you want to permanently delete ALL ${count.toLocaleString()} contacts? This cannot be undone and will stop any active campaigns.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/leads/bulk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deleteAll: true })
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            setContacts([]);
+            setSelectedIds([]);
+            const msg = data.protected > 0
+              ? `Deleted ${(data.deleted || 0).toLocaleString()} contacts. ${data.protected} in running campaigns were kept.`
+              : `Deleted ${(data.deleted || 0).toLocaleString()} contacts`;
+            showToast(msg);
+            fetchContacts();
+          } else {
+            showToast('Failed to delete contacts', 'error');
+          }
+        } catch (err) {
+          console.error("Failed to delete all contacts:", err);
+          showToast('Failed to delete contacts', 'error');
+        }
       }
-    } catch (err) {
-      console.error("Failed to delete all contacts:", err);
-      showToast('Failed to delete contacts', 'error');
-    }
+    });
   };
 
   const handleExport = () => {
@@ -800,19 +828,25 @@ export default function ContactsPage() {
                   <button 
                     onClick={async () => {
                       if (selectedIds.length > 0) {
-                        if (confirm(`Delete ${selectedIds.length} contacts?`)) {
-                          const res = await fetch('/api/leads/bulk', {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ids: selectedIds })
-                          });
-                          if (res.ok) {
-                            setContacts(prev => prev.filter(c => !selectedIds.includes(c.id)));
-                            setSelectedIds([]);
-                            showToast('Contacts deleted');
-                            fetchContacts();
+                        setConfirmModal({
+                          show: true,
+                          title: 'Delete Contacts?',
+                          description: `Are you sure you want to delete ${selectedIds.length} contacts?`,
+                          type: 'danger',
+                          onConfirm: async () => {
+                            const res = await fetch('/api/leads/bulk', {
+                              method: 'DELETE',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ ids: selectedIds })
+                            });
+                            if (res.ok) {
+                              setContacts(prev => prev.filter(c => !selectedIds.includes(c.id)));
+                              setSelectedIds([]);
+                              showToast('Contacts deleted');
+                              fetchContacts();
+                            }
                           }
-                        }
+                        });
                       } else {
                         showToast('Select contacts to delete', 'error');
                       }
@@ -967,13 +1001,19 @@ export default function ContactsPage() {
                                   <button 
                                     onClick={async (e) => {
                                       e.stopPropagation();
-                                      if (confirm(`Delete ${contact.first_name}?`)) {
-                                        const res = await fetch(`/api/leads/${contact.id}`, { method: 'DELETE' });
-                                        if (res.ok) {
-                                          setContacts(prev => prev.filter(c => c.id !== contact.id));
-                                          showToast('Contact deleted');
+                                      setConfirmModal({
+                                        show: true,
+                                        title: 'Delete Contact?',
+                                        description: `Are you sure you want to delete ${contact.first_name}? This cannot be undone.`,
+                                        type: 'danger',
+                                        onConfirm: async () => {
+                                          const res = await fetch(`/api/leads/${contact.id}`, { method: 'DELETE' });
+                                          if (res.ok) {
+                                            setContacts(prev => prev.filter(c => c.id !== contact.id));
+                                            showToast('Contact deleted');
+                                          }
                                         }
-                                      }
+                                      });
                                     }}
                                     className="w-full text-left px-5 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2 border-t border-gray-50"
                                   >
@@ -1538,15 +1578,21 @@ export default function ContactsPage() {
                 </button>
                 <button 
                   onClick={async () => {
-                    if (confirm(`Delete ${selectedContact.first_name}?`)) {
-                      const res = await fetch(`/api/leads/${selectedContact.id}`, { method: 'DELETE' });
-                      if (res.ok) {
-                        setContacts(prev => prev.filter(c => c.id !== selectedContact.id));
-                        setSelectedContact(null);
-                        showToast('Contact deleted');
-                        fetchContacts(); // Refresh stats cards
+                    setConfirmModal({
+                      show: true,
+                      title: 'Delete Contact?',
+                      description: `Are you sure you want to delete ${selectedContact.first_name}? This cannot be undone.`,
+                      type: 'danger',
+                      onConfirm: async () => {
+                        const res = await fetch(`/api/leads/${selectedContact.id}`, { method: 'DELETE' });
+                        if (res.ok) {
+                          setContacts(prev => prev.filter(c => c.id !== selectedContact.id));
+                          setSelectedContact(null);
+                          showToast('Contact deleted');
+                          fetchContacts(); // Refresh stats cards
+                        }
                       }
-                    }
+                    });
                   }}
                   className="p-4 bg-white border border-gray-200 text-red-500 rounded-2xl hover:bg-red-50 transition-all"
                 >
@@ -1557,6 +1603,15 @@ export default function ContactsPage() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={confirmModal.show}
+        onClose={() => setConfirmModal(prev => ({ ...prev, show: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        type={confirmModal.type}
+      />
 
       <AnimatePresence>
         {toast.show && (

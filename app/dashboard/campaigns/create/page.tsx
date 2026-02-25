@@ -62,6 +62,7 @@ export default function CreateCampaignPage() {
   const [totalLeads, setTotalLeads] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [tagFilter, setTagFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const leadsPerPage = 10;
   
@@ -101,7 +102,7 @@ export default function CreateCampaignPage() {
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
   };
 
-  const fetchLeads = async (page: number, search: string, tag: string) => {
+  const fetchLeads = async (page: number, search: string, tag: string, source?: string) => {
     setIsLoadingLeads(true);
     try {
       const params = new URLSearchParams({
@@ -110,6 +111,7 @@ export default function CreateCampaignPage() {
       });
       if (search) params.append('search', search);
       if (tag) params.append('tag', tag);
+      if (source) params.append('source', source);
       
       const res = await fetch(`/api/leads?${params.toString()}`);
       const data = await res.json();
@@ -153,7 +155,7 @@ export default function CreateCampaignPage() {
         } catch {}
         
         // Initial leads fetch
-        await fetchLeads(1, '', '');
+        await fetchLeads(1, '', '', '');
       } catch (err) {
         console.error("Error loading campaign data:", err);
       } finally {
@@ -168,11 +170,11 @@ export default function CreateCampaignPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!isLoadingData) {
-        fetchLeads(currentPage, searchQuery, tagFilter);
+        fetchLeads(currentPage, searchQuery, tagFilter, sourceFilter);
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [searchQuery, tagFilter, currentPage]);
+  }, [searchQuery, tagFilter, sourceFilter, currentPage]);
 
   useEffect(() => {
     if (!isLoadingData && accounts.length === 0) {
@@ -773,6 +775,22 @@ export default function CreateCampaignPage() {
                           className="pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl text-xs font-bold placeholder:text-gray-400 focus:ring-2 focus:ring-[#745DF3]/20 transition-all text-[#101828] w-full md:w-[200px]"
                         />
                       </div>
+                      <select
+                        value={sourceFilter}
+                        onChange={(e) => {
+                          setSourceFilter(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                        className="px-4 py-3 bg-gray-50 border-none rounded-2xl text-xs font-black text-[#101828] focus:ring-2 focus:ring-[#745DF3]/20 transition-all cursor-pointer w-full md:w-[180px] appearance-none"
+                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+                      >
+                        <option value="">All Sources</option>
+                        <option value="manual">Manual</option>
+                        <option value="csv">CSV Import</option>
+                        <option value="hubspot">HubSpot</option>
+                        <option value="pipedrive">Pipedrive</option>
+                        <option value="salesforce">Salesforce</option>
+                      </select>
                     </div>
 
                     <div className="space-y-4 max-h-[500px] overflow-y-auto pr-4 no-scrollbar relative min-h-[200px]">
@@ -886,6 +904,7 @@ export default function CreateCampaignPage() {
                                const params = new URLSearchParams({ limit: '1000' });
                                if (searchQuery) params.append('search', searchQuery);
                                if (tagFilter) params.append('tag', tagFilter);
+                               if (sourceFilter) params.append('source', sourceFilter);
                                
                                const res = await fetch(`/api/leads?${params.toString()}`);
                                const data = await res.json();

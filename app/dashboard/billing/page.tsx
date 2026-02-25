@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
+import ConfirmModal from '@/components/dashboard/ConfirmModal';
 import { 
   CreditCard, 
   Check, 
@@ -24,7 +25,8 @@ import {
   Users,
   Loader2,
   X,
-  CreditCard as CardIcon
+  CreditCard as CardIcon,
+  AlertTriangle
 } from 'lucide-react';
 
 const plans = [
@@ -70,6 +72,7 @@ export default function BillingPage() {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isManagingPlan, setIsManagingPlan] = useState(false);
   const [isCanceling, setIsCanceling] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{ show: boolean; title: string; description: string; onConfirm: () => void; type: 'danger' | 'warning' | 'info' }>({ show: false, title: '', description: '', onConfirm: () => {}, type: 'info' });
 
   useEffect(() => {
     fetchSubscription();
@@ -103,63 +106,75 @@ export default function BillingPage() {
     }
   };
 
+  const executePlanSwitch = async (planId: string) => {
+    setIsSwitchingPlan(planId);
+    try {
+      const res = await fetch('/api/billing/change-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId, billingCycle })
+      });
+      const data = await res.json();
+      
+      if (data.redirect === 'checkout') {
+        const checkoutRes = await fetch('/api/billing/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ planId, billingCycle })
+        });
+        const checkoutData = await checkoutRes.json();
+        if (checkoutData.error) throw new Error(checkoutData.error);
+        window.location.href = checkoutData.url;
+        return;
+      }
+
+      if (data.error) throw new Error(data.error);
+      
+      setNotificationMsg(data.message);
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 5000);
+      await fetchSubscription();
+    } catch (err: any) {
+      setNotificationMsg(err.message || 'Error changing plan');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    } finally {
+      setIsSwitchingPlan(null);
+    }
+  };
+
   const handlePlanSwitch = async (planId: string) => {
     const currentTier = subData?.plan_tier;
     const isCurrent = currentTier === planId;
     if (isCurrent) return;
 
-    // If user has an active subscription, use the change-plan API
-    // Otherwise (first-time, trial, or no sub), use checkout
     const hasActiveSub = !!subData?.subscription;
     
-    setIsSwitchingPlan(planId);
-    try {
-      if (hasActiveSub) {
-        // Determine if upgrade or downgrade for confirmation
-        const planOrder = ['starter', 'pro', 'enterprise'];
-        const currentIdx = planOrder.indexOf(currentTier);
-        const targetIdx = planOrder.indexOf(planId);
-        const isDowngrade = targetIdx < currentIdx;
-        const targetName = planId.charAt(0).toUpperCase() + planId.slice(1);
+    if (hasActiveSub) {
+      const planOrder = ['starter', 'pro', 'enterprise'];
+      const currentIdx = planOrder.indexOf(currentTier);
+      const targetIdx = planOrder.indexOf(planId);
+      const isDowngrade = targetIdx < currentIdx;
+      const targetName = planId.charAt(0).toUpperCase() + planId.slice(1);
 
-        if (isDowngrade) {
-          const confirmed = confirm(`Are you sure you want to downgrade to ${targetName}? Your current plan features will remain active until the end of your billing period.`);
-          if (!confirmed) {
-            setIsSwitchingPlan(null);
-            return;
+      if (isDowngrade) {
+        setConfirmModal({
+          show: true,
+          title: 'Downgrade Plan?',
+          description: `Are you sure you want to downgrade to ${targetName}? Your current plan features will remain active until the end of your billing period.`,
+          type: 'warning',
+          onConfirm: () => {
+            setConfirmModal(prev => ({ ...prev, show: false }));
+            executePlanSwitch(planId);
           }
-        }
-
-        const res = await fetch('/api/billing/change-plan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ planId, billingCycle })
         });
-        const data = await res.json();
-        
-        if (data.redirect === 'checkout') {
-          // Fallback: no active sub, use checkout flow
-          const checkoutRes = await fetch('/api/billing/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ planId, billingCycle })
-          });
-          const checkoutData = await checkoutRes.json();
-          if (checkoutData.error) throw new Error(checkoutData.error);
-          window.location.href = checkoutData.url;
-          return;
-        }
+        return;
+      }
 
-        if (data.error) throw new Error(data.error);
-        
-        setNotificationMsg(data.message);
-        setShowNotification(true);
-        setTimeout(() => setShowNotification(false), 5000);
-        
-        // Refresh subscription data
-        await fetchSubscription();
-      } else {
-        // No existing subscription — redirect to Stripe Checkout
+      await executePlanSwitch(planId);
+    } else {
+      setIsSwitchingPlan(planId);
+      try {
         const res = await fetch('/api/billing/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -168,13 +183,13 @@ export default function BillingPage() {
         const { url, error } = await res.json();
         if (error) throw new Error(error);
         window.location.href = url;
+      } catch (err: any) {
+        setNotificationMsg(err.message || 'Error redirecting to checkout');
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 3000);
+      } finally {
+        setIsSwitchingPlan(null);
       }
-    } catch (err: any) {
-      setNotificationMsg(err.message || 'Error changing plan');
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 3000);
-    } finally {
-      setIsSwitchingPlan(null);
     }
   };
 
@@ -676,6 +691,15 @@ export default function BillingPage() {
           )}
         </AnimatePresence>
       </main>
+
+      <ConfirmModal
+        isOpen={confirmModal.show}
+        onClose={() => setConfirmModal(prev => ({ ...prev, show: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        type={confirmModal.type as any}
+      />
     </div>
   );
 }

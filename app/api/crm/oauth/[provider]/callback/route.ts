@@ -77,6 +77,40 @@ export async function GET(
         accessToken = data.access_token;
         refreshToken = data.refresh_token;
         expiresAt = Date.now() + data.expires_in * 1000;
+    } else if (provider === 'salesforce') {
+      const loginUrl = process.env.SALESFORCE_LOGIN_URL || 'https://login.salesforce.com';
+      const resp = await fetch(`${loginUrl}/services/oauth2/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          client_id: process.env.SALESFORCE_CLIENT_ID!,
+          client_secret: process.env.SALESFORCE_CLIENT_SECRET!,
+          redirect_uri: process.env.SALESFORCE_REDIRECT_URI!,
+          code,
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error_description || "Salesforce token exchange failed");
+
+      accessToken = data.access_token;
+      refreshToken = data.refresh_token;
+      // Salesforce tokens don't always include expires_in; default to 2 hours
+      expiresAt = Date.now() + (data.issued_at ? 7200 * 1000 : 7200 * 1000);
+
+      // Fetch org info for account name
+      const idResp = await fetch(data.id, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (idResp.ok) {
+        const idData = await idResp.json();
+        accountName = idData.display_name || idData.username || "Salesforce Account";
+      }
+
+      // Store instance_url for API calls
+      accountName = `${accountName}`;
+      // We need to also store instance_url in config
+      (globalThis as any).__sf_instance_url = data.instance_url;
     } else {
       throw new Error("Unsupported provider");
     }
@@ -91,11 +125,15 @@ export async function GET(
           accessToken,
           refreshToken,
           expiresAt,
-          accountName
+          accountName,
+          ...((globalThis as any).__sf_instance_url ? { instanceUrl: (globalThis as any).__sf_instance_url } : {})
         },
         status: 'active',
         last_sync: new Date().toISOString()
       }, { onConflict: 'org_id,provider' });
+
+    // Clean up
+    delete (globalThis as any).__sf_instance_url;
 
     if (error) throw error;
 

@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
+import { supabase } from "@/lib/supabase";
 
 // ============================================================
 // Connection & Token Caching (critical at 1k-5k scale)
@@ -226,6 +227,21 @@ export async function sendOutreachEmail({ to, subject, bodyHtml, fromName, accou
     let smtpPort = parseInt(config.smtpPort || '587');
     let smtpUser = config.smtpUser || account.email;
     let smtpPass = config.smtpPass || config.pass;
+
+    // Resolve from SMTP provider defaults when account config is incomplete
+    if (!smtpHost && account.smtp_provider_id) {
+      const { data: provider } = await supabase
+        .from('smtp_providers')
+        .select('smtp_host, smtp_port, smtp_security, imap_host, imap_port, imap_security')
+        .eq('id', account.smtp_provider_id)
+        .single();
+
+      if (provider) {
+        smtpHost = provider.smtp_host;
+        smtpPort = provider.smtp_port || 587;
+        console.log(`[SMTP] Resolved host from provider defaults: ${smtpHost}:${smtpPort} for ${account.email}`);
+      }
+    }
 
     if (!smtpHost && account.provider === 'outlook') {
       smtpHost = 'smtp.office365.com';

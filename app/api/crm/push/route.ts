@@ -48,6 +48,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `CRM provider ${provider} not connected` }, { status: 400 });
     }
 
+    const startTime = Date.now();
     const results = await Promise.all(targets.map(async (integration) => {
       try {
         await crmService.pushLead(context.orgId, lead, integration.provider);
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
         return { provider: integration.provider, success: false, error: err.message };
       }
     }));
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
     // Log activity
     await (context.supabase as any).from("activity_log").insert([{
@@ -67,7 +69,7 @@ export async function POST(req: Request) {
         leadId, 
         leadEmail: (lead as any).email,
         results,
-        duration: Math.random() * 0.5 + 0.3 // Real duration simulation for history UI
+        duration: parseFloat(duration)
       }
     }] as any);
 

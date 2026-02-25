@@ -12,6 +12,7 @@ export async function GET(req: Request) {
   const status = searchParams.get("status");
   const search = searchParams.get("search");
   const tag = searchParams.get("tag");
+  const source = searchParams.get("source");
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "10");
   const from = (page - 1) * limit;
@@ -29,6 +30,10 @@ export async function GET(req: Request) {
 
   if (tag) {
     query = query.contains("tags", [tag]);
+  }
+
+  if (source) {
+    query = query.eq("source", source);
   }
 
   if (search) {

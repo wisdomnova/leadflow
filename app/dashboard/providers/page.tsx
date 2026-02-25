@@ -91,6 +91,18 @@ export default function EmailProvidersPage() {
   const [isDNSGuideOpen, setIsDNSGuideOpen] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [domainSearch, setDomainSearch] = useState('');
+
+  // SMTP Provider Defaults state
+  const [smtpProviders, setSmtpProviders] = useState<any[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState<string>('');
+  const [bulkImportMode, setBulkImportMode] = useState<'provider' | 'custom'>('provider');
+  const [isAddProviderOpen, setIsAddProviderOpen] = useState(false);
+  const [newProvider, setNewProvider] = useState({
+    name: '', smtpHost: '', smtpPort: '587', smtpSecurity: 'STARTTLS',
+    imapHost: '', imapPort: '993', imapSecurity: 'SSL/TLS', isDefault: false
+  });
+  const [isSavingProvider, setIsSavingProvider] = useState(false);
+
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
     show: boolean;
     type: 'account' | 'domain' | null;
@@ -117,15 +129,24 @@ export default function EmailProvidersPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [accountsRes, domainsRes, diagnosticsRes] = await Promise.all([
+      const [accountsRes, domainsRes, diagnosticsRes, providersRes] = await Promise.all([
         fetch('/api/accounts'),
         fetch('/api/domains'),
-        fetch('/api/diagnostics')
+        fetch('/api/diagnostics'),
+        fetch('/api/accounts/smtp-providers')
       ]);
       
       if (accountsRes.ok) setAccounts(await accountsRes.json());
       if (domainsRes.ok) setDomains(await domainsRes.json());
       if (diagnosticsRes.ok) setDiagnostics(await diagnosticsRes.json());
+      if (providersRes.ok) {
+        const providers = await providersRes.json();
+        setSmtpProviders(providers);
+        // Auto-select the default provider
+        const defaultProvider = providers.find((p: any) => p.is_default);
+        if (defaultProvider) setSelectedProviderId(defaultProvider.id);
+        else if (providers.length > 0) setSelectedProviderId(providers[0].id);
+      }
     } catch (err) {
       console.error("Failed to fetch data:", err);
     } finally {
@@ -204,14 +225,18 @@ export default function EmailProvidersPage() {
 
   const handleConnectSMTP = async (data: any) => {
     try {
+      const body: any = {
+        email: data.email,
+        provider: 'custom_smtp',
+        config: data
+      };
+      if (data.smtp_provider_id) {
+        body.smtp_provider_id = data.smtp_provider_id;
+      }
       const res = await fetch('/api/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: data.email,
-          provider: 'custom_smtp',
-          config: data
-        })
+        body: JSON.stringify(body)
       });
 
       if (res.ok) {
@@ -254,12 +279,20 @@ export default function EmailProvidersPage() {
 
   const handleBulkUpload = async () => {
     if (!bulkCsvText.trim()) return;
+    if (bulkImportMode === 'provider' && !selectedProviderId) {
+      showToast('Select an SMTP provider preset first', 'error');
+      return;
+    }
     try {
       setIsBulkImporting(true);
+      const body: any = { csv: bulkCsvText };
+      if (bulkImportMode === 'provider' && selectedProviderId) {
+        body.providerId = selectedProviderId;
+      }
       const res = await fetch('/api/accounts/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csv: bulkCsvText })
+        body: JSON.stringify(body)
       });
       const result = await res.json();
       if (!res.ok) {
@@ -296,6 +329,51 @@ export default function EmailProvidersPage() {
       reader.readAsText(file);
     }
   };
+
+  // --- SMTP Provider Presets ---
+  const handleSaveProvider = async () => {
+    if (!newProvider.name || !newProvider.smtpHost || !newProvider.imapHost) {
+      showToast('Name, SMTP Host, and IMAP Host are required', 'error');
+      return;
+    }
+    setIsSavingProvider(true);
+    try {
+      const res = await fetch('/api/accounts/smtp-providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProvider)
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to save provider');
+      }
+      const saved = await res.json();
+      setSmtpProviders(prev => [...prev, saved]);
+      if (saved.is_default || smtpProviders.length === 0) setSelectedProviderId(saved.id);
+      setNewProvider({ name: '', smtpHost: '', smtpPort: '587', smtpSecurity: 'STARTTLS', imapHost: '', imapPort: '993', imapSecurity: 'SSL/TLS', isDefault: false });
+      setIsAddProviderOpen(false);
+      showToast('Provider preset saved!');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to save', 'error');
+    } finally {
+      setIsSavingProvider(false);
+    }
+  };
+
+  const handleDeleteProvider = async (id: string) => {
+    try {
+      const res = await fetch(`/api/accounts/smtp-providers?id=${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      setSmtpProviders(prev => prev.filter(p => p.id !== id));
+      if (selectedProviderId === id) setSelectedProviderId('');
+      showToast('Provider preset deleted');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete', 'error');
+    }
+  };
+
+  const sampleCsvModeA = `email,password,from_name\njohn@company.com,SecurePass123,John Smith\njane@company.com,SecurePass456,Jane Doe\nmike@company.com,SecurePass789,Mike Johnson`;
+  const sampleCsvModeB = `email,smtp_host,smtp_port,smtp_user,smtp_pass,imap_host,imap_port,imap_user,imap_pass\njohn@company.com,smtp.company.com,587,john@company.com,pass123,imap.company.com,993,john@company.com,pass123\njane@company.com,smtp.company.com,587,jane@company.com,pass456,imap.company.com,993,jane@company.com,pass456`;
 
   const handleAddDomain = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -510,6 +588,61 @@ export default function EmailProvidersPage() {
                         Import Accounts
                       </button>
                     </div>
+
+                    {/* SMTP Provider Presets */}
+                    {smtpProviders.length > 0 && (
+                      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-gray-50 flex items-center justify-between bg-[#FBFBFB]/30">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-[#745DF3]/10 rounded-2xl flex items-center justify-center">
+                              <Settings2 className="w-5 h-5 text-[#745DF3]" />
+                            </div>
+                            <div>
+                              <h2 className="text-lg font-black text-[#101828] tracking-tight">SMTP Provider Presets</h2>
+                              <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-0.5">Reusable host/port configurations</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setIsAddProviderOpen(true)}
+                            className="px-4 py-2 bg-[#745DF3] text-white rounded-xl text-xs font-bold hover:bg-[#6347E0] transition-colors flex items-center gap-1.5"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Add Preset
+                          </button>
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                          {smtpProviders.map((sp: any) => (
+                            <div key={sp.id} className="px-6 py-4 flex items-center justify-between hover:bg-[#FBFBFB]/50 transition-colors">
+                              <div className="flex items-center gap-4">
+                                <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100">
+                                  <Globe className="w-4 h-4 text-gray-400" />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-[#101828]">{sp.name}</span>
+                                    {sp.is_default && (
+                                      <span className="text-[9px] font-black uppercase tracking-widest text-[#745DF3] bg-[#745DF3]/10 px-2 py-0.5 rounded-lg">Default</span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-400 font-mono mt-0.5">
+                                    SMTP: {sp.smtp_host}:{sp.smtp_port} · IMAP: {sp.imap_host}:{sp.imap_port}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400 font-medium">{sp.account_count || 0} accounts</span>
+                                <button
+                                  onClick={() => handleDeleteProvider(sp.id)}
+                                  className="w-8 h-8 rounded-xl hover:bg-red-50 flex items-center justify-center transition-colors group"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-gray-300 group-hover:text-red-500" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Connected Accounts List */}
@@ -1031,15 +1164,112 @@ export default function EmailProvidersPage() {
                 </button>
               </div>
 
+              {/* Import Mode Toggle */}
+              <div className="flex gap-2 mb-6 bg-gray-900/50 rounded-2xl p-1.5 border border-gray-800">
+                <button
+                  onClick={() => { setBulkImportMode('provider'); setBulkCsvText(''); setBulkPreview([]); }}
+                  className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-black transition-all ${
+                    bulkImportMode === 'provider'
+                      ? 'bg-[#745DF3] text-white shadow-lg shadow-[#745DF3]/20'
+                      : 'text-gray-400 hover:text-gray-300'
+                  }`}
+                >
+                  Use Provider Defaults
+                </button>
+                <button
+                  onClick={() => { setBulkImportMode('custom'); setBulkCsvText(''); setBulkPreview([]); }}
+                  className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-black transition-all ${
+                    bulkImportMode === 'custom'
+                      ? 'bg-[#745DF3] text-white shadow-lg shadow-[#745DF3]/20'
+                      : 'text-gray-400 hover:text-gray-300'
+                  }`}
+                >
+                  Custom Per Account
+                </button>
+              </div>
+
+              {/* Mode A: Provider Selection */}
+              {bulkImportMode === 'provider' && (
+                <div className="mb-6 space-y-3">
+                  {smtpProviders.length > 0 ? (
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Select SMTP Provider Preset</label>
+                      <select
+                        value={selectedProviderId}
+                        onChange={(e) => setSelectedProviderId(e.target.value)}
+                        className="w-full bg-gray-900/50 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white font-bold focus:outline-none focus:border-[#745DF3]/50 transition-colors appearance-none"
+                      >
+                        <option value="">— Select a provider preset —</option>
+                        {smtpProviders.map((p: any) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} — {p.smtp_host}:{p.smtp_port} {p.is_default ? '(Default)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedProviderId && (() => {
+                        const sp = smtpProviders.find((p: any) => p.id === selectedProviderId);
+                        return sp ? (
+                          <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-3 mt-2">
+                            <div className="grid grid-cols-2 gap-2 text-[10px] font-black uppercase tracking-widest">
+                              <div><span className="text-gray-500">SMTP:</span> <span className="text-emerald-400 font-mono">{sp.smtp_host}:{sp.smtp_port}</span></div>
+                              <div><span className="text-gray-500">Security:</span> <span className="text-gray-300">{sp.smtp_security}</span></div>
+                              <div><span className="text-gray-500">IMAP:</span> <span className="text-emerald-400 font-mono">{sp.imap_host}:{sp.imap_port}</span></div>
+                              <div><span className="text-gray-500">Security:</span> <span className="text-gray-300">{sp.imap_security}</span></div>
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-5 text-center">
+                      <Settings2 className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-400 font-bold mb-1">No SMTP provider presets yet</p>
+                      <p className="text-xs text-gray-500 mb-3 font-medium">Create a preset to store host/port settings once, then import accounts with just credentials.</p>
+                      <button
+                        onClick={() => setIsAddProviderOpen(true)}
+                        className="px-4 py-2 bg-[#745DF3] text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#6347E0] transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5 inline mr-1" />
+                        Create Provider Preset
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* CSV Format Guide */}
               <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-4 mb-6">
-                <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Required CSV Format</p>
-                <code className="text-xs text-emerald-400 break-all leading-relaxed">
-                  email, smtp_host, smtp_port, smtp_user, smtp_pass, imap_host, imap_port, imap_user, imap_pass
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    {bulkImportMode === 'provider' ? 'Minimal CSV (credentials only)' : 'Full CSV (all SMTP/IMAP fields)'}
+                  </p>
+                  <button
+                    onClick={() => {
+                      const csv = bulkImportMode === 'provider' ? sampleCsvModeA : sampleCsvModeB;
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = bulkImportMode === 'provider' ? 'import-template-minimal.csv' : 'import-template-full.csv';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Download Template
+                  </button>
+                </div>
+                <code className="text-xs text-emerald-400 break-all leading-relaxed font-mono">
+                  {bulkImportMode === 'provider'
+                    ? 'email, password, from_name (optional)'
+                    : 'email, smtp_host, smtp_port, smtp_user, smtp_pass, imap_host, imap_port, imap_user, imap_pass'}
                 </code>
-                <p className="text-xs text-gray-500 mt-2">
-                  Flexible column names: email/email_address, smtp_host/smtp_server, smtp_user/smtp_username, etc.
-                </p>
+                {bulkImportMode === 'provider' && (
+                  <p className="text-[10px] font-black text-gray-500 mt-2 uppercase tracking-widest">
+                    Host, port, and security settings inherited from the selected provider.
+                  </p>
+                )}
               </div>
 
               {/* Drag & Drop Zone */}
@@ -1069,7 +1299,9 @@ export default function EmailProvidersPage() {
                 <textarea
                   value={bulkCsvText}
                   onChange={(e) => handleBulkCSVPreview(e.target.value)}
-                  placeholder={`email,smtp_host,smtp_port,smtp_user,smtp_pass,imap_host,imap_port,imap_user,imap_pass\njohn@company.com,smtp.company.com,587,john@company.com,password123,imap.company.com,993,john@company.com,password123`}
+                  placeholder={bulkImportMode === 'provider'
+                    ? `email,password,from_name\njohn@company.com,SecurePass123,John Smith\njane@company.com,SecurePass456,Jane Doe`
+                    : `email,smtp_host,smtp_port,smtp_user,smtp_pass,imap_host,imap_port,imap_user,imap_pass\njohn@company.com,smtp.company.com,587,john@company.com,password123,imap.company.com,993,john@company.com,password123`}
                   className="w-full h-32 bg-gray-900/50 border border-gray-800 rounded-2xl p-4 text-sm text-white font-mono placeholder-gray-700 resize-none focus:outline-none focus:border-emerald-500/50 transition-colors"
                 />
               </div>
@@ -1087,18 +1319,36 @@ export default function EmailProvidersPage() {
                         <thead>
                           <tr className="border-b border-gray-800">
                             <th className="px-3 py-2 text-left text-gray-400 font-medium">Email</th>
-                            <th className="px-3 py-2 text-left text-gray-400 font-medium">SMTP Host</th>
-                            <th className="px-3 py-2 text-left text-gray-400 font-medium">Port</th>
-                            <th className="px-3 py-2 text-left text-gray-400 font-medium">IMAP Host</th>
+                            {bulkImportMode === 'provider' ? (
+                              <>
+                                <th className="px-3 py-2 text-left text-gray-400 font-medium">Password</th>
+                                <th className="px-3 py-2 text-left text-gray-400 font-medium">From Name</th>
+                              </>
+                            ) : (
+                              <>
+                                <th className="px-3 py-2 text-left text-gray-400 font-medium">SMTP Host</th>
+                                <th className="px-3 py-2 text-left text-gray-400 font-medium">Port</th>
+                                <th className="px-3 py-2 text-left text-gray-400 font-medium">IMAP Host</th>
+                              </>
+                            )}
                           </tr>
                         </thead>
                         <tbody>
                           {bulkPreview.map((row, i) => (
                             <tr key={i} className="border-b border-gray-800/50">
                               <td className="px-3 py-2 text-emerald-400 font-mono">{row.email || row.email_address || '-'}</td>
-                              <td className="px-3 py-2 text-gray-300 font-mono">{row.smtp_host || row.smtp_server || '-'}</td>
-                              <td className="px-3 py-2 text-gray-300">{row.smtp_port || '587'}</td>
-                              <td className="px-3 py-2 text-gray-300 font-mono">{row.imap_host || row.imap_server || '-'}</td>
+                              {bulkImportMode === 'provider' ? (
+                                <>
+                                  <td className="px-3 py-2 text-gray-300 font-mono">{'•'.repeat(Math.min((row.password || row.smtp_pass || '').length, 8)) || '-'}</td>
+                                  <td className="px-3 py-2 text-gray-300">{row.from_name || row.sender_name || '-'}</td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="px-3 py-2 text-gray-300 font-mono">{row.smtp_host || row.smtp_server || '-'}</td>
+                                  <td className="px-3 py-2 text-gray-300">{row.smtp_port || '587'}</td>
+                                  <td className="px-3 py-2 text-gray-300 font-mono">{row.imap_host || row.imap_server || '-'}</td>
+                                </>
+                              )}
                             </tr>
                           ))}
                         </tbody>
@@ -1118,7 +1368,7 @@ export default function EmailProvidersPage() {
                 </button>
                 <button
                   onClick={handleBulkUpload}
-                  disabled={!bulkCsvText.trim() || isBulkImporting}
+                  disabled={!bulkCsvText.trim() || isBulkImporting || (bulkImportMode === 'provider' && !selectedProviderId)}
                   className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center gap-2 transition-colors"
                 >
                   {isBulkImporting ? (
@@ -1132,6 +1382,149 @@ export default function EmailProvidersPage() {
                       Import Accounts
                     </>
                   )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add SMTP Provider Preset Modal */}
+      <AnimatePresence>
+        {isAddProviderOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setIsAddProviderOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#101828] border border-gray-800 rounded-[32px] p-8 w-full max-w-lg mx-4"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#745DF3]/10 flex items-center justify-center">
+                    <Settings2 className="w-5 h-5 text-[#745DF3]" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white tracking-tight">New Provider Preset</h3>
+                    <p className="text-sm text-gray-400">Save host/port settings once for all accounts</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsAddProviderOpen(false)}
+                  className="w-8 h-8 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest pl-1">Preset Name</label>
+                  <input
+                    value={newProvider.name}
+                    onChange={(e) => setNewProvider(p => ({ ...p, name: e.target.value }))}
+                    placeholder="e.g. Namecheap Private Email"
+                    className="w-full bg-gray-900/50 border border-gray-800 rounded-xl px-4 py-4 text-sm text-white font-bold placeholder-gray-600 focus:outline-none focus:border-[#745DF3]/50 transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-1">
+                    <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest pl-1">SMTP Host</label>
+                    <input
+                      value={newProvider.smtpHost}
+                      onChange={(e) => setNewProvider(p => ({ ...p, smtpHost: e.target.value }))}
+                      placeholder="smtp.example.com"
+                      className="w-full bg-gray-900/50 border border-gray-800 rounded-xl px-4 py-4 text-sm text-white font-mono placeholder-gray-600 focus:outline-none focus:border-[#745DF3]/50 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest pl-1">Port</label>
+                    <input
+                      value={newProvider.smtpPort}
+                      onChange={(e) => setNewProvider(p => ({ ...p, smtpPort: e.target.value }))}
+                      className="w-full bg-gray-900/50 border border-gray-800 rounded-xl px-4 py-4 text-sm text-white font-bold placeholder-gray-600 focus:outline-none focus:border-[#745DF3]/50 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest pl-1">Security</label>
+                    <select
+                      value={newProvider.smtpSecurity}
+                      onChange={(e) => setNewProvider(p => ({ ...p, smtpSecurity: e.target.value }))}
+                      className="w-full bg-gray-900/50 border border-gray-800 rounded-xl px-4 py-4 text-sm text-white font-bold focus:outline-none focus:border-[#745DF3]/50 transition-colors appearance-none"
+                    >
+                      <option value="STARTTLS">STARTTLS</option>
+                      <option value="SSL/TLS">SSL/TLS</option>
+                      <option value="None">None</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-1">
+                    <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest pl-1">IMAP Host</label>
+                    <input
+                      value={newProvider.imapHost}
+                      onChange={(e) => setNewProvider(p => ({ ...p, imapHost: e.target.value }))}
+                      placeholder="imap.example.com"
+                      className="w-full bg-gray-900/50 border border-gray-800 rounded-xl px-4 py-4 text-sm text-white font-mono placeholder-gray-600 focus:outline-none focus:border-[#745DF3]/50 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest pl-1">Port</label>
+                    <input
+                      value={newProvider.imapPort}
+                      onChange={(e) => setNewProvider(p => ({ ...p, imapPort: e.target.value }))}
+                      className="w-full bg-gray-900/50 border border-gray-800 rounded-xl px-4 py-4 text-sm text-white font-bold placeholder-gray-600 focus:outline-none focus:border-[#745DF3]/50 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest pl-1">Security</label>
+                    <select
+                      value={newProvider.imapSecurity}
+                      onChange={(e) => setNewProvider(p => ({ ...p, imapSecurity: e.target.value }))}
+                      className="w-full bg-gray-900/50 border border-gray-800 rounded-xl px-4 py-4 text-sm text-white font-bold focus:outline-none focus:border-[#745DF3]/50 transition-colors appearance-none"
+                    >
+                      <option value="SSL/TLS">SSL/TLS</option>
+                      <option value="STARTTLS">STARTTLS</option>
+                      <option value="None">None</option>
+                    </select>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-3 cursor-pointer group py-2">
+                  <input
+                    type="checkbox"
+                    checked={newProvider.isDefault}
+                    onChange={(e) => setNewProvider(p => ({ ...p, isDefault: e.target.checked }))}
+                    className="w-5 h-5 rounded-lg border-gray-800 text-[#745DF3] focus:ring-[#745DF3] bg-gray-900/50"
+                  />
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] group-hover:text-white transition-colors">Set as default account preset</span>
+                </label>
+              </div>
+
+              <div className="flex items-center gap-3 justify-end mt-8">
+                <button
+                  onClick={() => setIsAddProviderOpen(false)}
+                  className="px-6 py-3 rounded-2xl bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-black uppercase tracking-widest transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveProvider}
+                  disabled={isSavingProvider || !newProvider.name || !newProvider.smtpHost}
+                  className="px-8 py-3 rounded-2xl bg-[#745DF3] hover:bg-[#6347E0] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-colors shadow-lg shadow-[#745DF3]/20"
+                >
+                  {isSavingProvider ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Save Preset
                 </button>
               </div>
             </motion.div>

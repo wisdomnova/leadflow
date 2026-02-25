@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { email, provider, config } = await req.json();
+    const { email, provider, config, smtp_provider_id } = await req.json();
 
     if (!email || !provider) {
       return NextResponse.json({ error: "Email and provider are required" }, { status: 400 });
@@ -52,15 +52,20 @@ export async function POST(req: Request) {
       }, { status: 409 });
     }
 
+    const insertRow: any = {
+      org_id: context.orgId,
+      email,
+      provider,
+      config: config || {},
+      status: "active",
+    };
+    if (smtp_provider_id) {
+      insertRow.smtp_provider_id = smtp_provider_id;
+    }
+
     const { data, error } = await adminSupabase
       .from("email_accounts")
-      .insert([{
-        org_id: context.orgId,
-        email,
-        provider,
-        config: config || {},
-        status: "active",
-      }] as any)
+      .insert([insertRow] as any)
       .select()
       .single();
 

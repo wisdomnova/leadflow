@@ -16,7 +16,9 @@ import {
   SquareArrowOutUpRight,
   RefreshCw,
   Send,
-  Loader2
+  Loader2,
+  X,
+  Database
 } from 'lucide-react';
 
 const filters = ['All', 'Interested', 'Follow-up', 'Out of Office', 'Not Interested', 'Closed Won'];
@@ -52,6 +54,9 @@ export default function UniboxPage() {
   const [isPushing, setIsPushing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+  const [showCrmModal, setShowCrmModal] = useState(false);
+  const [crmIntegrations, setCrmIntegrations] = useState<any[]>([]);
+  const [pushingProvider, setPushingProvider] = useState<string | null>(null);
 
   useEffect(() => {
     fetchConversations();
@@ -89,6 +94,45 @@ export default function UniboxPage() {
       console.error('Sync error:', error);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleOpenCrmModal = async () => {
+    // Fetch active CRM integrations
+    try {
+      const res = await fetch('/api/crm');
+      const data = await res.json();
+      setCrmIntegrations(Array.isArray(data) ? data.filter((i: any) => i.status === 'active') : []);
+    } catch {
+      setCrmIntegrations([]);
+    }
+    setShowCrmModal(true);
+  };
+
+  const handlePushToProvider = async (provider: string) => {
+    const conv = conversations.find(c => c.id === selectedId);
+    if (!selectedId || !conv?.isLinkedToLead) return;
+    setPushingProvider(provider);
+    try {
+      const res = await fetch('/api/crm/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: selectedId, provider })
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setToastMsg(`Lead pushed to ${provider.charAt(0).toUpperCase() + provider.slice(1)}`);
+      } else {
+        setToastMsg(result.error || 'Failed to push to CRM');
+      }
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch {
+      setToastMsg('Failed to push to CRM');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } finally {
+      setPushingProvider(null);
     }
   };
 
@@ -415,16 +459,16 @@ export default function UniboxPage() {
                       <>
                         <div className="w-[1px] h-8 bg-gray-100 mx-2" />
                         <button 
-                          onClick={handlePushToCRM}
+                          onClick={handleOpenCrmModal}
                           disabled={isPushing}
                           className="flex items-center gap-2 px-6 py-3.5 bg-[#101828] rounded-2xl text-[13px] font-black text-white hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/20 group disabled:opacity-50"
                         >
                           {isPushing ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            <Zap className="w-4 h-4 text-[#745DF3] fill-[#745DF3]" />
+                            <Database className="w-4 h-4 text-[#745DF3]" />
                           )}
-                          Push to CRM
+                          Sync to CRM
                           <SquareArrowOutUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
                       </>
@@ -543,6 +587,110 @@ export default function UniboxPage() {
           <span className="text-sm font-bold">{toastMsg}</span>
         </motion.div>
       )}
+
+      {/* Sync to CRM Modal */}
+      <AnimatePresence>
+        {showCrmModal && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCrmModal(false)}
+              className="absolute inset-0 bg-[#101828]/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[3rem] border border-gray-100 shadow-2xl p-10 overflow-hidden"
+            >
+              <button
+                onClick={() => setShowCrmModal(false)}
+                className="absolute top-6 right-6 p-2 rounded-xl bg-gray-50 text-gray-400 hover:text-[#101828] hover:bg-gray-100 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 rounded-[2.5rem] bg-[#745DF3]/5 flex items-center justify-center text-[#745DF3] mb-6 border-4 border-white shadow-xl mx-auto">
+                  <Database className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-black text-[#101828] tracking-tight mb-2">Sync to CRM</h3>
+                <p className="text-gray-500 font-medium text-sm">Select a CRM to push this lead to.</p>
+              </div>
+
+              {crmIntegrations.length > 0 ? (
+                <div className="space-y-3">
+                  {crmIntegrations.map((integration: any) => {
+                    const providerMeta: Record<string, { name: string; icon: string; color: string }> = {
+                      hubspot: { name: 'HubSpot', icon: 'https://www.vectorlogo.zone/logos/hubspot/hubspot-icon.svg', color: '#FF7A59' },
+                      pipedrive: { name: 'Pipedrive', icon: 'https://raw.githubusercontent.com/dochne/wappalyzer/206b81ff73111aa98af217f35b8f3003e2730617/src/images/icons/Pipedrive.svg', color: '#222222' },
+                      salesforce: { name: 'Salesforce', icon: 'https://www.vectorlogo.zone/logos/salesforce/salesforce-icon.svg', color: '#00A1E0' }
+                    };
+                    const meta = providerMeta[integration.provider] || { name: integration.provider, icon: '', color: '#745DF3' };
+                    const isPushingThis = pushingProvider === integration.provider;
+
+                    return (
+                      <button
+                        key={integration.id}
+                        onClick={() => handlePushToProvider(integration.provider)}
+                        disabled={!!pushingProvider}
+                        className="w-full flex items-center gap-4 p-5 bg-gray-50 hover:bg-[#745DF3]/5 border-2 border-gray-100 hover:border-[#745DF3]/20 rounded-2xl transition-all disabled:opacity-50 group"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-sm overflow-hidden">
+                          {meta.icon ? (
+                            <img src={meta.icon} alt={meta.name} className="w-7 h-7 object-contain" />
+                          ) : (
+                            <Database className="w-6 h-6 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="text-sm font-black text-[#101828] tracking-tight">{meta.name}</p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                            {integration.config?.accountName || 'Connected'}
+                          </p>
+                        </div>
+                        {isPushingThis ? (
+                          <Loader2 className="w-5 h-5 text-[#745DF3] animate-spin" />
+                        ) : (
+                          <SquareArrowOutUpRight className="w-4 h-4 text-gray-300 group-hover:text-[#745DF3] transition-colors" />
+                        )}
+                      </button>
+                    );
+                  })}
+
+                  <div className="pt-4 border-t border-gray-100 mt-4">
+                    <button
+                      onClick={() => { handlePushToCRM(); setShowCrmModal(false); }}
+                      disabled={isPushing}
+                      className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-[#101828] rounded-2xl text-[13px] font-black text-white hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/20 disabled:opacity-50"
+                    >
+                      {isPushing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 text-[#745DF3]" />}
+                      Push to All Connected CRMs
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Database className="w-8 h-8 text-gray-200" />
+                  </div>
+                  <p className="text-sm font-black text-gray-400 mb-2">No CRM Connected</p>
+                  <p className="text-xs text-gray-400 font-medium mb-6">Connect a CRM integration to start syncing leads.</p>
+                  <a
+                    href="/dashboard/crm"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#745DF3] text-white rounded-2xl text-[13px] font-black hover:bg-[#5C46E5] transition-all shadow-xl shadow-[#745DF3]/20"
+                  >
+                    Connect CRM
+                    <SquareArrowOutUpRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
