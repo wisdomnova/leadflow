@@ -289,12 +289,15 @@ export default function BillingPage() {
                     <span className={`px-3 py-1 ${
                       subData?.status === 'active' ? 'bg-emerald-500/20 text-emerald-500' 
                       : subData?.status === 'canceling' ? 'bg-orange-500/20 text-orange-400'
+                      : subData?.status === 'past_due' ? 'bg-red-500/20 text-red-400'
                       : 'bg-amber-500/20 text-amber-500'
                     } rounded-lg text-[10px] font-black uppercase tracking-widest`}>
                       {(subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date()) 
                         ? 'Free Trial' 
                         : subData?.status === 'canceling' 
                           ? 'Cancels at Period End'
+                          : subData?.status === 'past_due'
+                            ? 'Payment Failed'
                           : (subData?.status || 'No Active Plan')}
                     </span>
                     {subData?.subscription?.cancel_at_period_end && (
@@ -308,7 +311,9 @@ export default function BillingPage() {
                     {subData?.subscription?.plan || (subData?.trial_ends_at && new Date(subData.trial_ends_at) > new Date() ? 'Starter (14-Day Trial)' : (subData?.plan_tier ? `${subData.plan_tier.charAt(0).toUpperCase() + subData.plan_tier.slice(1)} Plan` : 'Standard Plan'))}
                   </h2>
                   <p className="text-white font-medium mb-8 opacity-70">
-                    {subData?.subscription?.cancel_at_period_end && subData?.subscription?.current_period_end
+                    {subData?.status === 'past_due'
+                      ? 'Your latest payment was declined. Please update your payment method below to restore full access.'
+                      : subData?.subscription?.cancel_at_period_end && subData?.subscription?.current_period_end
                       ? `Your subscription will end on ${new Date(subData.subscription.current_period_end * 1000).toLocaleDateString()}. You retain full access until then.`
                       : subData?.status === 'active' && subData?.subscription?.current_period_end
                         ? `Your subscription is active. Next billing date: ${new Date(subData.subscription.current_period_end * 1000).toLocaleDateString()}`
@@ -318,6 +323,16 @@ export default function BillingPage() {
                     }
                   </p>
                   <div className="flex flex-wrap gap-3">
+                    {subData?.status === 'past_due' && (
+                      <button 
+                        onClick={handleOpenPortal}
+                        disabled={isManagingPlan}
+                        className="px-8 py-3.5 bg-red-500 text-white rounded-2xl text-sm font-black hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-500/20"
+                      >
+                        {isManagingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update Payment Method'}
+                        <CreditCard className="w-4 h-4" />
+                      </button>
+                    )}
                     <button 
                       onClick={handleOpenPortal}
                       disabled={isManagingPlan}
@@ -368,9 +383,21 @@ export default function BillingPage() {
                       </div>
                       <span className="text-[10px] font-black text-white uppercase tracking-widest">Status</span>
                     </div>
-                    <p className="text-2xl font-black text-white tracking-tight">{subData?.status === 'active' ? 'Active' : 'Inactive'}</p>
+                    <p className="text-2xl font-black text-white tracking-tight">
+                      {subData?.status === 'active' ? 'Active' 
+                        : subData?.status === 'canceling' ? 'Canceling'
+                        : subData?.status === 'past_due' ? 'Past Due'
+                        : subData?.status === 'trialing' ? 'Trial'
+                        : 'Inactive'}
+                    </p>
                     <div className="mt-4 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                      <div className={`h-full ${subData?.status === 'active' ? 'bg-emerald-500' : 'bg-gray-500'} w-full`} />
+                      <div className={`h-full ${
+                        subData?.status === 'active' ? 'bg-emerald-500' 
+                        : subData?.status === 'past_due' ? 'bg-red-500'
+                        : subData?.status === 'canceling' ? 'bg-orange-500'
+                        : subData?.status === 'trialing' ? 'bg-blue-500'
+                        : 'bg-gray-500'
+                      } w-full`} />
                     </div>
                   </div>
                 </div>

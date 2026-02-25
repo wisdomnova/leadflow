@@ -6,7 +6,7 @@ import { AlertCircle, Lock, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SubscriptionGuard({ children }: { children: React.ReactNode }) {
-  const [status, setStatus] = useState<'loading' | 'active' | 'trialing' | 'inactive'>('loading');
+  const [status, setStatus] = useState<'loading' | 'active' | 'past_due' | 'trialing' | 'inactive'>('loading');
   const router = useRouter();
 
   useEffect(() => {
@@ -15,8 +15,11 @@ export default function SubscriptionGuard({ children }: { children: React.ReactN
         const res = await fetch('/api/billing/subscription');
         const data = await res.json();
         // 'canceling' users still have access until end of billing period
+        // 'past_due' users get a grace period while Stripe retries payment
         if (data.status === 'active' || data.status === 'trialing' || data.status === 'canceling') {
           setStatus('active');
+        } else if (data.status === 'past_due') {
+          setStatus('past_due');
         } else {
           setStatus('inactive');
         }
@@ -52,5 +55,29 @@ export default function SubscriptionGuard({ children }: { children: React.ReactN
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {status === 'past_due' && (
+        <div className="mb-6 bg-red-50 border border-red-100 rounded-[2rem] p-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-500 shrink-0">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-red-900">Payment Failed</h4>
+              <p className="text-xs text-red-600 font-medium mt-0.5">Your last payment was declined. Please update your payment method to avoid losing access.</p>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/billing"
+            className="px-6 py-2.5 bg-red-600 text-white rounded-xl text-xs font-black hover:bg-red-700 transition-all shrink-0 flex items-center gap-1.5"
+          >
+            Update Payment
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      )}
+      {children}
+    </>
+  );
 }

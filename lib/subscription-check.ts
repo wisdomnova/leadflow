@@ -33,8 +33,13 @@ export async function checkSubscription(orgIdParam?: string) {
   };
 
   // Determine active status
+  // past_due gets a grace period — Stripe retries for ~3 weeks, don't immediately lock users out
   const trialExpired = org.trial_ends_at ? new Date(org.trial_ends_at) < new Date() : false;
-  const isActive = org.subscription_status === 'active' || org.subscription_status === 'canceling' || (org.subscription_status === 'trialing' && !trialExpired);
+  const isActive = org.subscription_status === 'active' 
+    || org.subscription_status === 'canceling' 
+    || org.subscription_status === 'past_due'
+    || (org.subscription_status === 'trialing' && !trialExpired);
+  const isPastDue = org.subscription_status === 'past_due';
 
   // Define limits per tier
   const tierLimits = {
@@ -49,6 +54,7 @@ export async function checkSubscription(orgIdParam?: string) {
   return { 
     active: isActive, 
     status: org.subscription_status,
+    isPastDue,
     tier,
     smartEnabled: org.smart_sending_enabled || (tier !== 'starter'),
     usage: {

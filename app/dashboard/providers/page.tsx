@@ -435,71 +435,77 @@ export default function EmailProvidersPage() {
                   exit={{ opacity: 0, y: -10 }}
                   className="space-y-10"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                    {/* OAuth Providers */}
-                    {providerTypes.map((provider) => (
-                      <div key={provider.id} className="bg-white p-8 rounded-[2rem] border border-gray-100 flex flex-col items-center text-center group hover:shadow-xl transition-all shadow-[#101828]/5 relative overflow-hidden">
-                        <div className={`w-20 h-20 ${provider.color} ${provider.borderColor} border rounded-[1.5rem] flex items-center justify-center mb-6`}>
-                          <img src={provider.icon} alt={provider.name} className="w-10 h-10 object-contain" />
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* OAuth Providers */}
+                      {providerTypes.map((provider) => (
+                        <div key={provider.id} className="bg-white p-8 rounded-[2rem] border border-gray-100 flex flex-col items-center text-center group hover:shadow-xl transition-all shadow-[#101828]/5 relative overflow-hidden">
+                          <div className={`w-20 h-20 ${provider.color} ${provider.borderColor} border rounded-[1.5rem] flex items-center justify-center mb-6`}>
+                            <img src={provider.icon} alt={provider.name} className="w-10 h-10 object-contain" />
+                          </div>
+                          <h3 className="text-xl font-black text-[#101828] mb-2">{provider.name}</h3>
+                          <p className="text-sm text-gray-500 font-medium mb-8 leading-relaxed">
+                            {provider.description}
+                          </p>
+                          <button 
+                            onClick={() => handleConnectProvider(provider.name)}
+                            disabled={isAddingAccount !== null}
+                            className="w-full py-4 bg-[#FBFBFB] hover:bg-[#101828] hover:text-white border border-gray-100 text-[#101828] rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            {isAddingAccount === provider.name ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Connecting...
+                              </>
+                            ) : (
+                              <>
+                                Connect Account
+                                <ChevronRight className="w-4 h-4" />
+                              </>
+                            )}
+                          </button>
                         </div>
-                        <h3 className="text-xl font-black text-[#101828] mb-2">{provider.name}</h3>
-                        <p className="text-sm text-gray-500 font-medium mb-8 leading-relaxed">
-                          {provider.description}
+                      ))}
+
+                      {/* SMTP Manual */}
+                      <div className="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 flex flex-col items-center justify-center text-center hover:border-[#745DF3]/40 transition-all cursor-pointer group"
+                        onClick={() => setIsSMTPModalOpen(true)}
+                      >
+                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#745DF3]/5 transition-colors">
+                          <Settings2 className="w-8 h-8 text-gray-300 group-hover:text-[#745DF3]" />
+                        </div>
+                        <h3 className="text-xl font-black text-[#101828] mb-2">Custom SMTP</h3>
+                        <p className="text-sm text-gray-400 font-medium mb-8 leading-relaxed">
+                          Enter your SMTP & IMAP details manually for any other provider.
                         </p>
                         <button 
-                          onClick={() => handleConnectProvider(provider.name)}
-                          disabled={isAddingAccount !== null}
-                          className="w-full py-4 bg-[#FBFBFB] hover:bg-[#101828] hover:text-white border border-gray-100 text-[#101828] rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                          onClick={() => setIsSMTPModalOpen(true)}
+                          className="px-8 py-3 bg-white border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:text-[#101828] hover:border-[#101828] transition-all"
                         >
-                          {isAddingAccount === provider.name ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Connecting...
-                            </>
-                          ) : (
-                            <>
-                              Connect Account
-                              <ChevronRight className="w-4 h-4" />
-                            </>
-                          )}
+                          Setup Manually
                         </button>
                       </div>
-                    ))}
-
-                    {/* SMTP Manual */}
-                    <div className="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 flex flex-col items-center justify-center text-center hover:border-[#745DF3]/40 transition-all cursor-pointer group"
-                      onClick={() => setIsSMTPModalOpen(true)}
-                    >
-                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#745DF3]/5 transition-colors">
-                        <Settings2 className="w-8 h-8 text-gray-300 group-hover:text-[#745DF3]" />
-                      </div>
-                      <h3 className="text-xl font-black text-[#101828] mb-2">Custom SMTP</h3>
-                      <p className="text-sm text-gray-400 font-medium mb-8 leading-relaxed">
-                        Enter your SMTP & IMAP details manually for any other provider.
-                      </p>
-                      <button 
-                        onClick={() => setIsSMTPModalOpen(true)}
-                        className="px-8 py-3 bg-white border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:text-[#101828] hover:border-[#101828] transition-all"
-                      >
-                        Setup Manually
-                      </button>
                     </div>
 
-                    {/* Bulk CSV Import */}
+                    {/* Bulk CSV Import - Full Width */}
                     <div 
-                      className="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 flex flex-col items-center justify-center text-center hover:border-emerald-300 transition-all cursor-pointer group"
+                      className="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 flex flex-col md:flex-row items-center justify-between text-center md:text-left hover:border-emerald-300 transition-all cursor-pointer group gap-8"
                       onClick={() => setIsBulkModalOpen(true)}
                     >
-                      <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-6 group-hover:bg-emerald-100 transition-colors border border-emerald-100">
-                        <Upload className="w-8 h-8 text-emerald-400 group-hover:text-emerald-600" />
+                      <div className="flex flex-col md:flex-row items-center gap-6">
+                        <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center group-hover:bg-emerald-100 transition-colors border border-emerald-100 shrink-0">
+                          <Upload className="w-8 h-8 text-emerald-400 group-hover:text-emerald-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-black text-[#101828] mb-1">Bulk CSV Import</h3>
+                          <p className="text-sm text-gray-400 font-medium leading-relaxed">
+                            Upload a CSV to add multiple SMTP accounts at once. Perfect for agencies.
+                          </p>
+                        </div>
                       </div>
-                      <h3 className="text-xl font-black text-[#101828] mb-2">Bulk CSV Import</h3>
-                      <p className="text-sm text-gray-400 font-medium mb-8 leading-relaxed">
-                        Upload a CSV to add multiple SMTP accounts at once. Perfect for agencies.
-                      </p>
                       <button 
                         onClick={(e) => { e.stopPropagation(); setIsBulkModalOpen(true); }}
-                        className="px-8 py-3 bg-white border border-emerald-100 rounded-xl text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:border-emerald-300 transition-all"
+                        className="px-8 py-4 bg-emerald-500 text-white rounded-2xl text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 shrink-0"
                       >
                         Import Accounts
                       </button>

@@ -1152,16 +1152,17 @@ export default function PowerSendPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100"
+              className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl border border-gray-100 flex flex-col max-h-[85vh] overflow-hidden"
             >
               <button 
                 onClick={() => setIsAddModalOpen(false)}
-                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all z-10"
+                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all z-20 bg-white/80 backdrop-blur-sm"
               >
                 <X className="w-5 h-5" />
               </button>
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-8">
+              
+              <div className="p-8 border-b border-gray-50 shrink-0">
+                <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-xl font-black text-[#101828]">Add Smart Server</h3>
                     <p className="text-sm text-gray-500 font-medium">Provision a new high-reputation node</p>
@@ -1170,8 +1171,10 @@ export default function PowerSendPage() {
                     <Zap className="w-6 h-6" />
                   </div>
                 </div>
+              </div>
 
-                <form onSubmit={handleAddServer} className="space-y-6">
+              <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
+                <form id="add-server-form" onSubmit={handleAddServer} className="space-y-6">
                   <div className="space-y-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Node Name</label>
@@ -1243,7 +1246,7 @@ export default function PowerSendPage() {
                     {/* Default SMTP/IMAP Settings */}
                     <div className="pt-4 border-t border-gray-100">
                       <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-1">Default SMTP / IMAP</p>
-                      <p className="text-[10px] font-bold text-gray-400 mb-4">These defaults are inherited by all mailboxes in the pool unless overridden per-mailbox.</p>
+                      <p className="text-[10px] font-bold text-gray-400 mb-4 leading-relaxed">These defaults are inherited by all mailboxes in the pool unless overridden per-mailbox.</p>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Host</label>
@@ -1291,9 +1294,9 @@ export default function PowerSendPage() {
                     </div>
 
                     {/* Legacy SMTP Config (backward compat) */}
-                    <div className="pt-4 border-t border-gray-100">
+                    <div className="pt-4 border-t border-gray-100 pb-2">
                       <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-1">Legacy SMTP Config</p>
-                      <p className="text-[10px] font-bold text-gray-400 mb-4">Single-mailbox fallback. Add mailboxes to the pool after creating the server for best results.</p>
+                      <p className="text-[10px] font-bold text-gray-400 mb-4 leading-relaxed">Single-mailbox fallback. Add mailboxes to the pool after creating the server for best results.</p>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Host</label>
@@ -1350,29 +1353,32 @@ export default function PowerSendPage() {
                       </div>
                     </div>
                   </div>
-
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setIsAddModalOpen(false)}
-                      className="flex-1 px-6 py-3 border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="flex-[2] px-6 py-3 bg-[#101828] text-white rounded-xl text-sm font-bold hover:bg-[#101828]/90 transition-all shadow-xl shadow-gray-200 flex items-center justify-center gap-2"
-                    >
-                      {isSubmitting ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="w-4 h-4" />
-                      )}
-                      {isSubmitting ? 'Provisioning...' : 'Provision Node'}
-                    </button>
-                  </div>
                 </form>
+              </div>
+
+              <div className="p-8 border-t border-gray-50 bg-[#FBFBFB]/50 shrink-0">
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="flex-1 px-6 py-4 border border-gray-200 rounded-2xl text-sm font-bold text-gray-500 hover:bg-white transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    form="add-server-form"
+                    disabled={isSubmitting}
+                    className="flex-[2] px-6 py-4 bg-[#101828] text-white rounded-2xl text-sm font-bold hover:bg-[#101828]/90 transition-all shadow-xl shadow-gray-200 flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4" />
+                    )}
+                    {isSubmitting ? 'Provisioning...' : 'Provision Node'}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

@@ -124,7 +124,6 @@ export async function POST(req: Request) {
     }
 
     case 'invoice.payment_failed': {
-      // Potentially notify user or lock account
       const subscriptionId = session.subscription;
       const { data: org } = await (supabaseAdmin as any)
         .from('organizations')
@@ -144,6 +143,35 @@ export async function POST(req: Request) {
           category: "billing_alerts",
           link: "/dashboard/billing"
         });
+      }
+      break;
+    }
+
+    case 'invoice.payment_succeeded': {
+      // Recover from past_due when a retry or updated payment method succeeds
+      const subscriptionId = session.subscription;
+      if (subscriptionId) {
+        const { data: org } = await (supabaseAdmin as any)
+          .from('organizations')
+          .select('id, subscription_status')
+          .eq('subscription_id', subscriptionId)
+          .single();
+
+        if (org && org.subscription_status === 'past_due') {
+          await (supabaseAdmin as any)
+            .from('organizations')
+            .update({ subscription_status: 'active' })
+            .eq('id', org.id);
+
+          await createNotification({
+            orgId: org.id,
+            title: "Payment Successful",
+            description: "Your payment has been processed successfully. Your subscription is fully active again.",
+            type: "success",
+            category: "billing_alerts",
+            link: "/dashboard/billing"
+          });
+        }
       }
       break;
     }
