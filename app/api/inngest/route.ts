@@ -14,7 +14,8 @@ import {
   powersendReputationMonitor,
   powersendWarmupScheduler,
   powersendWarmupProcessor,
-  powersendWarmupRampUp
+  powersendWarmupRampUp,
+  planDowngradeApplier
 } from "@/lib/inngest/functions";
 
 // Serve all Inngest functions
@@ -34,6 +35,7 @@ export const { GET, POST, PUT } = serve({
     powersendReputationMonitor,
     powersendWarmupScheduler,
     powersendWarmupProcessor,
-    powersendWarmupRampUp
+    powersendWarmupRampUp,
+    planDowngradeApplier
   ],
 });

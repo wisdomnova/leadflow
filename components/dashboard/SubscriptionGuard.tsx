@@ -60,17 +60,17 @@ export default function SubscriptionGuard({ children }: { children: React.ReactN
       {status === 'past_due' && (
         <div className="mb-6 bg-red-50 border border-red-100 rounded-[2rem] p-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-500 shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600 shrink-0">
               <AlertCircle className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="text-sm font-black text-red-900">Payment Failed</h4>
-              <p className="text-xs text-red-600 font-medium mt-0.5">Your last payment was declined. Please update your payment method to avoid losing access.</p>
+              <h4 className="text-sm font-black text-red-900 tracking-tight">Payment Failed</h4>
+              <p className="text-xs text-red-700/70 font-medium mt-0.5 whitespace-nowrap">Your last payment was declined. Update your payment method to avoid losing access.</p>
             </div>
           </div>
           <Link
             href="/dashboard/billing"
-            className="px-6 py-2.5 bg-red-600 text-white rounded-xl text-xs font-black hover:bg-red-700 transition-all shrink-0 flex items-center gap-1.5"
+            className="px-6 py-3 bg-red-600 text-white rounded-2xl text-xs font-black hover:bg-red-700 transition-all shrink-0 flex items-center gap-1.5 shadow-lg shadow-red-600/10"
           >
             Update Payment
             <ArrowRight className="w-3.5 h-3.5" />

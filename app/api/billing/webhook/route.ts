@@ -78,10 +78,13 @@ export async function POST(req: Request) {
       };
 
       // If the subscription was deleted (actually canceled), reset plan to starter
+      // and clear any pending downgrade
       if (event.type === 'customer.subscription.deleted') {
         updatePayload.plan_tier = 'starter';
         updatePayload.plan = 'free';
         updatePayload.subscription_id = null;
+        updatePayload.pending_plan_tier = null;
+        updatePayload.plan_change_at = null;
       }
 
       const { data: org } = await (supabaseAdmin as any)

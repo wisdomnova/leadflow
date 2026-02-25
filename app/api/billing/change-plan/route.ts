@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     const isUpgrade = targetIdx > currentIdx;
 
     // Retrieve the current subscription
-    const subscription = await stripe.subscriptions.retrieve((org as any).subscription_id);
+    const subscription = await stripe.subscriptions.retrieve((org as any).subscription_id) as any;
     const subscriptionItemId = subscription.items.data[0]?.id;
 
     if (!subscriptionItemId) {
@@ -71,16 +71,30 @@ export async function POST(req: Request) {
 
     await stripe.subscriptions.update((org as any).subscription_id, updateParams);
 
-    // Update the org's plan_tier immediately for upgrades, 
-    // for downgrades we still update now (features stay until period end via Stripe)
-    await (adminSupabase as any)
-      .from('organizations')
-      .update({ 
-        plan_tier: planId,
-        // Also sync the legacy plan column
-        plan: planId
-      })
-      .eq('id', context.orgId);
+    if (isUpgrade) {
+      // Upgrades: apply immediately — user gets higher-tier features right away
+      // Also clear any pending downgrade if there was one scheduled
+      await (adminSupabase as any)
+        .from('organizations')
+        .update({ 
+          plan_tier: planId,
+          plan: planId,
+          pending_plan_tier: null,
+          plan_change_at: null
+        })
+        .eq('id', context.orgId);
+    } else {
+      // Downgrades: DON'T update plan_tier yet — user paid for current tier through end of period.
+      // Store the pending downgrade; an Inngest cron applies it when the period ends.
+      const currentPeriodEnd = subscription.current_period_end;
+      await (adminSupabase as any)
+        .from('organizations')
+        .update({ 
+          pending_plan_tier: planId,
+          plan_change_at: new Date(currentPeriodEnd * 1000).toISOString()
+        })
+        .eq('id', context.orgId);
+    }
 
     // Send notification
     const planName = planId.charAt(0).toUpperCase() + planId.slice(1);
@@ -99,9 +113,10 @@ export async function POST(req: Request) {
       success: true, 
       isUpgrade,
       newPlan: planId,
+      effectiveDate: !isUpgrade ? new Date(subscription.current_period_end * 1000).toISOString() : null,
       message: isUpgrade 
         ? `Upgraded to ${planName}! Changes are effective immediately.`
-        : `Downgraded to ${planName}. Your current plan features remain active until the end of this billing period.`
+        : `Downgraded to ${planName}. Your current plan features remain active until ${new Date(subscription.current_period_end * 1000).toLocaleDateString()}.`
     });
   } catch (error: any) {
     console.error('Plan change error:', error);

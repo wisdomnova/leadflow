@@ -313,6 +313,8 @@ export default function BillingPage() {
                   <p className="text-white font-medium mb-8 opacity-70">
                     {subData?.status === 'past_due'
                       ? 'Your latest payment was declined. Please update your payment method below to restore full access.'
+                      : subData?.pending_plan_tier && subData?.plan_change_at
+                        ? `Downgrading to ${subData.pending_plan_tier.charAt(0).toUpperCase() + subData.pending_plan_tier.slice(1)} on ${new Date(subData.plan_change_at).toLocaleDateString()}. You keep full ${(subData?.plan_tier || 'current').charAt(0).toUpperCase() + (subData?.plan_tier || 'current').slice(1)} access until then.`
                       : subData?.subscription?.cancel_at_period_end && subData?.subscription?.current_period_end
                       ? `Your subscription will end on ${new Date(subData.subscription.current_period_end * 1000).toLocaleDateString()}. You retain full access until then.`
                       : subData?.status === 'active' && subData?.subscription?.current_period_end
@@ -327,7 +329,7 @@ export default function BillingPage() {
                       <button 
                         onClick={handleOpenPortal}
                         disabled={isManagingPlan}
-                        className="px-8 py-3.5 bg-red-500 text-white rounded-2xl text-sm font-black hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-500/20"
+                        className="px-8 py-3.5 bg-red-600 text-white rounded-2xl text-sm font-black hover:bg-red-700 transition-all flex items-center gap-2 shadow-lg shadow-red-600/20"
                       >
                         {isManagingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update Payment Method'}
                         <CreditCard className="w-4 h-4" />
@@ -428,9 +430,14 @@ export default function BillingPage() {
                 // A plan is only "Current" if the user has an active Stripe subscription for it.
                 // Trial users see their limits (Starter), but haven't "selected" a paid plan yet.
                 const isCurrent = subData?.plan_tier === p.id && (subData?.status === 'active' || !!subData?.subscription);
-                const isDowngrade = !isCurrent && subData?.plan_tier && plans.findIndex(x => x.id === subData.plan_tier) > plans.findIndex(x => x.id === p.id);
+                const isPendingDowngrade = subData?.pending_plan_tier === p.id;
+                const isDowngrade = !isCurrent && !isPendingDowngrade && subData?.plan_tier && plans.findIndex(x => x.id === subData.plan_tier) > plans.findIndex(x => x.id === p.id);
                 const isUpgrade = !isCurrent && subData?.plan_tier && plans.findIndex(x => x.id === subData.plan_tier) < plans.findIndex(x => x.id === p.id);
-                const buttonText = isCurrent ? 'Current Plan' : isUpgrade ? `Upgrade to ${p.name}` : isDowngrade ? `Downgrade to ${p.name}` : p.button;
+                const buttonText = isCurrent ? 'Current Plan' 
+                  : isPendingDowngrade ? `Switching on ${subData?.plan_change_at ? new Date(subData.plan_change_at).toLocaleDateString() : 'period end'}`
+                  : isUpgrade ? `Upgrade to ${p.name}` 
+                  : isDowngrade ? `Downgrade to ${p.name}` 
+                  : p.button;
                 
                 return (
                 <div 
@@ -472,10 +479,12 @@ export default function BillingPage() {
 
                   <button 
                     onClick={() => handlePlanSwitch(p.id)}
-                    disabled={isCurrent || isSwitchingPlan !== null}
+                    disabled={isCurrent || isPendingDowngrade || isSwitchingPlan !== null}
                     className={`w-full py-4 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 ${
                       isCurrent 
                         ? 'bg-[#101828] text-white opacity-50 cursor-default' 
+                        : isPendingDowngrade
+                          ? 'bg-orange-500/20 text-orange-600 cursor-default border-2 border-orange-200'
                         : 'bg-[#745DF3] text-white hover:bg-[#745DF3]/90 shadow-xl shadow-[#745DF3]/10'
                     } ${isSwitchingPlan === p.id ? 'opacity-70 cursor-not-allowed' : ''}`}
                   >

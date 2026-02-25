@@ -1111,3 +1111,60 @@ export const warmupReplyProcessor = inngest.createFunction(
     return { success: true };
   }
 );
+
+/**
+ * ========================================
+ * 6. PLAN DOWNGRADE APPLIER
+ * ========================================
+ * Runs daily at 1:00 AM UTC.
+ * Finds organizations with a pending_plan_tier where plan_change_at <= now,
+ * applies the downgrade, and clears the pending fields.
+ */
+export const planDowngradeApplier = inngest.createFunction(
+  { id: "plan-downgrade-applier" },
+  { cron: "0 1 * * *" }, // Run daily at 1:00 AM UTC
+  async ({ step }) => {
+    const supabase = getAdminClient();
+
+    const orgsToDowngrade = await step.run("find-pending-downgrades", async () => {
+      const { data } = await (supabase as any)
+        .from('organizations')
+        .select('id, plan_tier, pending_plan_tier, plan_change_at')
+        .not('pending_plan_tier', 'is', null)
+        .lte('plan_change_at', new Date().toISOString());
+      return data || [];
+    });
+
+    if (orgsToDowngrade.length === 0) {
+      return { applied: 0 };
+    }
+
+    let applied = 0;
+    for (const org of orgsToDowngrade) {
+      await step.run(`apply-downgrade-${org.id}`, async () => {
+        await (supabase as any)
+          .from('organizations')
+          .update({
+            plan_tier: org.pending_plan_tier,
+            plan: org.pending_plan_tier,
+            pending_plan_tier: null,
+            plan_change_at: null
+          })
+          .eq('id', org.id);
+
+        const planName = org.pending_plan_tier.charAt(0).toUpperCase() + org.pending_plan_tier.slice(1);
+        await createNotification({
+          orgId: org.id,
+          title: "Plan Change Applied",
+          description: `Your plan has been changed to ${planName}. Your new limits are now in effect.`,
+          type: "info",
+          category: "billing_alerts",
+          link: "/dashboard/billing"
+        });
+      });
+      applied++;
+    }
+
+    return { applied };
+  }
+);
