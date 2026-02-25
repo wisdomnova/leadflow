@@ -157,7 +157,7 @@ export default function WarmupPage() {
   };
 
   const filteredAccounts = accounts.filter(acc => 
-    acc.warmup_enabled && acc.email.toLowerCase().includes(searchQuery.toLowerCase())
+    (acc.warmup_enabled || acc.warmup_status === 'Paused') && acc.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const activeWarmupCount = accounts.filter(a => a.warmup_enabled).length;
@@ -262,7 +262,7 @@ export default function WarmupPage() {
               <div className="xl:col-span-2 space-y-6">
                 <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
                   <div className="p-8 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-50 bg-[#FBFBFB]/30">
-                    <h2 className="text-2xl font-black text-[#101828] tracking-tight">Active Accounts</h2>
+                    <h2 className="text-2xl font-black text-[#101828] tracking-tight">Warmup Accounts</h2>
                     <div className="flex items-center gap-3">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
@@ -625,7 +625,7 @@ export default function WarmupPage() {
       <AddWarmupAccountModal 
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        availableAccounts={accounts.filter(acc => !acc.warmup_enabled)}
+        availableAccounts={accounts.filter(acc => !acc.warmup_enabled && acc.warmup_status !== 'Paused')}
         onAdd={() => fetchAccounts()}
       />
 

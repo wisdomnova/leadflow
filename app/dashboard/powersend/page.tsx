@@ -28,8 +28,46 @@ import {
   Trash2,
   HelpCircle,
   X,
-  ArrowRight
+  ArrowRight,
+  Flame,
+  Play,
+  Pause,
+  Timer,
+  Calendar,
+  Mail,
+  Upload,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Copy,
+  FileText
 } from 'lucide-react';
+
+interface ServerMailbox {
+  id: string;
+  server_id: string;
+  email: string;
+  display_name: string;
+  smtp_host: string | null;
+  smtp_port: number | null;
+  smtp_username: string | null;
+  smtp_password: string | null;
+  imap_host: string | null;
+  imap_port: number | null;
+  imap_username: string | null;
+  imap_password: string | null;
+  status: 'active' | 'warming' | 'paused' | 'error' | 'disabled';
+  reputation_score: number;
+  daily_limit: number;
+  current_usage: number;
+  total_sends: number;
+  last_sent_at: string | null;
+  error_message: string | null;
+  warmup_enabled: boolean;
+  warmup_day: number;
+  warmup_daily_sends: number;
+  created_at: string;
+}
 
 interface SmartServer {
   id: string;
@@ -48,6 +86,17 @@ interface SmartServer {
   complaint_rate: number;
   delivery_rate: number;
   auto_warmup_at: string | null;
+  warmup_enabled: boolean;
+  warmup_day: number;
+  warmup_started_at: string | null;
+  warmup_completed_at: string | null;
+  warmup_target_limit: number;
+  warmup_daily_sends: number;
+  mailbox_count: number;
+  default_smtp_host: string | null;
+  default_smtp_port: number | null;
+  default_imap_host: string | null;
+  default_imap_port: number | null;
   created_at: string;
 }
 
@@ -69,7 +118,35 @@ export default function PowerSendPage() {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isHealthChecking, setIsHealthChecking] = useState(false);
+  const [isWarmupModalOpen, setIsWarmupModalOpen] = useState(false);
+  const [warmupTarget, setWarmupTarget] = useState<SmartServer | null>(null);
+  const [warmupTargetLimit, setWarmupTargetLimit] = useState(500);
+  const [isWarmupSubmitting, setIsWarmupSubmitting] = useState(false);
   const [editingServer, setEditingServer] = useState<SmartServer | null>(null);
+  
+  // Mailbox pool states
+  const [expandedServerId, setExpandedServerId] = useState<string | null>(null);
+  const [serverMailboxes, setServerMailboxes] = useState<Record<string, ServerMailbox[]>>({});
+  const [isMailboxModalOpen, setIsMailboxModalOpen] = useState(false);
+  const [isCSVModalOpen, setIsCSVModalOpen] = useState(false);
+  const [mailboxServer, setMailboxServer] = useState<SmartServer | null>(null);
+  const [csvText, setCsvText] = useState('');
+  const [csvPreview, setCsvPreview] = useState<any[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [mailboxFormData, setMailboxFormData] = useState({
+    email: '',
+    display_name: '',
+    smtp_host: '',
+    smtp_port: '',
+    smtp_username: '',
+    smtp_password: '',
+    imap_host: '',
+    imap_port: '',
+    imap_username: '',
+    imap_password: '',
+    daily_limit: 30,
+  });
+
   const [editFormData, setEditFormData] = useState({
     name: '',
     ip_address: '',
@@ -91,6 +168,10 @@ export default function PowerSendPage() {
     ip_address: '',
     daily_limit: 500,
     api_key: '',
+    default_smtp_host: '',
+    default_smtp_port: '465',
+    default_imap_host: '',
+    default_imap_port: '993',
     smtp_config: {
       host: '',
       port: '465',
@@ -153,6 +234,10 @@ export default function PowerSendPage() {
         ip_address: '',
         daily_limit: 500,
         api_key: '',
+        default_smtp_host: '',
+        default_smtp_port: '465',
+        default_imap_host: '',
+        default_imap_port: '993',
         smtp_config: {
           host: '',
           port: '465',
@@ -258,6 +343,231 @@ export default function PowerSendPage() {
     }
   };
 
+  const openWarmupModal = (server: SmartServer) => {
+    setWarmupTarget(server);
+    setWarmupTargetLimit(server.warmup_target_limit || server.daily_limit || 500);
+    setIsWarmupModalOpen(true);
+  };
+
+  const handleStartWarmup = async () => {
+    if (!warmupTarget) return;
+    try {
+      setIsWarmupSubmitting(true);
+      const res = await fetch('/api/powersend/warmup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serverId: warmupTarget.id,
+          action: 'start',
+          targetLimit: warmupTargetLimit,
+        })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || 'Failed to start warmup');
+      }
+      await fetchData();
+      setIsWarmupModalOpen(false);
+      setWarmupTarget(null);
+    } catch (error: any) {
+      console.error('Warmup start error:', error);
+      alert(error.message);
+    } finally {
+      setIsWarmupSubmitting(false);
+    }
+  };
+
+  const handleStopWarmup = async (serverId: string) => {
+    if (!confirm('Stop warmup and restore full sending capacity?')) return;
+    try {
+      const res = await fetch('/api/powersend/warmup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverId, action: 'stop' })
+      });
+      if (!res.ok) throw new Error('Failed to stop warmup');
+      await fetchData();
+    } catch (error: any) {
+      console.error('Warmup stop error:', error);
+    }
+  };
+
+  // --- Mailbox Pool Functions ---
+  const fetchMailboxes = async (serverId: string) => {
+    try {
+      const res = await fetch(`/api/powersend/mailboxes?serverId=${serverId}`);
+      const data = await res.json();
+      setServerMailboxes(prev => ({ ...prev, [serverId]: data.mailboxes || [] }));
+    } catch (error) {
+      console.error('Failed to fetch mailboxes:', error);
+    }
+  };
+
+  const toggleExpandServer = async (serverId: string) => {
+    if (expandedServerId === serverId) {
+      setExpandedServerId(null);
+    } else {
+      setExpandedServerId(serverId);
+      if (!serverMailboxes[serverId]) {
+        await fetchMailboxes(serverId);
+      }
+    }
+  };
+
+  const openAddMailboxModal = (server: SmartServer) => {
+    setMailboxServer(server);
+    setMailboxFormData({
+      email: '',
+      display_name: '',
+      smtp_host: server.default_smtp_host || '',
+      smtp_port: server.default_smtp_port?.toString() || '465',
+      smtp_username: '',
+      smtp_password: '',
+      imap_host: server.default_imap_host || '',
+      imap_port: server.default_imap_port?.toString() || '993',
+      imap_username: '',
+      imap_password: '',
+      daily_limit: 30,
+    });
+    setIsMailboxModalOpen(true);
+  };
+
+  const handleAddMailbox = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mailboxServer) return;
+    try {
+      setIsSubmitting(true);
+      const res = await fetch('/api/powersend/mailboxes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serverId: mailboxServer.id,
+          mailbox: mailboxFormData,
+        })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || 'Failed to add mailbox');
+      }
+      await fetchMailboxes(mailboxServer.id);
+      await fetchData();
+      setIsMailboxModalOpen(false);
+      setMailboxServer(null);
+    } catch (error: any) {
+      console.error('Add mailbox error:', error);
+      alert(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteMailbox = async (mailboxId: string, serverId: string) => {
+    if (!confirm('Remove this mailbox from the pool?')) return;
+    try {
+      const res = await fetch('/api/powersend/mailboxes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mailboxIds: [mailboxId] })
+      });
+      if (res.ok) {
+        await fetchMailboxes(serverId);
+        await fetchData();
+      }
+    } catch (error) {
+      console.error('Delete mailbox error:', error);
+    }
+  };
+
+  const openCSVModal = (server: SmartServer) => {
+    setMailboxServer(server);
+    setCsvText('');
+    setCsvPreview([]);
+    setIsCSVModalOpen(true);
+  };
+
+  const handleCSVPreview = (text: string) => {
+    setCsvText(text);
+    try {
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) { setCsvPreview([]); return; }
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const preview = lines.slice(1, 6).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const row: Record<string, string> = {};
+        headers.forEach((h, i) => { row[h] = values[i] || ''; });
+        return row;
+      }).filter(r => r['email'] || r['email_address']);
+      setCsvPreview(preview);
+    } catch {
+      setCsvPreview([]);
+    }
+  };
+
+  const handleCSVUpload = async () => {
+    if (!mailboxServer || !csvText.trim()) return;
+    try {
+      setIsImporting(true);
+      const res = await fetch('/api/powersend/mailboxes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serverId: mailboxServer.id,
+          csv: csvText,
+        })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || 'CSV import failed');
+      }
+      const result = await res.json();
+      alert(`Successfully imported ${result.imported} mailbox${result.imported !== 1 ? 'es' : ''}`);
+      await fetchMailboxes(mailboxServer.id);
+      await fetchData();
+      setIsCSVModalOpen(false);
+      setMailboxServer(null);
+    } catch (error: any) {
+      console.error('CSV upload error:', error);
+      alert(error.message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleCSVFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        handleCSVPreview(text);
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleCSVFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        handleCSVPreview(text);
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  // Warmup schedule reference for the UI
+  const warmupSchedule = [
+    { day: '1', limit: 10 }, { day: '2', limit: 25 }, { day: '3', limit: 50 },
+    { day: '4', limit: 75 }, { day: '5', limit: 100 }, { day: '6-7', limit: 150 },
+    { day: '8-10', limit: 200 }, { day: '11-14', limit: 300 }, { day: '15-21', limit: 400 },
+    { day: '22-28', limit: 500 },
+  ];
+
+  const warmingNodes = servers.filter(s => s.warmup_enabled && s.status === 'warming');
+
   const filteredServers = servers.filter(s => 
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.ip_address.includes(searchQuery) ||
@@ -267,8 +577,8 @@ export default function PowerSendPage() {
   const statCards = [
     { name: 'Total Nodes', value: stats.totalNodes.toString(), icon: Server },
     { name: 'Active & Protected', value: stats.activeNodes.toString(), icon: ShieldCheck },
+    { name: 'Warming Up', value: warmingNodes.length.toString(), icon: Flame },
     { name: 'Avg Reputation', value: `${stats.avgReputation}%`, icon: TrendingUp },
-    { name: 'PowerSends (Total)', value: stats.totalSends.toLocaleString(), icon: Zap },
   ];
 
   return (
@@ -400,6 +710,7 @@ export default function PowerSendPage() {
                   <tr className="bg-[#FBFBFB] border-b border-gray-100">
                     <th className="px-8 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest">Node Name / IP</th>
                     <th className="px-6 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest">Provider</th>
+                    <th className="px-6 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest">Mailboxes</th>
                     <th className="px-6 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest">Status</th>
                     <th className="px-6 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest">Reputation</th>
                     <th className="px-6 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest">Daily Load</th>
@@ -410,12 +721,13 @@ export default function PowerSendPage() {
                   {isLoading ? (
                     [...Array(5)].map((_, i) => (
                       <tr key={i} className="animate-pulse">
-                        <td colSpan={6} className="px-8 py-6 h-20 bg-gray-50/20" />
+                        <td colSpan={7} className="px-8 py-6 h-20 bg-gray-50/20" />
                       </tr>
                     ))
                   ) : filteredServers.length > 0 ? (
                     filteredServers.map((server) => (
-                      <tr key={server.id} className="hover:bg-gray-50/50 transition-colors">
+                      <React.Fragment key={server.id}>
+                      <tr className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => toggleExpandServer(server.id)}>
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-4">
                             <div className="w-10 h-10 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center">
@@ -431,15 +743,39 @@ export default function PowerSendPage() {
                           <span className="text-sm text-gray-600 font-bold">{server.provider}</span>
                         </td>
                         <td className="px-6 py-6">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleExpandServer(server.id); }}
+                            className="flex items-center gap-2 group/mb"
+                          >
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#745DF3]/5 rounded-lg border border-[#745DF3]/10 group-hover/mb:bg-[#745DF3]/10 transition-all">
+                              <Mail className="w-3.5 h-3.5 text-[#745DF3]" />
+                              <span className="text-xs font-black text-[#745DF3]">{server.mailbox_count || 0}</span>
+                            </div>
+                            {expandedServerId === server.id ? (
+                              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                            )}
+                          </button>
+                        </td>
+                        <td className="px-6 py-6">
                           <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest w-fit shadow-sm border ${
                             server.status === 'active' ? 'bg-green-50 text-green-600 border-green-100' :
                             server.status === 'warming' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                             server.status === 'paused' ? 'bg-gray-50 text-gray-500 border-gray-100' :
                             'bg-red-50 text-red-600 border-red-100'
                           }`}>
-                            {server.status === 'warming' ? 'Auto-Warmup' : server.status}
+                            {server.status === 'warming' && server.warmup_enabled ? 'Warming Up' : server.status === 'warming' ? 'Auto-Warmup' : server.status}
                           </div>
-                          {server.status === 'warming' && server.auto_warmup_at && (
+                          {server.status === 'warming' && server.warmup_enabled && server.warmup_day > 0 && (
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <div className="w-16 h-1 bg-amber-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${Math.min((server.warmup_day / 28) * 100, 100)}%` }} />
+                              </div>
+                              <span className="text-[9px] text-amber-600 font-black">Day {server.warmup_day}/28</span>
+                            </div>
+                          )}
+                          {server.status === 'warming' && !server.warmup_enabled && server.auto_warmup_at && (
                             <p className="text-[9px] text-amber-500 font-bold mt-1 uppercase tracking-wider">Since {new Date(server.auto_warmup_at).toLocaleDateString()}</p>
                           )}
                         </td>
@@ -475,26 +811,190 @@ export default function PowerSendPage() {
                           </div>
                         </td>
                         <td className="px-8 py-6 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {server.warmup_enabled && server.status === 'warming' ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleStopWarmup(server.id); }}
+                                className="p-2 hover:bg-amber-50 rounded-xl transition-all text-amber-500 hover:text-amber-700 border border-transparent hover:border-amber-100"
+                                title="Stop Warmup"
+                              >
+                                <Pause className="w-4 h-4" />
+                              </button>
+                            ) : server.status === 'active' || server.status === 'paused' ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openWarmupModal(server); }}
+                                className="p-2 hover:bg-amber-50 rounded-xl transition-all text-gray-400 hover:text-amber-600 border border-transparent hover:border-amber-100"
+                                title="Start Warmup"
+                              >
+                                <Flame className="w-4 h-4" />
+                              </button>
+                            ) : null}
                             <button 
-                              onClick={() => openEditModal(server)}
-                              className="p-2.5 hover:bg-gray-50 rounded-xl transition-all text-gray-400 hover:text-[#101828] border border-transparent hover:border-gray-100"
+                              onClick={(e) => { e.stopPropagation(); openEditModal(server); }}
+                              className="p-2 hover:bg-gray-50 rounded-xl transition-all text-gray-400 hover:text-[#101828] border border-transparent hover:border-gray-100"
                             >
                               <Settings2 className="w-4 h-4" />
                             </button>
                             <button 
-                              onClick={() => handleDeleteServer(server.id)}
-                              className="p-2.5 hover:bg-red-50 rounded-xl transition-all text-gray-400 hover:text-red-600 border border-transparent hover:border-red-100"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteServer(server.id); }}
+                              className="p-2 hover:bg-red-50 rounded-xl transition-all text-gray-400 hover:text-red-600 border border-transparent hover:border-red-100"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
                       </tr>
+
+                      {/* Expanded Mailbox Pool Row */}
+                      {expandedServerId === server.id && (
+                        <tr>
+                          <td colSpan={7} className="px-0 py-0 bg-gray-50/30">
+                            <div className="px-8 py-5 border-t border-gray-100">
+                              {/* Mailbox pool header */}
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 bg-[#745DF3]/5 rounded-xl flex items-center justify-center border border-[#745DF3]/10">
+                                    <Mail className="w-4 h-4 text-[#745DF3]" />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-black text-[#101828]">Mailbox Pool</p>
+                                    <p className="text-[10px] text-gray-400 font-medium">{(serverMailboxes[server.id] || []).length} mailbox{(serverMailboxes[server.id] || []).length !== 1 ? 'es' : ''} in rotation</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openCSVModal(server); }}
+                                    className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-black text-[#745DF3] bg-[#745DF3]/5 border border-[#745DF3]/10 rounded-xl hover:bg-[#745DF3]/10 transition-all uppercase tracking-widest"
+                                  >
+                                    <Upload className="w-3.5 h-3.5" />
+                                    CSV Import
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openAddMailboxModal(server); }}
+                                    className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-black text-white bg-[#101828] rounded-xl hover:bg-[#101828]/90 transition-all uppercase tracking-widest shadow-sm"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Add Mailbox
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Mailbox list */}
+                              {(serverMailboxes[server.id] || []).length > 0 ? (
+                                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                                  <table className="w-full text-left">
+                                    <thead>
+                                      <tr className="bg-gray-50/50 border-b border-gray-100">
+                                        <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Email</th>
+                                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">SMTP</th>
+                                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Daily Usage</th>
+                                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Sent</th>
+                                        <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                      {(serverMailboxes[server.id] || []).map((mb: ServerMailbox) => (
+                                        <tr key={mb.id} className="hover:bg-gray-50/30 transition-colors">
+                                          <td className="px-5 py-3">
+                                            <div>
+                                              <p className="text-xs font-bold text-[#101828]">{mb.email}</p>
+                                              {mb.display_name && mb.display_name !== mb.email.split('@')[0] && (
+                                                <p className="text-[10px] text-gray-400 mt-0.5">{mb.display_name}</p>
+                                              )}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <div className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest w-fit border ${
+                                              mb.status === 'active' ? 'bg-green-50 text-green-600 border-green-100' :
+                                              mb.status === 'warming' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                              mb.status === 'paused' ? 'bg-gray-50 text-gray-500 border-gray-100' :
+                                              mb.status === 'error' ? 'bg-red-50 text-red-600 border-red-100' :
+                                              'bg-gray-50 text-gray-400 border-gray-100'
+                                            }`}>
+                                              {mb.status}
+                                            </div>
+                                            {mb.error_message && (
+                                              <p className="text-[9px] text-red-400 mt-0.5 truncate max-w-[120px]" title={mb.error_message}>{mb.error_message}</p>
+                                            )}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <p className="text-[10px] text-gray-500 font-mono">
+                                              {mb.smtp_host || server.default_smtp_host || '—'}
+                                              <span className="text-gray-300">:</span>
+                                              {mb.smtp_port || server.default_smtp_port || '—'}
+                                            </p>
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                              <div className="w-14 h-1 bg-gray-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-[#745DF3] rounded-full" style={{ width: `${((mb.current_usage || 0) / (mb.daily_limit || 30)) * 100}%` }} />
+                                              </div>
+                                              <span className="text-[10px] font-bold text-gray-500">{mb.current_usage || 0}/{mb.daily_limit}</span>
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <span className="text-xs font-bold text-gray-600">{(mb.total_sends || 0).toLocaleString()}</span>
+                                          </td>
+                                          <td className="px-5 py-3 text-right">
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleDeleteMailbox(mb.id, server.id); }}
+                                              className="p-1.5 hover:bg-red-50 rounded-lg transition-all text-gray-300 hover:text-red-500"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+                                  <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-gray-100">
+                                    <Mail className="w-6 h-6 text-gray-200" />
+                                  </div>
+                                  <p className="text-sm font-bold text-gray-500 mb-1">No mailboxes yet</p>
+                                  <p className="text-xs text-gray-400 mb-4">Add mailboxes to this server pool to start rotating sends across multiple addresses.</p>
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); openCSVModal(server); }}
+                                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-[#745DF3] bg-[#745DF3]/5 border border-[#745DF3]/10 rounded-xl hover:bg-[#745DF3]/10 transition-all"
+                                    >
+                                      <Upload className="w-3.5 h-3.5" />
+                                      Import CSV
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); openAddMailboxModal(server); }}
+                                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-[#101828] rounded-xl hover:bg-[#101828]/90 transition-all"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      Add Mailbox
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Default SMTP/IMAP info */}
+                              {(server.default_smtp_host || server.default_imap_host) && (
+                                <div className="mt-3 flex items-center gap-4 px-1">
+                                  <p className="text-[9px] font-bold text-gray-400">
+                                    Default SMTP: <span className="text-gray-500 font-mono">{server.default_smtp_host || '—'}:{server.default_smtp_port || '—'}</span>
+                                  </p>
+                                  <p className="text-[9px] font-bold text-gray-400">
+                                    Default IMAP: <span className="text-gray-500 font-mono">{server.default_imap_host || '—'}:{server.default_imap_port || '—'}</span>
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-8 py-20 text-center">
+                      <td colSpan={7} className="px-8 py-20 text-center">
                         <div className="flex flex-col items-center gap-4">
                           <div className="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center border border-gray-100 shadow-inner">
                             <Server className="w-8 h-8 text-gray-200" />
@@ -512,8 +1012,94 @@ export default function PowerSendPage() {
             </div>
           </div>
 
+          {/* Warmup Progress Section */}
+          {warmingNodes.length > 0 && (
+            <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center border border-amber-100">
+                    <Flame className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-[#101828]">IP Warmup Progress</h3>
+                    <p className="text-xs text-gray-400 font-medium">{warmingNodes.length} node{warmingNodes.length !== 1 ? 's' : ''} currently warming up</p>
+                  </div>
+                </div>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {warmingNodes.map((node) => {
+                  const progress = Math.min((node.warmup_day / 28) * 100, 100);
+                  const dailyProgress = node.daily_limit > 0 ? ((node.warmup_daily_sends || 0) / node.daily_limit) * 100 : 0;
+                  return (
+                    <div key={node.id} className="px-8 py-5 flex items-center gap-6">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-2">
+                          <p className="font-bold text-[#101828] text-sm truncate">{node.name}</p>
+                          <span className="text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-lg uppercase tracking-widest">Day {node.warmup_day}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden border border-gray-100">
+                            <div 
+                              className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-700"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] font-black text-gray-500 whitespace-nowrap">{Math.round(progress)}% complete</span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Today</p>
+                        <p className="text-sm font-black text-[#101828]">{node.warmup_daily_sends || 0} <span className="text-gray-400 font-bold">/ {node.daily_limit}</span></p>
+                        <div className="w-20 h-1 bg-gray-100 rounded-full overflow-hidden mt-1">
+                          <div className="h-full bg-[#745DF3] rounded-full" style={{ width: `${dailyProgress}%` }} />
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <button
+                          onClick={() => handleStopWarmup(node.id)}
+                          className="px-3 py-1.5 text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-100 rounded-xl hover:bg-amber-100 transition-all uppercase tracking-widest"
+                        >
+                          Stop
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Warmup Schedule Reference */}
+              <div className="px-8 py-5 bg-gray-50/50 border-t border-gray-100">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">28-Day Warmup Schedule</p>
+                <div className="flex items-center gap-1">
+                  {warmupSchedule.map((step, idx) => (
+                    <div key={idx} className="flex-1 text-center">
+                      <div className={`h-6 rounded-md flex items-center justify-center text-[8px] font-black uppercase ${
+                        idx < (warmingNodes[0]?.warmup_day || 0) 
+                          ? 'bg-amber-500 text-white' 
+                          : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {step.limit}
+                      </div>
+                      <p className="text-[7px] font-bold text-gray-400 mt-0.5">D{step.day}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Infrastructure Health Footer */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="bg-amber-50 border border-amber-100 p-6 rounded-2xl flex items-start gap-4">
+              <Flame className="w-6 h-6 text-amber-500 shrink-0" />
+              <div>
+                <h4 className="font-bold text-gray-900 text-sm mb-1">IP Warmup</h4>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  New nodes start at 10 emails/day and gradually ramp to full capacity over 28 days. This builds IP reputation with ISPs and prevents blacklisting.
+                </p>
+              </div>
+            </div>
+
             <div className="bg-[#745DF3]/5 border border-[#745DF3]/10 p-6 rounded-2xl flex items-start gap-4">
               <ShieldCheck className="w-6 h-6 text-[#745DF3] shrink-0" />
               <div>
@@ -654,15 +1240,65 @@ export default function PowerSendPage() {
                       />
                     </div>
 
-                    {/* SMTP Configuration */}
+                    {/* Default SMTP/IMAP Settings */}
                     <div className="pt-4 border-t border-gray-100">
-                      <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-4">SMTP Configuration</p>
+                      <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-1">Default SMTP / IMAP</p>
+                      <p className="text-[10px] font-bold text-gray-400 mb-4">These defaults are inherited by all mailboxes in the pool unless overridden per-mailbox.</p>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Host</label>
                           <input
                             type="text"
-                            required
+                            placeholder="smtp.mailreef.com"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={formData.default_smtp_host}
+                            onChange={e => setFormData({ ...formData, default_smtp_host: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Port</label>
+                          <input
+                            type="text"
+                            placeholder="465"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={formData.default_smtp_port}
+                            onChange={e => setFormData({ ...formData, default_smtp_port: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">IMAP Host</label>
+                          <input
+                            type="text"
+                            placeholder="imap.mailreef.com"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={formData.default_imap_host}
+                            onChange={e => setFormData({ ...formData, default_imap_host: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">IMAP Port</label>
+                          <input
+                            type="text"
+                            placeholder="993"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={formData.default_imap_port}
+                            onChange={e => setFormData({ ...formData, default_imap_port: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Legacy SMTP Config (backward compat) */}
+                    <div className="pt-4 border-t border-gray-100">
+                      <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-1">Legacy SMTP Config</p>
+                      <p className="text-[10px] font-bold text-gray-400 mb-4">Single-mailbox fallback. Add mailboxes to the pool after creating the server for best results.</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Host</label>
+                          <input
+                            type="text"
                             placeholder="smtp.mailreef.com"
                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
                             value={formData.smtp_config.host}
@@ -673,7 +1309,6 @@ export default function PowerSendPage() {
                           <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Port</label>
                           <input
                             type="text"
-                            required
                             placeholder="465"
                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
                             value={formData.smtp_config.port}
@@ -683,10 +1318,9 @@ export default function PowerSendPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Username</label>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Username</label>
                           <input
                             type="text"
-                            required
                             placeholder="user@domain.com"
                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
                             value={formData.smtp_config.username}
@@ -694,10 +1328,9 @@ export default function PowerSendPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Password</label>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Password</label>
                           <input
                             type="password"
-                            required
                             placeholder="••••••••••••••••"
                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
                             value={formData.smtp_config.password}
@@ -706,7 +1339,7 @@ export default function PowerSendPage() {
                         </div>
                       </div>
                       <div className="mt-4">
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">From Email (on this node)</label>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">From Email</label>
                         <input
                           type="email"
                           placeholder="outreach@yourdomain.com"
@@ -1023,9 +1656,9 @@ export default function PowerSendPage() {
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-black text-orange-900 mb-1">Recommended Limits</p>
+                        <p className="text-sm font-black text-orange-900 mb-1">Use IP Warmup</p>
                         <p className="text-xs text-orange-800/80 font-medium leading-relaxed">
-                          For brand new servers, start with a <b>Daily Limit of 50</b>. Our system will automatically scale this up to 500+ as your reputation score remains high (80%+).
+                          For brand new servers, <b>always use the IP Warmup feature</b>. Click the flame icon on any node to start a 28-day warmup schedule that gradually ramps from 10 to 500+ emails/day. This builds ISP trust and prevents blacklisting.
                         </p>
                       </div>
                     </div>
@@ -1038,6 +1671,471 @@ export default function PowerSendPage() {
                     className="w-full py-4 bg-[#101828] text-white rounded-2xl text-sm font-bold hover:bg-[#101828]/90 transition-all shadow-xl shadow-gray-200"
                   >
                     Got it, let's build
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Start Warmup Modal */}
+      <AnimatePresence>
+        {isWarmupModalOpen && warmupTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setIsWarmupModalOpen(false); setWarmupTarget(null); }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100"
+            >
+              <button 
+                onClick={() => { setIsWarmupModalOpen(false); setWarmupTarget(null); }}
+                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="text-xl font-black text-[#101828]">Start IP Warmup</h3>
+                    <p className="text-sm text-gray-500 font-medium">Gradually build reputation for <span className="font-bold text-[#101828]">{warmupTarget.name}</span></p>
+                  </div>
+                  <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center border border-amber-100">
+                    <Flame className="w-6 h-6 text-amber-500" />
+                  </div>
+                </div>
+
+                {/* How it works */}
+                <div className="mb-6 p-4 bg-amber-50/50 rounded-2xl border border-amber-100">
+                  <div className="flex items-start gap-3">
+                    <Timer className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-amber-900 mb-1">28-Day Warmup Schedule</p>
+                      <p className="text-xs text-amber-800/80 leading-relaxed font-medium">
+                        Starts at <b>10 emails/day</b> and gradually ramps up to your target limit over 28 days. 
+                        Warmup emails are sent to our seed network to build ISP trust for your IP.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Schedule Preview */}
+                <div className="mb-6">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 px-1">Ramp-Up Preview</p>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {warmupSchedule.map((step, idx) => (
+                      <div key={idx} className="bg-gray-50 border border-gray-100 rounded-xl p-2 text-center">
+                        <p className="text-[9px] font-black text-gray-400 uppercase">Day {step.day}</p>
+                        <p className="text-sm font-black text-[#101828]">{step.limit}</p>
+                        <p className="text-[8px] text-gray-400 font-bold">emails</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Target Limit */}
+                <div className="mb-6">
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Target Daily Limit</label>
+                  <p className="text-[10px] text-gray-400 font-medium mb-2 px-1">The daily limit the node will reach after warmup completes.</p>
+                  <input
+                    type="number"
+                    min={100}
+                    max={5000}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all font-medium"
+                    value={warmupTargetLimit}
+                    onChange={(e) => setWarmupTargetLimit(parseInt(e.target.value) || 500)}
+                  />
+                </div>
+
+                {/* Node info */}
+                <div className="mb-6 flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-gray-100">
+                    <Globe className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-[#101828]">{warmupTarget.name}</p>
+                    <p className="text-xs text-gray-400 font-mono">{warmupTarget.ip_address || warmupTarget.domain_name}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Current</p>
+                    <p className="text-sm font-bold text-gray-600">{warmupTarget.daily_limit}/day</p>
+                  </div>
+                </div>
+
+                {/* Warning */}
+                <div className="mb-6 p-3 bg-orange-50/60 rounded-xl border border-orange-100 flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-orange-800 font-medium leading-relaxed">
+                    Starting warmup will set this node to <b>"Warming"</b> status and reduce its daily limit to <b>10 emails/day</b>. The node won't be used for campaign sends during warmup.
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setIsWarmupModalOpen(false); setWarmupTarget(null); }}
+                    className="flex-1 px-6 py-3 border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleStartWarmup}
+                    disabled={isWarmupSubmitting}
+                    className="flex-[2] px-6 py-3 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all shadow-xl shadow-amber-100 flex items-center justify-center gap-2"
+                  >
+                    {isWarmupSubmitting ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Flame className="w-4 h-4" />
+                    )}
+                    {isWarmupSubmitting ? 'Starting...' : 'Start Warmup'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Mailbox Modal */}
+      <AnimatePresence>
+        {isMailboxModalOpen && mailboxServer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setIsMailboxModalOpen(false); setMailboxServer(null); }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 max-h-[90vh] overflow-y-auto"
+            >
+              <button 
+                onClick={() => { setIsMailboxModalOpen(false); setMailboxServer(null); }}
+                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="text-xl font-black text-[#101828]">Add Mailbox</h3>
+                    <p className="text-sm text-gray-500 font-medium">Add to <span className="font-bold text-[#101828]">{mailboxServer.name}</span> pool</p>
+                  </div>
+                  <div className="w-12 h-12 bg-[#745DF3]/5 rounded-2xl flex items-center justify-center text-[#745DF3]">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <form onSubmit={handleAddMailbox} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Email Address</label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="sender@yourdomain.com"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                          value={mailboxFormData.email}
+                          onChange={e => setMailboxFormData({ ...mailboxFormData, email: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Display Name</label>
+                        <input
+                          type="text"
+                          placeholder="John Smith"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                          value={mailboxFormData.display_name}
+                          onChange={e => setMailboxFormData({ ...mailboxFormData, display_name: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Daily Limit</label>
+                        <input
+                          type="number"
+                          min={1}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                          value={mailboxFormData.daily_limit}
+                          onChange={e => setMailboxFormData({ ...mailboxFormData, daily_limit: parseInt(e.target.value) || 30 })}
+                        />
+                      </div>
+                    </div>
+
+                    {/* SMTP Override */}
+                    <div className="pt-4 border-t border-gray-100">
+                      <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-1">SMTP Settings</p>
+                      <p className="text-[10px] font-bold text-gray-400 mb-4">Leave blank to use server defaults ({mailboxServer.default_smtp_host || 'not set'}:{mailboxServer.default_smtp_port || '—'})</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Host</label>
+                          <input
+                            type="text"
+                            placeholder={mailboxServer.default_smtp_host || 'smtp.example.com'}
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={mailboxFormData.smtp_host}
+                            onChange={e => setMailboxFormData({ ...mailboxFormData, smtp_host: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Port</label>
+                          <input
+                            type="text"
+                            placeholder={mailboxServer.default_smtp_port?.toString() || '465'}
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={mailboxFormData.smtp_port}
+                            onChange={e => setMailboxFormData({ ...mailboxFormData, smtp_port: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Username</label>
+                          <input
+                            type="text"
+                            placeholder="user@domain.com"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={mailboxFormData.smtp_username}
+                            onChange={e => setMailboxFormData({ ...mailboxFormData, smtp_username: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">SMTP Password</label>
+                          <input
+                            type="password"
+                            placeholder="••••••••••••••••"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={mailboxFormData.smtp_password}
+                            onChange={e => setMailboxFormData({ ...mailboxFormData, smtp_password: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* IMAP Override */}
+                    <div className="pt-4 border-t border-gray-100">
+                      <p className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest mb-1">IMAP Settings</p>
+                      <p className="text-[10px] font-bold text-gray-400 mb-4">For inbox monitoring / reply tracking. Leave blank for server defaults.</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">IMAP Host</label>
+                          <input
+                            type="text"
+                            placeholder={mailboxServer.default_imap_host || 'imap.example.com'}
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={mailboxFormData.imap_host}
+                            onChange={e => setMailboxFormData({ ...mailboxFormData, imap_host: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">IMAP Port</label>
+                          <input
+                            type="text"
+                            placeholder={mailboxServer.default_imap_port?.toString() || '993'}
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={mailboxFormData.imap_port}
+                            onChange={e => setMailboxFormData({ ...mailboxFormData, imap_port: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">IMAP Username</label>
+                          <input
+                            type="text"
+                            placeholder="Same as email"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={mailboxFormData.imap_username}
+                            onChange={e => setMailboxFormData({ ...mailboxFormData, imap_username: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">IMAP Password</label>
+                          <input
+                            type="password"
+                            placeholder="••••••••••••••••"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                            value={mailboxFormData.imap_password}
+                            onChange={e => setMailboxFormData({ ...mailboxFormData, imap_password: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => { setIsMailboxModalOpen(false); setMailboxServer(null); }}
+                      className="flex-1 px-6 py-3 border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-[2] px-6 py-3 bg-[#101828] text-white rounded-xl text-sm font-bold hover:bg-[#101828]/90 transition-all shadow-xl shadow-gray-200 flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Mail className="w-4 h-4" />
+                      )}
+                      {isSubmitting ? 'Adding...' : 'Add to Pool'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* CSV Import Modal */}
+      <AnimatePresence>
+        {isCSVModalOpen && mailboxServer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setIsCSVModalOpen(false); setMailboxServer(null); }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden border border-gray-100 max-h-[90vh] overflow-y-auto"
+            >
+              <button 
+                onClick={() => { setIsCSVModalOpen(false); setMailboxServer(null); }}
+                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="text-xl font-black text-[#101828]">Bulk CSV Import</h3>
+                    <p className="text-sm text-gray-500 font-medium">Import mailboxes to <span className="font-bold text-[#101828]">{mailboxServer.name}</span></p>
+                  </div>
+                  <div className="w-12 h-12 bg-[#745DF3]/5 rounded-2xl flex items-center justify-center text-[#745DF3]">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                </div>
+
+                {/* CSV Format Guide */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Required CSV Format</p>
+                  <div className="bg-white rounded-xl p-3 border border-gray-100 font-mono text-[11px] text-gray-600 overflow-x-auto">
+                    <p className="text-[#745DF3] font-bold">email,smtp_username,smtp_password,display_name,daily_limit</p>
+                    <p>john@acme.com,john@acme.com,appPass123,John Smith,30</p>
+                    <p>sarah@acme.com,sarah@acme.com,appPass456,Sarah Lee,30</p>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-medium mt-2">
+                    Optional columns: smtp_host, smtp_port, imap_host, imap_port, imap_username, imap_password. 
+                    Blank SMTP/IMAP fields inherit server defaults.
+                  </p>
+                </div>
+
+                {/* Drag & Drop Zone */}
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleCSVFileDrop}
+                  className="mb-6 border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center hover:border-[#745DF3]/30 hover:bg-[#745DF3]/[0.02] transition-all cursor-pointer"
+                  onClick={() => document.getElementById('csv-file-input')?.click()}
+                >
+                  <input
+                    id="csv-file-input"
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={handleCSVFileSelect}
+                  />
+                  <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-gray-100">
+                    <FileText className="w-7 h-7 text-gray-300" />
+                  </div>
+                  <p className="text-sm font-bold text-gray-600 mb-1">Drop CSV file here or click to browse</p>
+                  <p className="text-xs text-gray-400">Supports .csv files with comma-separated values</p>
+                </div>
+
+                {/* Or paste CSV text */}
+                <div className="mb-6">
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Or Paste CSV Content</label>
+                  <textarea
+                    placeholder="email,smtp_username,smtp_password&#10;john@acme.com,john@acme.com,pass123"
+                    rows={5}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-mono"
+                    value={csvText}
+                    onChange={(e) => handleCSVPreview(e.target.value)}
+                  />
+                </div>
+
+                {/* Preview */}
+                {csvPreview.length > 0 && (
+                  <div className="mb-6">
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Preview ({csvPreview.length} row{csvPreview.length !== 1 ? 's' : ''} shown)</p>
+                    <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="px-3 py-2 text-[9px] font-black text-gray-400 uppercase">Email</th>
+                            <th className="px-3 py-2 text-[9px] font-black text-gray-400 uppercase">Username</th>
+                            <th className="px-3 py-2 text-[9px] font-black text-gray-400 uppercase">Name</th>
+                            <th className="px-3 py-2 text-[9px] font-black text-gray-400 uppercase">Limit</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {csvPreview.map((row, idx) => (
+                            <tr key={idx}>
+                              <td className="px-3 py-1.5 text-[10px] font-medium text-gray-700">{row.email || row.email_address || '—'}</td>
+                              <td className="px-3 py-1.5 text-[10px] font-mono text-gray-500">{row.smtp_username || row.username || '—'}</td>
+                              <td className="px-3 py-1.5 text-[10px] text-gray-500">{row.display_name || row.name || '—'}</td>
+                              <td className="px-3 py-1.5 text-[10px] text-gray-500">{row.daily_limit || '30'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {csvText.trim().split('\n').length - 1} total mailboxes will be imported
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => { setIsCSVModalOpen(false); setMailboxServer(null); }}
+                    className="flex-1 px-6 py-3 border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCSVUpload}
+                    disabled={isImporting || !csvText.trim()}
+                    className="flex-[2] px-6 py-3 bg-[#101828] text-white rounded-xl text-sm font-bold hover:bg-[#101828]/90 transition-all shadow-xl shadow-gray-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isImporting ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
+                    {isImporting ? 'Importing...' : 'Import Mailboxes'}
                   </button>
                 </div>
               </div>

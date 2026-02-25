@@ -219,45 +219,89 @@ export const emailProcessor = inngest.createFunction(
         
         if (node && !nodeError) {
           powersendNodeId = node.id;
-          const smtpConfig = node.smtp_config || {};
-          
-          // Construct a virtual sender account from the node's SMTP config
-          // The sender_id email account is still used for the "From" address
-          const senderId = (campaignRes.data as any)?.sender_id;
-          let fromEmail = smtpConfig.from_email || 'outreach@' + (node.domain_name || 'mail.example.com');
-          let fromName = null;
-          
-          if (senderId) {
-            const { data: senderAccount } = await supabase
-              .from("email_accounts")
-              .select("email, from_name")
-              .eq("id", senderId)
-              .single();
-            if (senderAccount) {
-              fromEmail = (senderAccount as any).email;
-              fromName = (senderAccount as any).from_name;
-            }
-          }
 
-          account = {
-            id: node.id,
-            email: fromEmail,
-            from_name: fromName,
-            provider: 'custom_smtp',
-            config: {
-              smtpHost: smtpConfig.host || (node.provider === 'mailreef' ? 'smtp.mailreef.com' : 'smtp.custom.com'),
-              smtpPort: smtpConfig.port || '465',
-              smtpUser: smtpConfig.username || node.api_key,
-              smtpPass: smtpConfig.password || node.api_key,
+          // Try mailbox pool first (new architecture: 1 server = N mailboxes)
+          const { data: mailbox, error: mbError } = await (supabase as any)
+            .rpc('get_next_pool_mailbox', { server_id_param: node.id })
+            .single();
+
+          if (mailbox && !mbError && mailbox.email) {
+            // Mailbox pool path — use the pool mailbox's SMTP config
+            account = {
+              id: mailbox.id,
+              email: mailbox.email,
+              from_name: mailbox.display_name || mailbox.email.split('@')[0],
+              provider: 'custom_smtp',
+              config: {
+                smtpHost: mailbox.smtp_host,
+                smtpPort: String(mailbox.smtp_port || '465'),
+                smtpUser: mailbox.smtp_username,
+                smtpPass: mailbox.smtp_password,
+              }
+            };
+
+            // Increment mailbox usage counter
+            await (supabase as any).rpc('increment_mailbox_usage', { mailbox_id_param: mailbox.id });
+          } else {
+            // Legacy fallback — use the node's smtp_config JSONB directly
+            const smtpConfig = node.smtp_config || {};
+            const senderId = (campaignRes.data as any)?.sender_id;
+            let fromEmail = smtpConfig.from_email || 'outreach@' + (node.domain_name || 'mail.example.com');
+            let fromName = null;
+            
+            if (senderId) {
+              const { data: senderAccount } = await supabase
+                .from("email_accounts")
+                .select("email, from_name")
+                .eq("id", senderId)
+                .single();
+              if (senderAccount) {
+                fromEmail = (senderAccount as any).email;
+                fromName = (senderAccount as any).from_name;
+              }
             }
-          };
+
+            account = {
+              id: node.id,
+              email: fromEmail,
+              from_name: fromName,
+              provider: 'custom_smtp',
+              config: {
+                smtpHost: smtpConfig.host || (node.provider === 'mailreef' ? 'smtp.mailreef.com' : 'smtp.custom.com'),
+                smtpPort: smtpConfig.port || '465',
+                smtpUser: smtpConfig.username || node.api_key,
+                smtpPass: smtpConfig.password || node.api_key,
+              }
+            };
+          }
         }
       }
 
       // Fallback to traditional sender accounts if not PowerSend or PowerSend failed
       if (!account) {
+        const senderIds: string[] = (campaignRes.data as any)?.sender_ids || [];
         const senderId = (campaignRes.data as any)?.sender_id;
-        if (senderId) {
+
+        if (senderIds.length > 1) {
+          // Multi-sender rotation: pick account round-robin based on leadId hash
+          const leadHash = leadId.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
+          const rotationIdx = leadHash % senderIds.length;
+          const chosenSenderId = senderIds[rotationIdx];
+          const { data: rotatedAccount } = await supabase
+            .from("email_accounts")
+            .select("*")
+            .eq("id", chosenSenderId)
+            .single();
+          account = rotatedAccount;
+        } else if (senderIds.length === 1) {
+          const { data: specificAccount } = await supabase
+            .from("email_accounts")
+            .select("*")
+            .eq("id", senderIds[0])
+            .single();
+          account = specificAccount;
+        } else if (senderId) {
+          // Legacy single sender_id fallback
           const { data: specificAccount } = await supabase
             .from("email_accounts")
             .select("*")
@@ -646,6 +690,211 @@ export const powersendReputationMonitor = inngest.createFunction(
     return {
       checked: results.length,
       guardActions: (guardActions as any[])?.length || 0,
+    };
+  }
+);
+
+/**
+ * 4c. PowerSend Warmup Scheduler
+ * Runs every hour — finds all nodes in warmup mode and fans out to send
+ * warmup emails through their SMTP, spreading sends across the day.
+ */
+export const powersendWarmupScheduler = inngest.createFunction(
+  { id: "powersend-warmup-scheduler" },
+  { cron: "0 * * * *" }, // Every hour
+  async ({ step }) => {
+    const supabase = getAdminClient();
+
+    const servers = await step.run("fetch-warming-nodes", async () => {
+      const { data, error } = await supabase
+        .from("smart_servers")
+        .select("id, name, org_id, daily_limit, warmup_daily_sends, warmup_day")
+        .eq("warmup_enabled", true)
+        .eq("status", "warming");
+      if (error) throw error;
+      return data || [];
+    });
+
+    if (servers.length === 0) return { message: "No nodes warming up" };
+
+    const events = (servers as any[]).map((s) => ({
+      name: "powersend-warmup/node.process",
+      data: { serverId: s.id, orgId: s.org_id },
+    }));
+
+    await step.sendEvent("fan-out-warmup-sends", events);
+    return { count: servers.length };
+  }
+);
+
+/**
+ * 4d. PowerSend Warmup Processor
+ * Sends warmup emails through a specific node's SMTP config to build IP rep.
+ * Sends to warmup seeds, similar to the email account warmup system.
+ */
+export const powersendWarmupProcessor = inngest.createFunction(
+  { id: "powersend-warmup-processor", concurrency: 3 },
+  { event: "powersend-warmup/node.process" },
+  async ({ event, step }) => {
+    const { serverId, orgId } = event.data;
+    const supabase = getAdminClient();
+
+    const data = await step.run("fetch-warmup-context", async () => {
+      const { data: server } = await supabase
+        .from("smart_servers")
+        .select("*")
+        .eq("id", serverId)
+        .single();
+      return server;
+    });
+
+    if (!data || !(data as any).warmup_enabled) return { skipped: true };
+
+    const server = data as any;
+    const currentHour = new Date().getHours();
+    // Spread daily_limit over 16 waking hours (6am-10pm)
+    const sendingHours = 16;
+    const targetSentByNow = Math.ceil((server.daily_limit / sendingHours) * Math.min(currentHour - 5, sendingHours));
+    const remaining = targetSentByNow - (server.warmup_daily_sends || 0);
+
+    if (remaining <= 0 || (server.warmup_daily_sends || 0) >= server.daily_limit) {
+      return { message: "Quota reached for this hour or day", node: server.name };
+    }
+
+    // Send warmup emails (1-3 per invocation to be gentle)
+    const toSend = Math.min(remaining, 3);
+
+    await step.run("send-warmup-emails", async () => {
+      // Fetch pool mailboxes for this server (new architecture)
+      const { data: poolMailboxes } = await supabase
+        .from("server_mailboxes")
+        .select("*")
+        .eq("server_id", serverId)
+        .in("status", ["active", "warming"])
+        .order("last_sent_at", { ascending: true, nullsFirst: true });
+
+      const hasPool = poolMailboxes && poolMailboxes.length > 0;
+
+      for (let i = 0; i < toSend; i++) {
+        try {
+          // Get random seed
+          const { data: seeds } = await (supabase as any).rpc("get_random_seed");
+          const seed = Array.isArray(seeds) ? seeds[0]?.email : seeds?.email;
+          if (!seed) continue;
+
+          // Get random content
+          const [subjectRes, bodyRes] = await Promise.all([
+            (supabase as any).rpc("get_random_warmup_content", { req_category: "subject", num_results: 1 }),
+            (supabase as any).rpc("get_random_warmup_content", { req_category: "body", num_results: 1 }),
+          ]);
+
+          const subject = subjectRes.data?.[0]?.content || "Quick update";
+          const body = bodyRes.data?.[0]?.content || "Just checking in — any updates on your end?";
+
+          let syntheticAccount: any;
+
+          if (hasPool) {
+            // Rotate through pool mailboxes round-robin
+            const mb = poolMailboxes[i % poolMailboxes.length] as any;
+            syntheticAccount = {
+              id: mb.id,
+              email: mb.email,
+              smtp_host: mb.smtp_host || server.default_smtp_host,
+              smtp_port: mb.smtp_port || server.default_smtp_port || 465,
+              smtp_username: mb.smtp_username || mb.email,
+              smtp_password: mb.smtp_password,
+              provider: "smtp",
+            };
+
+            // Increment mailbox usage
+            await (supabase as any).rpc("increment_mailbox_usage", { mailbox_id_param: mb.id });
+          } else {
+            // Legacy fallback — use the node's smtp_config JSONB
+            const smtpConfig = server.smtp_config || {};
+            syntheticAccount = {
+              id: serverId,
+              email: smtpConfig.from_email || `warmup@${server.domain_name}`,
+              smtp_host: smtpConfig.host,
+              smtp_port: parseInt(smtpConfig.port || "465"),
+              smtp_username: smtpConfig.username,
+              smtp_password: smtpConfig.password,
+              provider: "smtp",
+            };
+          }
+
+          await sendOutreachEmail({
+            to: seed,
+            subject,
+            bodyHtml: `<p>${body}</p>`,
+            fromName: server.name.split(" ")[0],
+            account: syntheticAccount,
+          });
+
+          // Track the send
+          await (supabase as any).rpc("increment_powersend_warmup_send", {
+            server_id_param: serverId,
+          });
+        } catch (err: any) {
+          console.error(`PowerSend warmup send failed for node ${server.name}:`, err);
+        }
+      }
+    });
+
+    return { success: true, node: server.name, sent: toSend };
+  }
+);
+
+/**
+ * 4e. PowerSend Warmup Daily Ramp-Up
+ * Runs at midnight to advance warmup day, increase limits, and graduate
+ * nodes that have completed the ~28-day warmup schedule.
+ */
+export const powersendWarmupRampUp = inngest.createFunction(
+  { id: "powersend-warmup-rampup" },
+  { cron: "0 0 * * *" }, // Midnight
+  async ({ step }) => {
+    const supabase = getAdminClient();
+
+    // 1. Advance all warming nodes to next day + adjust limits
+    const results = await step.run("advance-warmup-schedule", async () => {
+      const { data, error } = await (supabase as any).rpc("advance_powersend_warmup");
+      if (error) throw error;
+      return data || [];
+    });
+
+    // 2. Reset daily warmup send counters
+    await step.run("reset-warmup-sends", async () => {
+      await (supabase as any).rpc("reset_powersend_warmup_sends");
+    });
+
+    // 3. Notify on completions
+    const completions = (results as any[]).filter((r: any) => r.completed);
+    if (completions.length > 0) {
+      await step.run("notify-completions", async () => {
+        for (const c of completions) {
+          const { data: server } = await supabase
+            .from("smart_servers")
+            .select("org_id, name")
+            .eq("id", c.server_id)
+            .single();
+
+          if (server) {
+            await createNotification({
+              orgId: (server as any).org_id,
+              title: "Node Warmup Complete",
+              description: `"${(server as any).name}" has completed its ${c.new_day}-day IP warmup and is now active at full capacity.`,
+              type: "success",
+              category: "system" as any,
+              link: "/dashboard/powersend",
+            });
+          }
+        }
+      });
+    }
+
+    return {
+      advanced: (results as any[]).length,
+      completed: completions.length,
     };
   }
 );

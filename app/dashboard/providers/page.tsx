@@ -27,7 +27,9 @@ import {
   Loader2,
   Activity,
   FileText,
-  MailPlus
+  MailPlus,
+  Upload,
+  X
 } from 'lucide-react';
 
 const providerTypes = [
@@ -82,6 +84,10 @@ export default function EmailProvidersPage() {
   const [selectedSender, setSelectedSender] = useState('');
   const [isAddingAccount, setIsAddingAccount] = useState<string | null>(null);
   const [isSMTPModalOpen, setIsSMTPModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkCsvText, setBulkCsvText] = useState('');
+  const [bulkPreview, setBulkPreview] = useState<any[]>([]);
+  const [isBulkImporting, setIsBulkImporting] = useState(false);
   const [isDNSGuideOpen, setIsDNSGuideOpen] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [domainSearch, setDomainSearch] = useState('');
@@ -227,6 +233,70 @@ export default function EmailProvidersPage() {
     }
   };
 
+  // --- Bulk CSV Import ---
+  const handleBulkCSVPreview = (text: string) => {
+    setBulkCsvText(text);
+    try {
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) { setBulkPreview([]); return; }
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const preview = lines.slice(1, 6).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const row: Record<string, string> = {};
+        headers.forEach((h, i) => { row[h] = values[i] || ''; });
+        return row;
+      }).filter(r => r['email'] || r['email_address']);
+      setBulkPreview(preview);
+    } catch {
+      setBulkPreview([]);
+    }
+  };
+
+  const handleBulkUpload = async () => {
+    if (!bulkCsvText.trim()) return;
+    try {
+      setIsBulkImporting(true);
+      const res = await fetch('/api/accounts/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csv: bulkCsvText })
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || 'Bulk import failed');
+      }
+      showToast(result.message || `Imported ${result.imported} accounts`);
+      setIsBulkModalOpen(false);
+      setBulkCsvText('');
+      setBulkPreview([]);
+      await fetchData();
+    } catch (err: any) {
+      console.error('Bulk import error:', err);
+      showToast(err.message || 'Bulk import failed', 'error');
+    } finally {
+      setIsBulkImporting(false);
+    }
+  };
+
+  const handleBulkFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => handleBulkCSVPreview(ev.target?.result as string);
+      reader.readAsText(file);
+    }
+  };
+
+  const handleBulkFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => handleBulkCSVPreview(ev.target?.result as string);
+      reader.readAsText(file);
+    }
+  };
+
   const handleAddDomain = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDomain) return;
@@ -365,7 +435,7 @@ export default function EmailProvidersPage() {
                   exit={{ opacity: 0, y: -10 }}
                   className="space-y-10"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                     {/* OAuth Providers */}
                     {providerTypes.map((provider) => (
                       <div key={provider.id} className="bg-white p-8 rounded-[2rem] border border-gray-100 flex flex-col items-center text-center group hover:shadow-xl transition-all shadow-[#101828]/5 relative overflow-hidden">
@@ -397,7 +467,9 @@ export default function EmailProvidersPage() {
                     ))}
 
                     {/* SMTP Manual */}
-                    <div className="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 flex flex-col items-center justify-center text-center hover:border-[#745DF3]/40 transition-all cursor-pointer group">
+                    <div className="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 flex flex-col items-center justify-center text-center hover:border-[#745DF3]/40 transition-all cursor-pointer group"
+                      onClick={() => setIsSMTPModalOpen(true)}
+                    >
                       <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-6 group-hover:bg-[#745DF3]/5 transition-colors">
                         <Settings2 className="w-8 h-8 text-gray-300 group-hover:text-[#745DF3]" />
                       </div>
@@ -410,6 +482,26 @@ export default function EmailProvidersPage() {
                         className="px-8 py-3 bg-white border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:text-[#101828] hover:border-[#101828] transition-all"
                       >
                         Setup Manually
+                      </button>
+                    </div>
+
+                    {/* Bulk CSV Import */}
+                    <div 
+                      className="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 flex flex-col items-center justify-center text-center hover:border-emerald-300 transition-all cursor-pointer group"
+                      onClick={() => setIsBulkModalOpen(true)}
+                    >
+                      <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-6 group-hover:bg-emerald-100 transition-colors border border-emerald-100">
+                        <Upload className="w-8 h-8 text-emerald-400 group-hover:text-emerald-600" />
+                      </div>
+                      <h3 className="text-xl font-black text-[#101828] mb-2">Bulk CSV Import</h3>
+                      <p className="text-sm text-gray-400 font-medium mb-8 leading-relaxed">
+                        Upload a CSV to add multiple SMTP accounts at once. Perfect for agencies.
+                      </p>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setIsBulkModalOpen(true); }}
+                        className="px-8 py-3 bg-white border border-emerald-100 rounded-xl text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:border-emerald-300 transition-all"
+                      >
+                        Import Accounts
                       </button>
                     </div>
                   </div>
@@ -895,6 +987,151 @@ export default function EmailProvidersPage() {
         onClose={() => setIsSMTPModalOpen(false)}
         onConnect={handleConnectSMTP}
       />
+
+      {/* Bulk CSV Import Modal */}
+      <AnimatePresence>
+        {isBulkModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => { setIsBulkModalOpen(false); setBulkCsvText(''); setBulkPreview([]); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#101828] border border-gray-800 rounded-[32px] p-8 w-full max-w-2xl mx-4 max-h-[85vh] overflow-y-auto"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                    <Upload className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white tracking-tight">Bulk CSV Import</h3>
+                    <p className="text-sm text-gray-400">Import multiple SMTP accounts at once</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setIsBulkModalOpen(false); setBulkCsvText(''); setBulkPreview([]); }}
+                  className="w-8 h-8 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+
+              {/* CSV Format Guide */}
+              <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-4 mb-6">
+                <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Required CSV Format</p>
+                <code className="text-xs text-emerald-400 break-all leading-relaxed">
+                  email, smtp_host, smtp_port, smtp_user, smtp_pass, imap_host, imap_port, imap_user, imap_pass
+                </code>
+                <p className="text-xs text-gray-500 mt-2">
+                  Flexible column names: email/email_address, smtp_host/smtp_server, smtp_user/smtp_username, etc.
+                </p>
+              </div>
+
+              {/* Drag & Drop Zone */}
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleBulkFileDrop}
+                className="border-2 border-dashed border-gray-700 hover:border-emerald-500/50 rounded-2xl p-8 text-center transition-colors cursor-pointer mb-4"
+                onClick={() => document.getElementById('bulk-csv-file-input')?.click()}
+              >
+                <Upload className="w-8 h-8 text-gray-500 mx-auto mb-3" />
+                <p className="text-sm text-gray-400 font-medium">Drop a CSV file here or click to browse</p>
+                <p className="text-xs text-gray-600 mt-1">Supports .csv files</p>
+                <input
+                  id="bulk-csv-file-input"
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={handleBulkFileSelect}
+                />
+              </div>
+
+              {/* Or Paste */}
+              <div className="relative mb-4">
+                <div className="absolute -top-3 left-4 bg-[#101828] px-2">
+                  <span className="text-xs text-gray-500 font-medium">Or paste CSV content</span>
+                </div>
+                <textarea
+                  value={bulkCsvText}
+                  onChange={(e) => handleBulkCSVPreview(e.target.value)}
+                  placeholder={`email,smtp_host,smtp_port,smtp_user,smtp_pass,imap_host,imap_port,imap_user,imap_pass\njohn@company.com,smtp.company.com,587,john@company.com,password123,imap.company.com,993,john@company.com,password123`}
+                  className="w-full h-32 bg-gray-900/50 border border-gray-800 rounded-2xl p-4 text-sm text-white font-mono placeholder-gray-700 resize-none focus:outline-none focus:border-emerald-500/50 transition-colors"
+                />
+              </div>
+
+              {/* Preview Table */}
+              {bulkPreview.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    Preview ({bulkPreview.length} row{bulkPreview.length > 1 ? 's' : ''} shown)
+                  </p>
+                  <div className="bg-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-gray-800">
+                            <th className="px-3 py-2 text-left text-gray-400 font-medium">Email</th>
+                            <th className="px-3 py-2 text-left text-gray-400 font-medium">SMTP Host</th>
+                            <th className="px-3 py-2 text-left text-gray-400 font-medium">Port</th>
+                            <th className="px-3 py-2 text-left text-gray-400 font-medium">IMAP Host</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bulkPreview.map((row, i) => (
+                            <tr key={i} className="border-b border-gray-800/50">
+                              <td className="px-3 py-2 text-emerald-400 font-mono">{row.email || row.email_address || '-'}</td>
+                              <td className="px-3 py-2 text-gray-300 font-mono">{row.smtp_host || row.smtp_server || '-'}</td>
+                              <td className="px-3 py-2 text-gray-300">{row.smtp_port || '587'}</td>
+                              <td className="px-3 py-2 text-gray-300 font-mono">{row.imap_host || row.imap_server || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center gap-3 justify-end">
+                <button
+                  onClick={() => { setIsBulkModalOpen(false); setBulkCsvText(''); setBulkPreview([]); }}
+                  className="px-5 py-2.5 rounded-2xl bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkUpload}
+                  disabled={!bulkCsvText.trim() || isBulkImporting}
+                  className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center gap-2 transition-colors"
+                >
+                  {isBulkImporting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Import Accounts
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <DNSGuideModal 
         isOpen={isDNSGuideOpen}

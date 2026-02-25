@@ -68,6 +68,8 @@ export default function CreateCampaignPage() {
   // Real Data States
   const [accounts, setAccounts] = useState<any[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [isSmartSending, setIsSmartSending] = useState(false);
   const [showSmartSendingInfo, setShowSmartSendingInfo] = useState(false);
   const [savedTemplates, setSavedTemplates] = useState<any[]>([]);
@@ -138,6 +140,7 @@ export default function CreateCampaignPage() {
         
         if (validatedAccounts.length > 0) {
           setSelectedAccountId(validatedAccounts[0].id);
+          setSelectedAccountIds([validatedAccounts[0].id]);
         }
         setSavedTemplates(Array.isArray(tempData) ? tempData : []);
         
@@ -316,7 +319,7 @@ export default function CreateCampaignPage() {
 
   const handleLaunch = async () => {
     if (!campaignName) return showToast("Please enter a campaign name", "error");
-    if (!selectedAccountId) return showToast("Please select a sender profile", "error");
+    if (selectedAccountIds.length === 0) return showToast("Please select at least one sender profile", "error");
     if (selectedLeadIds.length === 0) return showToast("Please select at least one lead", "error");
     if (emailSteps.length === 0 || !emailSteps[0].subject || !emailSteps[0].body) {
       return showToast("Please complete at least the first email in your sequence", "error");
@@ -329,7 +332,8 @@ export default function CreateCampaignPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: campaignName,
-          sender_id: selectedAccountId,
+          sender_id: selectedAccountIds[0],
+          sender_ids: selectedAccountIds,
           lead_ids: selectedLeadIds,
           steps: emailSteps,
           status: 'running',
@@ -364,7 +368,8 @@ export default function CreateCampaignPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: campaignName,
-          sender_id: selectedAccountId || null,
+          sender_id: selectedAccountIds[0] || null,
+          sender_ids: selectedAccountIds,
           lead_ids: selectedLeadIds,
           steps: emailSteps,
           status: 'draft',
@@ -386,7 +391,7 @@ export default function CreateCampaignPage() {
 
   const isLaunchDisabled = currentStep === 5 && (
     !campaignName || 
-    !selectedAccountId || 
+    selectedAccountIds.length === 0 || 
     selectedLeadIds.length === 0 ||
     emailSteps.length === 0 || 
     !emailSteps[0].subject || 
@@ -511,22 +516,113 @@ export default function CreateCampaignPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Sender Profile</label>
-                        <select 
-                          value={selectedAccountId}
-                          onChange={(e) => setSelectedAccountId(e.target.value)}
-                          className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-[#101828] focus:ring-2 focus:ring-[#745DF3]/20 transition-all outline-none appearance-none"
-                        >
-                          {!Array.isArray(accounts) || accounts.length === 0 ? (
-                            <option value="">No sender profiles found</option>
-                          ) : (
-                            accounts.map(acc => (
-                              <option key={acc.id} value={acc.id}>
-                                {acc.email} ({acc.provider})
-                              </option>
-                            ))
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">
+                          Sender Profile{accounts.length > 1 ? 's' : ''}
+                          {selectedAccountIds.length > 1 && (
+                            <span className="ml-2 text-[#745DF3] normal-case">({selectedAccountIds.length} selected — will rotate)</span>
                           )}
-                        </select>
+                        </label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+                            className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-[#101828] focus:ring-2 focus:ring-[#745DF3]/20 transition-all outline-none text-left flex items-center justify-between"
+                          >
+                            <span className="truncate">
+                              {selectedAccountIds.length === 0 
+                                ? 'Select sender profiles...'
+                                : selectedAccountIds.length === 1
+                                  ? accounts.find(a => a.id === selectedAccountIds[0])?.email || 'Selected'
+                                  : `${selectedAccountIds.length} accounts selected`
+                              }
+                            </span>
+                            <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showAccountDropdown ? 'rotate-90' : ''}`} />
+                          </button>
+                          
+                          <AnimatePresence>
+                            {showAccountDropdown && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -4 }}
+                                className="absolute z-50 mt-2 w-full bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden"
+                              >
+                                {/* Select All / Clear */}
+                                <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedAccountIds(accounts.map(a => a.id))}
+                                    className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest hover:underline"
+                                  >
+                                    Select All
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedAccountIds([])}
+                                    className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:underline"
+                                  >
+                                    Clear
+                                  </button>
+                                </div>
+                                <div className="max-h-48 overflow-y-auto">
+                                  {!Array.isArray(accounts) || accounts.length === 0 ? (
+                                    <div className="px-4 py-3 text-sm text-gray-400">No sender profiles found</div>
+                                  ) : (
+                                    accounts.map(acc => {
+                                      const isSelected = selectedAccountIds.includes(acc.id);
+                                      return (
+                                        <button
+                                          key={acc.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedAccountIds(prev => 
+                                              isSelected 
+                                                ? prev.filter(id => id !== acc.id) 
+                                                : [...prev, acc.id]
+                                            );
+                                            setSelectedAccountId(isSelected ? '' : acc.id);
+                                          }}
+                                          className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left ${isSelected ? 'bg-[#745DF3]/5' : ''}`}
+                                        >
+                                          <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
+                                            isSelected ? 'bg-[#745DF3] border-[#745DF3]' : 'border-gray-200'
+                                          }`}>
+                                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-[#101828] truncate">{acc.email}</p>
+                                            <p className="text-[10px] text-gray-400 uppercase tracking-wider">{acc.provider}</p>
+                                          </div>
+                                          {acc.status === 'active' && (
+                                            <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                                          )}
+                                        </button>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                                <div className="px-4 py-3 border-t border-gray-50">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAccountDropdown(false)}
+                                    className="w-full py-2 rounded-xl bg-[#745DF3] text-white text-xs font-black uppercase tracking-widest hover:bg-[#6246E0] transition-colors"
+                                  >
+                                    Done
+                                  </button>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+
+                        {selectedAccountIds.length > 1 && (
+                          <div className="mt-2 pl-2">
+                            <p className="text-[10px] text-[#745DF3] font-medium">
+                              Emails will be distributed across selected profiles using round-robin rotation to protect sender reputation.
+                            </p>
+                          </div>
+                        )}
+
                         {!Array.isArray(accounts) || accounts.length === 0 ? (
                           <div className="mt-2 pl-2">
                              <Link href="/dashboard/providers" className="text-[#745DF3] text-[10px] font-black uppercase tracking-widest hover:underline flex items-center gap-1">
@@ -1211,9 +1307,14 @@ export default function CreateCampaignPage() {
                               </span>
                            </div>
                            <div className="flex justify-between py-2 border-b border-gray-50">
-                              <span className="text-xs font-bold text-gray-400">Sender Profile</span>
-                              <span className={`text-xs font-black ${selectedAccountId ? 'text-[#101828]' : 'text-red-400'}`}>
-                                 {accounts.find(a => a.id === selectedAccountId)?.email || 'None selected'}
+                              <span className="text-xs font-bold text-gray-400">Sender Profile{selectedAccountIds.length > 1 ? 's' : ''}</span>
+                              <span className={`text-xs font-black ${selectedAccountIds.length > 0 ? 'text-[#101828]' : 'text-red-400'}`}>
+                                 {selectedAccountIds.length === 0 
+                                   ? 'None selected' 
+                                   : selectedAccountIds.length === 1 
+                                     ? accounts.find(a => a.id === selectedAccountIds[0])?.email || 'Selected'
+                                     : `${selectedAccountIds.length} accounts (rotating)`
+                                 }
                               </span>
                            </div>
                            <div className="flex justify-between py-2 border-b border-gray-50">
@@ -1222,7 +1323,7 @@ export default function CreateCampaignPage() {
                                  {isSmartSending ? 'Enabled' : 'Disabled'}
                               </span>
                            </div>
-                           {!campaignName || !selectedAccountId ? (
+                           {!campaignName || selectedAccountIds.length === 0 ? (
                              <div className="pt-2">
                                <p className="text-[10px] font-black text-red-400 uppercase tracking-widest leading-relaxed">
                                  Please go back to Step 1: Setup to complete the campaign details.
