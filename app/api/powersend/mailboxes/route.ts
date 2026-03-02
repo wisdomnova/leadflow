@@ -12,11 +12,13 @@ export async function GET(req: Request) {
   if (!context) return new NextResponse('Unauthorized', { status: 401 });
 
   try {
-    const { supabase, orgId } = context;
+    const { orgId } = context;
     const { searchParams } = new URL(req.url);
     const serverId = searchParams.get('serverId');
 
-    let query = supabase
+    const adminClient = getAdminClient();
+
+    let query = adminClient
       .from('server_mailboxes')
       .select('*')
       .eq('org_id', orgId)
@@ -73,19 +75,20 @@ export async function POST(req: Request) {
       return new NextResponse('Missing serverId', { status: 400 });
     }
 
-    // Verify server ownership
-    const { data: server, error: serverError } = await supabase
+    const adminClient = getAdminClient();
+
+    // Verify server ownership using admin client to avoid RLS issues
+    const { data: server, error: serverError } = await adminClient
       .from('smart_servers')
-      .select('id, org_id, default_smtp_host, default_smtp_port')
+      .select('id, org_id, default_smtp_host, default_smtp_port, default_imap_host, default_imap_port')
       .eq('id', serverId)
       .eq('org_id', orgId)
       .single();
 
     if (serverError || !server) {
-      return new NextResponse('Server not found', { status: 404 });
+      console.error('Server lookup failed:', serverError);
+      return new NextResponse('Server not found or access denied', { status: 404 });
     }
-
-    const adminClient = getAdminClient();
     let mailboxRows: any[] = [];
 
     if (body.csv) {
@@ -172,7 +175,6 @@ export async function PATCH(req: Request) {
     if (!mailboxId) return new NextResponse('Missing mailboxId', { status: 400 });
 
     const adminClient = getAdminClient();
-
     const { data, error } = await (adminClient as any)
       .from('server_mailboxes')
       .update({ ...updates, updated_at: new Date().toISOString() })

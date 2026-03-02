@@ -22,24 +22,30 @@ export async function GET() {
     }
 
     // Fetch smart servers
-    const { data: servers, error: serversError } = await supabase
+    // Use admin client for reliable reads (avoids custom JWT + RLS edge cases)
+    const { getAdminClient } = await import('@/lib/supabase');
+    const adminClient = getAdminClient();
+
+    const { data: servers, error: serversError } = await (adminClient as any)
       .from('smart_servers')
       .select('*')
+      .eq('org_id', orgId)
       .order('created_at', { ascending: false });
 
     if (serversError) throw serversError;
 
     // Fetch some stats (count unique nodes, avg reputation, etc.)
+    const serverList = (servers || []) as any[];
     const stats = {
-      totalNodes: servers?.length || 0,
-      activeNodes: servers?.filter(s => s.status === 'active').length || 0,
-      avgReputation: servers?.length 
-        ? Math.round(servers.reduce((acc, s) => acc + (s.reputation_score || 0), 0) / servers.length) 
+      totalNodes: serverList.length,
+      activeNodes: serverList.filter((s: any) => s.status === 'active').length,
+      avgReputation: serverList.length 
+        ? Math.round(serverList.reduce((acc: number, s: any) => acc + (s.reputation_score || 0), 0) / serverList.length) 
         : 100,
-      totalSends: servers?.reduce((acc, s) => acc + (s.total_sends || 0), 0) || 0,
+      totalSends: serverList.reduce((acc: number, s: any) => acc + (s.total_sends || 0), 0),
     };
 
-    return NextResponse.json({ servers, stats });
+    return NextResponse.json({ servers: serverList, stats });
   } catch (error: any) {
     console.error('Error fetching powersend data:', error);
     return new NextResponse(error.message, { status: 500 });
@@ -75,13 +81,26 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    const { data: server, error } = await supabase
+    // Use admin client for insert to avoid RLS issues with custom JWT
+    const { getAdminClient } = await import('@/lib/supabase');
+    const adminClient = getAdminClient();
+
+    const { data: server, error } = await (adminClient as any)
       .from('smart_servers')
       .insert([
         {
-          ...body,
+          name: body.name,
+          domain_name: body.domain_name || null,
+          ip_address: body.ip_address || null,
+          daily_limit: body.daily_limit || 500,
+          api_key: body.api_key || null,
+          default_smtp_host: body.default_smtp_host || null,
+          default_smtp_port: body.default_smtp_port ? parseInt(body.default_smtp_port) : null,
+          default_imap_host: body.default_imap_host || null,
+          default_imap_port: body.default_imap_port ? parseInt(body.default_imap_port) : null,
+          smtp_config: body.smtp_config || {},
           org_id: orgId,
-          provider: 'mailreef', // Only Mailreef supported now
+          provider: body.provider || 'custom',
           status: 'active',
           reputation_score: 100,
           current_usage: 0

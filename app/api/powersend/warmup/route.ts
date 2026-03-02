@@ -15,17 +15,19 @@ export async function GET() {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const { supabase, orgId } = context;
+    const { orgId } = context;
     const sub = await checkSubscription(orgId);
+    const adminClient = getAdminClient();
 
     if (sub.tier !== 'enterprise') {
       return NextResponse.json({ nodes: [], stats: {} }, { status: 200 });
     }
 
     // Fetch all nodes with warmup data
-    const { data: servers, error } = await supabase
+    const { data: servers, error } = await adminClient
       .from('smart_servers')
       .select('id, name, status, warmup_enabled, warmup_day, warmup_started_at, warmup_completed_at, warmup_target_limit, warmup_daily_sends, daily_limit, reputation_score, ip_address, domain_name')
+      .eq('org_id', orgId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -40,7 +42,7 @@ export async function GET() {
       const fourteenDaysAgo = new Date();
       fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-      const { data: stats } = await supabase
+      const { data: stats } = await adminClient
         .from('powersend_warmup_stats')
         .select('*')
         .in('server_id', warmingIds)
@@ -86,7 +88,7 @@ export async function POST(req: Request) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const { supabase, orgId } = context;
+    const { orgId } = context;
     const sub = await checkSubscription(orgId);
 
     if (sub.tier !== 'enterprise') {
@@ -99,8 +101,10 @@ export async function POST(req: Request) {
       return new NextResponse('Missing serverId or action', { status: 400 });
     }
 
+    const adminClient = getAdminClient();
+
     // Verify the server belongs to this org
-    const { data: server, error: fetchError } = await supabase
+    const { data: server, error: fetchError } = await adminClient
       .from('smart_servers')
       .select('*')
       .eq('id', serverId)
@@ -110,8 +114,6 @@ export async function POST(req: Request) {
     if (fetchError || !server) {
       return new NextResponse('Server not found', { status: 404 });
     }
-
-    const adminClient = getAdminClient();
 
     if (action === 'start' || action === 'restart') {
       // Start warmup: set status to warming, day 1, low daily limit

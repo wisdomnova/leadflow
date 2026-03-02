@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from "@/lib/auth-utils";
+import { getAdminClient } from "@/lib/supabase";
 
 export async function DELETE(
   req: Request,
@@ -9,13 +10,14 @@ export async function DELETE(
 
   try {
     if (!context) {
-      return new NextResponse('Unauthorized', { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 }); 
     }
 
-    const { supabase, orgId } = context;
+    const { orgId } = context;
     const { id } = await params;
+    const adminClient = getAdminClient();
 
-    const { error } = await supabase
+    const { error } = await adminClient
       .from('smart_servers')
       .delete()
       .eq('id', id)
@@ -41,11 +43,12 @@ export async function PATCH(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const { supabase, orgId } = context;
+    const { orgId } = context;
     const { id } = await params;
     const body = await req.json();
+    const adminClient = getAdminClient();
 
-    const { data: server, error } = await supabase
+    const { data: server, error } = await (adminClient as any)
       .from('smart_servers')
       .update(body)
       .eq('id', id)

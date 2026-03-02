@@ -168,7 +168,7 @@ export default function PowerSendPage() {
   });
   const [formData, setFormData] = useState({
     name: '',
-    provider: 'mailreef',
+    provider: '',
     domain_name: '',
     ip_address: '',
     daily_limit: 500,
@@ -239,7 +239,7 @@ export default function PowerSendPage() {
       const res = await fetch('/api/powersend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, provider: 'mailreef' })
+        body: JSON.stringify(formData)
       });
 
       if (!res.ok) {
@@ -247,10 +247,12 @@ export default function PowerSendPage() {
         throw new Error(errData || 'Failed to add server');
       }
 
+      const newServer = await res.json();
+
       setIsAddModalOpen(false);
       setFormData({
         name: '',
-        provider: 'mailreef',
+        provider: 'custom',
         domain_name: '',
         ip_address: '',
         daily_limit: 500,
@@ -267,8 +269,13 @@ export default function PowerSendPage() {
           from_email: ''
         }
       });
-      showToast('Smart server added successfully');
+      showToast('Smart server added — now add your mailboxes!');
       await refreshData();
+      // Auto-expand the new server so mailbox buttons are immediately visible
+      if (newServer?.id) {
+        setExpandedServerId(newServer.id);
+        setServerMailboxes(prev => ({ ...prev, [newServer.id]: [] }));
+      }
     } catch (error: any) {
       console.error('Add server error:', error);
       showToast(error.message || 'Failed to add server', 'error');
@@ -278,7 +285,7 @@ export default function PowerSendPage() {
   };
 
   const handleDeleteServer = (id: string) => {
-    const server = servers.find(s => s.id === id);
+    const server = servers.find(s => s.id === id); 
     setConfirmModal({
       show: true,
       title: 'Remove Smart Server?',
@@ -907,6 +914,20 @@ export default function PowerSendPage() {
                                     <Flame className="w-4 h-4" />
                                   </button>
                                 ) : null}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openAddMailboxModal(server); }}
+                                  className="p-2 hover:bg-[#745DF3]/5 rounded-xl transition-all text-gray-400 hover:text-[#745DF3] border border-transparent hover:border-[#745DF3]/10"
+                                  title="Add Mailbox"
+                                >
+                                  <Mail className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openCSVModal(server); }}
+                                  className="p-2 hover:bg-[#745DF3]/5 rounded-xl transition-all text-gray-400 hover:text-[#745DF3] border border-transparent hover:border-[#745DF3]/10"
+                                  title="Import CSV Mailboxes"
+                                >
+                                  <Upload className="w-4 h-4" />
+                                </button>
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); openEditModal(server); }}
                                   className="p-2 hover:bg-gray-50 rounded-xl transition-all text-gray-400 hover:text-[#101828] border border-transparent hover:border-gray-100"
@@ -1297,10 +1318,13 @@ export default function PowerSendPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Infrastructure Provider</label>
-                        <div className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-[#745DF3] flex items-center gap-2">
-                          <Zap className="w-4 h-4 fill-[#745DF3]" />
-                          Mailreef Node
-                        </div>
+                        <input
+                          type="text"
+                          placeholder="e.g. Mailreef, AWS SES, Custom SMTP"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#745DF3]/20 transition-all font-medium"
+                          value={formData.provider}
+                          onChange={e => setFormData({ ...formData, provider: e.target.value })}
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Daily Limit</label>
