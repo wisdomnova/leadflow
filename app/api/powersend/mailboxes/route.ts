@@ -230,8 +230,9 @@ function parseCSV(csvString: string, serverId: string, orgId: string, server: an
   const lines = csvString.trim().split('\n');
   if (lines.length < 2) return []; // Need header + at least 1 row
 
-  // Normalize headers
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[\s\-]+/g, '_'));
+  // Parse headers properly (handle quoted CSV)
+  const headerValues = parseCSVLine(lines[0]);
+  const headers = headerValues.map(h => h.trim().toLowerCase().replace(/[\s\-]+/g, '_'));
   const rows: any[] = [];
 
   for (let i = 1; i < lines.length; i++) {

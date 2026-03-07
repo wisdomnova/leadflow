@@ -569,9 +569,35 @@ export default function PowerSendPage() {
     try {
       const lines = text.trim().split('\n');
       if (lines.length < 2) { setCsvPreview([]); return; }
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      
+      // Parse CSV header properly (handle quoted fields)
+      const parseCSVLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
+              current += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (ch === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+          } else {
+            current += ch;
+          }
+        }
+        result.push(current);
+        return result;
+      };
+      
+      const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
       const preview = lines.slice(1, 6).map(line => {
-        const values = line.split(',').map(v => v.trim());
+        const values = parseCSVLine(line).map(v => v.trim());
         const row: Record<string, string> = {};
         headers.forEach((h, i) => { row[h] = values[i] || ''; });
         return row;
@@ -1255,7 +1281,7 @@ export default function PowerSendPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl border border-gray-100 flex flex-col max-h-[85vh] overflow-hidden"
+              className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl border border-gray-100 flex flex-col max-h-[75vh] overflow-hidden"
             >
               <button 
                 onClick={() => setIsAddModalOpen(false)}
@@ -1276,7 +1302,7 @@ export default function PowerSendPage() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
+              <div className="flex-1 overflow-y-auto p-8">
                 <form id="add-server-form" onSubmit={handleAddServer} className="space-y-6">
                   <div className="space-y-4">
                     <div>
@@ -1514,34 +1540,37 @@ export default function PowerSendPage() {
               >
                 <X className="w-5 h-5" />
               </button>
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h3 className="text-xl font-black text-[#101828]">Edit Node</h3>
-                    <p className="text-sm text-gray-500 font-medium">Update configuration for <span className="font-bold text-[#101828]">{editingServer.name}</span></p>
-                  </div>
-                  <div className="w-12 h-12 bg-[#745DF3]/5 rounded-2xl flex items-center justify-center text-[#745DF3]">
-                    <Settings2 className="w-6 h-6" />
-                  </div>
-                </div>
-
-                {/* Current Status Banner */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2.5 h-2.5 rounded-full ${editingServer.status === 'active' ? 'bg-green-500' : editingServer.status === 'warming' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
+              <div className="p-0 flex flex-col max-h-[75vh]">
+                <div className="p-8 pb-0">
+                  <div className="flex items-center justify-between mb-8">
                     <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Current Status</p>
-                      <p className="text-sm font-bold text-[#101828] capitalize">{editingServer.status === 'warming' ? 'Auto-Warmup' : editingServer.status}</p>
+                      <h3 className="text-xl font-black text-[#101828]">Edit Node</h3>
+                      <p className="text-sm text-gray-500 font-medium">Update configuration for <span className="font-bold text-[#101828]">{editingServer.name}</span></p>
+                    </div>
+                    <div className="w-12 h-12 bg-[#745DF3]/5 rounded-2xl flex items-center justify-center text-[#745DF3]">
+                      <Settings2 className="w-6 h-6" />
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reputation</p>
-                    <p className={`text-sm font-black ${editingServer.reputation_score > 80 ? 'text-green-600' : editingServer.reputation_score > 50 ? 'text-amber-600' : 'text-red-600'}`}>{editingServer.reputation_score}%</p>
+
+                  {/* Current Status Banner */}
+                  <div className="mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2.5 h-2.5 rounded-full ${editingServer.status === 'active' ? 'bg-green-500' : editingServer.status === 'warming' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Current Status</p>
+                        <p className="text-sm font-bold text-[#101828] capitalize">{editingServer.status === 'warming' ? 'Auto-Warmup' : editingServer.status}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reputation</p>
+                      <p className={`text-sm font-black ${editingServer.reputation_score > 80 ? 'text-green-600' : editingServer.reputation_score > 50 ? 'text-amber-600' : 'text-red-600'}`}>{editingServer.reputation_score}%</p>
+                    </div>
                   </div>
                 </div>
 
-                <form onSubmit={handleEditServer} className="space-y-6">
-                  <div className="space-y-4">
+                <form onSubmit={handleEditServer} className="flex flex-col min-h-0">
+                  <div className="px-8 pb-8 space-y-6 overflow-y-auto">
+                    <div className="space-y-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Node Name</label>
                       <input
@@ -1669,8 +1698,9 @@ export default function PowerSendPage() {
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex gap-3 pt-4">
+                <div className="flex gap-3 p-8 pt-6 border-t border-gray-100 bg-white shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
                     <button
                       type="button"
                       onClick={() => { setIsEditModalOpen(false); setEditingServer(null); }}
@@ -1932,7 +1962,7 @@ export default function PowerSendPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 max-h-[75vh] overflow-y-auto"
             >
               <button 
                 onClick={() => { setIsMailboxModalOpen(false); setMailboxServer(null); }}
@@ -2131,7 +2161,7 @@ export default function PowerSendPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden border border-gray-100 max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden border border-gray-100 max-h-[75vh] overflow-y-auto"
             >
               <button 
                 onClick={() => { setIsCSVModalOpen(false); setMailboxServer(null); }}
