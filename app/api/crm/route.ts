@@ -13,7 +13,7 @@ export async function GET() {
     .eq("org_id", context.orgId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
   return NextResponse.json(data || []);
@@ -39,7 +39,7 @@ export async function DELETE(req: Request) {
     .eq("org_id", context.orgId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
 import { sendOutreachEmail } from "@/lib/services/email-sender";
+import { escapeHtml } from "@/lib/sanitize";
 
 // POST /api/diagnostics - Start a new seed test
 export async function POST(req: Request) {
@@ -76,8 +77,7 @@ export async function POST(req: Request) {
     return NextResponse.json(diagnostic);
 
   } catch (error: any) {
-    console.error("Diagnostic error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to run diagnostic test" }, { status: 500 });
   }
 }
 
@@ -101,6 +101,6 @@ export async function GET() {
     if (error) throw error;
     return NextResponse.json(data);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to list diagnostics" }, { status: 500 });
   }
 }

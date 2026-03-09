@@ -16,6 +16,7 @@
 # leads
 /leads
 /all_seed_emails.txt
+/runs.txt
 
 # next.js
 /.next/

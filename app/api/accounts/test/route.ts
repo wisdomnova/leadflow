@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       } catch (err: any) {
         return NextResponse.json({ 
           success: false, 
-          error: err.message || "SMTP connection failed",
+          error: "SMTP connection failed",
           code: err.code
         }, { status: 400 });
       }
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
         } catch (err: any) {
             return NextResponse.json({ 
                 success: false, 
-                error: err.message || "IMAP connection failed" 
+                error: "IMAP connection failed" 
             }, { status: 400 });
         }
     }

@@ -18,6 +18,18 @@ export async function GET(
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const dateStr = thirtyDaysAgo.toISOString().split('T')[0];
 
+    // Verify the account belongs to this org before querying stats
+    const { data: account } = await context.supabase
+      .from("email_accounts")
+      .select("id")
+      .eq("id", id)
+      .eq("org_id", context.orgId)
+      .single();
+
+    if (!account) {
+      return NextResponse.json({ error: "Account not found" }, { status: 404 });
+    }
+
     const { data: history, error: historyError } = await context.supabase
       .from("warmup_stats")
       .select("date, sent_count, inbox_count, spam_count, health_score")
@@ -53,6 +65,6 @@ export async function GET(
 
   } catch (error: any) {
     console.error("Error fetching account warmup stats:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

@@ -6,13 +6,35 @@ import { cookies } from "next/headers";
 import { processReferral } from "@/lib/affiliate-utils";
 import crypto from "crypto";
 import { resend } from "@/lib/resend";
+import { rateLimiters, getClientIp } from "@/lib/rate-limit";
+import { validatePassword } from "@/lib/password-validation";
+import { escapeHtml } from "@/lib/sanitize";
 
 export async function POST(req: Request) {
   try {
-    const { email, password, fullName, orgName, referralCode, fingerprint } = await req.json();
+    const ip = getClientIp(req);
+    const rl = rateLimiters.signup(ip);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many signup attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+      );
+    }
 
-    if (!email || !password || !fullName || !orgName) {
+    const { email: rawEmail, password, fullName: rawFullName, orgName: rawOrgName, referralCode, fingerprint } = await req.json();
+
+    if (!rawEmail || !password || !rawFullName || !rawOrgName) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const email = rawEmail.trim().toLowerCase();
+    const fullName = rawFullName.trim();
+    const orgName = rawOrgName.trim();
+
+    // Validate password strength
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.valid) {
+      return NextResponse.json({ error: pwCheck.errors[0] }, { status: 400 });
     }
 
     // Capture anti-abuse signals from request
@@ -29,18 +51,24 @@ export async function POST(req: Request) {
       .single();
 
     if (existingUser) {
-      return NextResponse.json({ error: "User already exists" }, { status: 400 });
+      // Generic message to prevent user enumeration
+      return NextResponse.json({ error: "Unable to create account. Please try a different email." }, { status: 400 });
     }
 
     // 2. Hash Password
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // 3. Create Organization
+    // Generate slug with random suffix to prevent collisions
+    const baseSlug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const slugSuffix = crypto.randomBytes(3).toString('hex');
+    const orgSlug = `${baseSlug}-${slugSuffix}`;
+
     const { data: org, error: orgError } = await (supabase as any)
       .from("organizations")
       .insert([{
         name: orgName,
-        slug: orgName.toLowerCase().replace(/\s+/g, "-"),
+        slug: orgSlug,
         plan: "free",
         subscription_status: "trialing",
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
@@ -101,7 +129,7 @@ export async function POST(req: Request) {
             <div style="margin-bottom: 32px;">
               <img src="https://www.tryleadflow.ai/_next/image?url=%2Fleadflow-black.png&w=256&q=75" alt="Leadflow" style="height: 32px; width: auto;" />
             </div>
-            <h1 style="font-size: 24px; font-weight: 800; margin-bottom: 16px;">Welcome to Leadflow, ${fullName}!</h1>
+            <h1 style="font-size: 24px; font-weight: 800; margin-bottom: 16px;">Welcome to Leadflow, ${escapeHtml(fullName)}!</h1>
             <p style="font-size: 16px; line-height: 1.6; color: #475467; margin-bottom: 24px;">
               Thanks for signing up. Please verify your email address to get started with scaling your outreach.
             </p>
@@ -137,13 +165,12 @@ export async function POST(req: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24, // 24 hours
+      maxAge: 60 * 60 * 4, // 4 hours (matches JWT expiry)
       path: "/",
     });
 
     return NextResponse.json({ success: true, user: { email: (user as any).email, fullName: (user as any).full_name } });
   } catch (err) {
-    console.error("Signup error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

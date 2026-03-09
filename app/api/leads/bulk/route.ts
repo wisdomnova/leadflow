@@ -30,7 +30,7 @@ export async function PATCH(req: Request) {
       .eq("org_id", context.orgId);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     // Log activities for each lead
@@ -119,7 +119,7 @@ export async function DELETE(req: Request) {
 
       const { error, count } = await query;
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
       }
       return NextResponse.json({ success: true, deleted: count || 0 });
     }
@@ -152,7 +152,7 @@ export async function DELETE(req: Request) {
       .eq("org_id", context.orgId);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, deleted: deletableIds.length, protected: protectedIds.length });

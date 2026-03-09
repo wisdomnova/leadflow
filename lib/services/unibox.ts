@@ -28,12 +28,12 @@ async function syncGoogleInbox(accountId: string, account: any) {
   const config = account.config || {};
 
   if (!config.refresh_token) {
-    console.error(`[Gmail Sync] No refresh_token for ${account.email}. Skipping.`);
+    console.error(`[Gmail Sync] No refresh_token for account ${accountId}. Skipping.`);
     return;
   }
 
   // 1. Get a fresh access token
-  console.log(`[Gmail Sync] Refreshing token for ${account.email}...`);
+  console.log(`[Gmail Sync] Refreshing token for account ${accountId}...`);
   const { access_token } = await refreshGoogleAccessToken(config.refresh_token);
   console.log(`[Gmail Sync] Token refreshed. Fetching inbox...`);
 
@@ -53,13 +53,13 @@ async function syncGoogleInbox(accountId: string, account: any) {
   const listData = await listRes.json();
 
   if (!listRes.ok) {
-    console.error(`[Gmail Sync] List failed for ${account.email}:`, JSON.stringify(listData));
+    console.error(`[Gmail Sync] List failed for account ${accountId}`);
     return;
   }
 
   const messageIds: string[] = (listData.messages || []).map((m: any) => m.id);
   if (messageIds.length === 0) {
-    console.log(`[Gmail Sync] No new messages for ${account.email}`);
+    console.log(`[Gmail Sync] No new messages for account ${accountId}`);
     // Still update the sync timestamp
     await (supabase as any).from("email_accounts").update({
       last_sync_at: new Date().toISOString()
@@ -67,7 +67,7 @@ async function syncGoogleInbox(accountId: string, account: any) {
     return;
   }
 
-  console.log(`[Gmail Sync] Found ${messageIds.length} messages for ${account.email}`);
+  console.log(`[Gmail Sync] Found ${messageIds.length} messages for account ${accountId}`);
 
   // 4. Fetch each message and process it
   for (const msgId of messageIds) {
@@ -208,6 +208,18 @@ async function syncGoogleInbox(accountId: string, account: any) {
             direction: 'inbound',
             sender_name: fromName
           }], { onConflict: 'message_id' }) as any;
+
+          // Trigger AI classification for this reply (non-blocking via Inngest)
+          await inngest.send({
+            name: "unibox/reply.classify",
+            data: {
+              leadId: (campaignLead as any).lead_id,
+              orgId: account.org_id,
+              snippet: decodeSnippet(snippet).substring(0, 500),
+              subject: subject || "",
+              leadName: fromName || "",
+            }
+          });
         }
         // else: sender is not a campaign lead — skip storing
       }
@@ -430,6 +442,20 @@ export async function syncAccountInbox(accountId: string) {
             direction: 'inbound',
             sender_name: parsed.from?.value[0]?.name || ""
           }], { onConflict: 'message_id' }) as any;
+
+          // Trigger AI classification for campaign leads (non-blocking via Inngest)
+          if ((lead as any)?.id && recipients && recipients.length > 0) {
+            await inngest.send({
+              name: "unibox/reply.classify",
+              data: {
+                leadId: (lead as any).id,
+                orgId: (account as any).org_id,
+                snippet: (parsed.text || "").substring(0, 500),
+                subject: parsed.subject || "",
+                leadName: parsed.from?.value[0]?.name || "",
+              }
+            });
+          }
         }
       }
     }

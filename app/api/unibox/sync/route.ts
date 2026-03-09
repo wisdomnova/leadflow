@@ -2,10 +2,17 @@ import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
 import { inngest } from "@/lib/services/inngest";
 import { checkSubscription } from "@/lib/subscription-check";
+import { rateLimiters } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   const context = await getSessionContext();
   if (!context) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Rate limit sync requests to prevent abuse
+  const rl = rateLimiters.emailSync(context.userId);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many sync requests. Please wait." }, { status: 429 });
+  }
 
   const sub = await checkSubscription(context.orgId);
   if (!sub.active) {
@@ -34,6 +41,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, count: accounts.length });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

@@ -17,7 +17,7 @@ export async function DELETE(
     .eq("org_id", context.orgId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
@@ -35,16 +35,27 @@ export async function PATCH(
 
   try {
     const body = await req.json();
+
+    // Whitelist allowed fields to prevent mass-assignment
+    const ALLOWED_FIELDS = ['first_name', 'last_name', 'email', 'company', 'job_title', 'phone', 'linkedin_url', 'website', 'tags', 'custom_fields', 'status', 'notes'];
+    const sanitizedBody: Record<string, any> = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (key in body) sanitizedBody[key] = body[key];
+    }
+    if (Object.keys(sanitizedBody).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
     const { data, error } = await context.supabase
       .from("leads")
-      .update(body)
+      .update(sanitizedBody)
       .eq("id", id)
       .eq("org_id", context.orgId)
       .select()
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     // Log update activity

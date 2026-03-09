@@ -23,7 +23,7 @@ export async function GET() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
   return NextResponse.json(data);
@@ -75,12 +75,12 @@ export async function POST(req: Request) {
       if (error.code === '23505') {
         return NextResponse.json({ error: `A provider named "${name}" already exists` }, { status: 409 });
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     return NextResponse.json(data);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Invalid request" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
 
@@ -112,11 +112,11 @@ export async function DELETE(req: Request) {
       .eq("org_id", context.orgId);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Invalid request" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }

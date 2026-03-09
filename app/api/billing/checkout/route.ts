@@ -9,6 +9,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  if (context.role !== 'admin') {
+    return NextResponse.json({ error: 'Only admins can manage billing' }, { status: 403 });
+  }
+
   try {
     const { planId, billingCycle } = await req.json();
 
@@ -45,6 +49,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (error: any) {
     console.error('Checkout error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

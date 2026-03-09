@@ -28,7 +28,10 @@ import {
   HelpCircle,
   Search,
   Filter,
-  Tag as TagIcon
+  Tag as TagIcon,
+  Server,
+  ChevronDown,
+  Zap
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
@@ -80,6 +83,9 @@ export default function CreateCampaignPage() {
   const [usePowerSend, setUsePowerSend] = useState(false);
   const [hasPowerSendNodes, setHasPowerSendNodes] = useState(false);
   const [showPowerSendInfo, setShowPowerSendInfo] = useState(false);
+  const [powerSendServers, setPowerSendServers] = useState<any[]>([]);
+  const [selectedServerId, setSelectedServerId] = useState<string>('');
+  const [showServerDropdown, setShowServerDropdown] = useState(false);
   
   // AI States
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
@@ -151,6 +157,11 @@ export default function CreateCampaignPage() {
           const psData = await psRes.json();
           if (psData.servers && psData.servers.length > 0) {
             setHasPowerSendNodes(true);
+            const activeServers = psData.servers.filter((s: any) => s.status === 'active');
+            setPowerSendServers(activeServers);
+            if (activeServers.length > 0) {
+              setSelectedServerId(activeServers[0].id);
+            }
           }
         } catch {}
         
@@ -340,6 +351,7 @@ export default function CreateCampaignPage() {
           steps: emailSteps,
           status: 'running',
           use_powersend: usePowerSend,
+          powersend_server_id: usePowerSend && selectedServerId ? selectedServerId : null,
           config: {
             smart_sending: isSmartSending
           }
@@ -376,6 +388,7 @@ export default function CreateCampaignPage() {
           steps: emailSteps,
           status: 'draft',
           use_powersend: usePowerSend,
+          powersend_server_id: usePowerSend && selectedServerId ? selectedServerId : null,
           config: {
             smart_sending: isSmartSending
           }
@@ -676,18 +689,25 @@ export default function CreateCampaignPage() {
                         </AnimatePresence>
                       </div>
 
-                      {/* PowerSend Toggle */}
+                      {/* PowerSend Toggle + Server Selector */}
                       {hasPowerSendNodes && (
                         <div className="pt-4 border-t border-gray-50">
                           <div className="flex items-center justify-between">
                             <label className="flex items-center gap-3 cursor-pointer">
                               <div 
-                                onClick={() => setUsePowerSend(!usePowerSend)}
+                                onClick={() => {
+                                  const next = !usePowerSend;
+                                  setUsePowerSend(next);
+                                  if (!next) setShowServerDropdown(false);
+                                }}
                                 className={`w-12 h-6 rounded-full relative transition-all ${usePowerSend ? 'bg-emerald-500' : 'bg-gray-200'}`}
                               >
                                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${usePowerSend ? 'right-1' : 'left-1'}`} />
                               </div>
-                              <span className="text-sm font-bold text-[#101828]">Use PowerSend (Server Rotation)</span>
+                              <div className="flex items-center gap-2">
+                                <Zap className="w-4 h-4 text-emerald-500" />
+                                <span className="text-sm font-bold text-[#101828]">Use PowerSend</span>
+                              </div>
                             </label>
                             <button 
                               onClick={(e) => {
@@ -713,8 +733,103 @@ export default function CreateCampaignPage() {
                                     <span className="font-black uppercase tracking-widest block mb-1">What is PowerSend?</span>
                                     PowerSend routes emails through your dedicated Smart Server infrastructure instead of your personal mailbox. 
                                     Traffic is distributed across nodes using reputation-weighted rotation, protecting your sender reputation and enabling high-volume delivery. 
-                                    Your Sender Profile's "From" address is still used — only the SMTP relay changes.
+                                    Your Sender Profile&#39;s &quot;From&quot; address is still used — only the SMTP relay changes.
                                   </p>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
+                          {/* Server Selector — visible when PowerSend is enabled */}
+                          <AnimatePresence>
+                            {usePowerSend && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="mt-4 space-y-2">
+                                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">
+                                    Smart Server
+                                  </label>
+                                  <div className="relative">
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowServerDropdown(!showServerDropdown)}
+                                      className="w-full px-5 py-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm font-bold text-[#101828] focus:ring-2 focus:ring-emerald-300/30 transition-all outline-none text-left flex items-center justify-between"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <Server className="w-4 h-4 text-emerald-600" />
+                                        <span className="truncate">
+                                          {selectedServerId
+                                            ? powerSendServers.find(s => s.id === selectedServerId)?.name || 'Select server...'
+                                            : 'Select a server...'}
+                                        </span>
+                                        {selectedServerId && (
+                                          <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                                            {powerSendServers.find(s => s.id === selectedServerId)?.provider || ''}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showServerDropdown ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    <AnimatePresence>
+                                      {showServerDropdown && (
+                                        <motion.div
+                                          initial={{ opacity: 0, y: -4 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          exit={{ opacity: 0, y: -4 }}
+                                          className="absolute z-50 mt-2 w-full bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden"
+                                        >
+                                          <div className="max-h-56 overflow-y-auto">
+                                            {powerSendServers.length === 0 ? (
+                                              <div className="px-5 py-4 text-sm text-gray-400">No active servers found</div>
+                                            ) : (
+                                              powerSendServers.map(server => {
+                                                const isSelected = selectedServerId === server.id;
+                                                return (
+                                                  <button
+                                                    key={server.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                      setSelectedServerId(server.id);
+                                                      setShowServerDropdown(false);
+                                                    }}
+                                                    className={`w-full px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left ${
+                                                      isSelected ? 'bg-emerald-50' : ''
+                                                    }`}
+                                                  >
+                                                    <Server className={`w-4 h-4 flex-shrink-0 ${isSelected ? 'text-emerald-600' : 'text-gray-400'}`} />
+                                                    <div className="flex-1 min-w-0">
+                                                      <p className={`text-sm font-bold truncate ${isSelected ? 'text-emerald-700' : 'text-[#101828]'}`}>
+                                                        {server.name}
+                                                      </p>
+                                                      <p className="text-[10px] font-medium text-gray-400 truncate">
+                                                        {server.provider} · Reputation: {server.reputation_score ?? 100}
+                                                      </p>
+                                                    </div>
+                                                    {isSelected && (
+                                                      <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                                                    )}
+                                                  </button>
+                                                );
+                                              })
+                                            )}
+                                          </div>
+                                          <div className="px-5 py-3 border-t border-gray-50 bg-gray-50/50">
+                                            <Link
+                                              href="/dashboard/powersend"
+                                              className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest hover:underline"
+                                            >
+                                              Manage Servers →
+                                            </Link>
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </div>
                                 </div>
                               </motion.div>
                             )}
@@ -1340,6 +1455,14 @@ export default function CreateCampaignPage() {
                               <span className="text-xs font-bold text-gray-400">Smart Sending</span>
                               <span className={`text-[10px] font-black uppercase tracking-widest ${isSmartSending ? 'text-emerald-500' : 'text-gray-400'}`}>
                                  {isSmartSending ? 'Enabled' : 'Disabled'}
+                              </span>
+                           </div>
+                           <div className="flex justify-between py-2 border-b border-gray-50">
+                              <span className="text-xs font-bold text-gray-400">PowerSend</span>
+                              <span className={`text-[10px] font-black uppercase tracking-widest ${usePowerSend ? 'text-emerald-500' : 'text-gray-400'}`}>
+                                 {usePowerSend 
+                                   ? (powerSendServers.find(s => s.id === selectedServerId)?.name || 'Enabled')
+                                   : 'Disabled'}
                               </span>
                            </div>
                            {!campaignName || selectedAccountIds.length === 0 ? (

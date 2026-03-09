@@ -45,7 +45,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ mailboxes, stats });
   } catch (error: any) {
     console.error('Error fetching mailboxes:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -155,7 +155,7 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error('Error adding mailboxes:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -170,9 +170,18 @@ export async function PATCH(req: Request) {
   try {
     const { orgId } = context;
     const body = await req.json();
-    const { mailboxId, ...updates } = body;
+    const { mailboxId } = body;
 
     if (!mailboxId) return new NextResponse('Missing mailboxId', { status: 400 });
+
+    // Whitelist allowed fields to prevent mass assignment
+    const ALLOWED_FIELDS = ['email', 'display_name', 'daily_limit', 'status', 'warmup_enabled', 'warmup_config', 'signature'];
+    const updates: Record<string, any> = {};
+    for (const field of ALLOWED_FIELDS) {
+      if (body[field] !== undefined) {
+        updates[field] = body[field];
+      }
+    }
 
     const adminClient = getAdminClient();
     const { data, error } = await (adminClient as any)
@@ -187,7 +196,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json(data);
   } catch (error: any) {
     console.error('Error updating mailbox:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -220,7 +229,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ success: true, deleted: mailboxIds.length });
   } catch (error: any) {
     console.error('Error deleting mailboxes:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 

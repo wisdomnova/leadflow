@@ -28,6 +28,7 @@ export async function POST(req: Request) {
         .from("leads")
         .select("*, email_accounts!inner(*)")
         .eq("id", leadId)
+        .eq("org_id", context.orgId)
         .single();
       lead = data;
     }
@@ -90,6 +91,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, messageId: response.messageId });
   } catch (err: any) {
     console.error("Reply error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

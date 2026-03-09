@@ -100,7 +100,7 @@ export async function GET() {
     });
 
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -136,7 +136,7 @@ export async function PATCH(req: Request) {
       .eq("org_id", context.orgId);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

@@ -3,9 +3,20 @@ import { cookies } from "next/headers";
 import { verifyUserJWT } from "@/lib/jwt";
 import { getAdminClient } from "@/lib/supabase";
 import bcrypt from "bcryptjs";
+import { validatePassword } from "@/lib/password-validation";
+import { rateLimiters, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rl = rateLimiters.auth(ip);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+      );
+    }
+
     const cookieStore = await cookies();
     const token = cookieStore.get("session_token")?.value;
 
@@ -22,6 +33,12 @@ export async function POST(req: Request) {
 
     if (!currentPassword || !newPassword) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // Validate new password strength
+    const pwCheck = validatePassword(newPassword);
+    if (!pwCheck.valid) {
+      return NextResponse.json({ error: pwCheck.errors[0] }, { status: 400 });
     }
 
     const supabase = getAdminClient();

@@ -126,6 +126,6 @@ export async function GET(req: Request) {
 
   } catch (err: any) {
     console.error("Analytics API Error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

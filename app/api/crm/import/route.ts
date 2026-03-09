@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 
         if (error) {
           skipped++;
-          errors.push(`${contact.email}: ${error.message}`);
+          errors.push(`${contact.email}: Import failed`);
         } else {
           imported++;
         }
@@ -101,6 +101,6 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error("CRM import error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

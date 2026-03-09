@@ -10,6 +10,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  if (context.role !== 'admin') {
+    return NextResponse.json({ error: 'Only admins can manage billing' }, { status: 403 });
+  }
+
   try {
     const { action } = await req.json(); // 'cancel' or 'reactivate'
 
@@ -82,6 +86,6 @@ export async function POST(req: Request) {
     }
   } catch (error: any) {
     console.error('Cancel/reactivate error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

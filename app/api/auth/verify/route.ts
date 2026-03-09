@@ -17,6 +17,18 @@ export async function GET(req: NextRequest) {
 
   const supabase = getAdminClient();
 
+  // Check if already verified to make token single-use effectively
+  const { data: user } = await (supabase as any)
+    .from("users")
+    .select("is_verified")
+    .eq("email", payload.email)
+    .single();
+
+  if (user?.is_verified) {
+    // Already verified — redirect without error (idempotent)
+    return NextResponse.redirect(new URL("/signin?verified=true", req.url));
+  }
+
   // Update user as verified
   const { error } = await (supabase as any)
     .from("users")

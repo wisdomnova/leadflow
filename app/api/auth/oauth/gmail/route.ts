@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
+import { createSignedState } from "@/lib/oauth-state";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -13,7 +14,6 @@ export async function GET(request: NextRequest) {
   }
 
   if (!GOOGLE_CLIENT_ID) {
-    console.error("Missing GOOGLE_CLIENT_ID");
     return NextResponse.redirect(`${APP_URL}/dashboard/providers?error=misconfigured`);
   }
 
@@ -24,10 +24,10 @@ export async function GET(request: NextRequest) {
     "https://www.googleapis.com/auth/userinfo.profile"
   ].join(" ");
 
-  const state = Buffer.from(JSON.stringify({ 
+  const state = createSignedState({ 
     userId: context.userId, 
     orgId: context.orgId 
-  })).toString("base64");
+  });
 
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,

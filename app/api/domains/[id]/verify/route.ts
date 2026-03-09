@@ -88,7 +88,8 @@ export async function POST(
       .eq("id", id);
 
     if (updateError) {
-        return NextResponse.json({ error: updateError.message }, { status: 500 });
+        console.error("Domain update error:", updateError);
+        return NextResponse.json({ error: "Failed to update domain verification status" }, { status: 500 });
     }
 
     return NextResponse.json({
