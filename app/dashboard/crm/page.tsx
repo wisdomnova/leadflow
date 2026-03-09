@@ -81,6 +81,17 @@ export default function CRMPage() {
         fetch('/api/crm/stats')
       ]);
       
+      // Check response status before parsing JSON
+      if (!crmRes.ok) {
+        throw new Error(`CRM API error: ${crmRes.status}`);
+      }
+      if (!activityRes.ok) {
+        throw new Error(`Activity API error: ${activityRes.status}`);
+      }
+      if (!statsRes.ok) {
+        throw new Error(`Stats API error: ${statsRes.status}`);
+      }
+      
       const data = await crmRes.json();
       const activityData = await activityRes.json();
       const statsData = await statsRes.json();
@@ -105,6 +116,12 @@ export default function CRMPage() {
       setIntegrations(merged as any);
     } catch (error) {
       console.error("Failed to fetch integrations:", error);
+      // Set default empty state on error
+      setIntegrations(providers.map(p => ({
+        ...p,
+        connected: false,
+        status: 'Error loading'
+      })));
     } finally {
       setIsLoading(false);
     }
@@ -161,10 +178,15 @@ export default function CRMPage() {
     }
   };
 
-  const filteredIntegrations = integrations.filter(crm => 
+  const filteredIntegrations = integrations.filter(crm =>
     crm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     crm.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const integrationsWithComingSoon = filteredIntegrations.map(crm => ({
+    ...crm,
+    isComingSoon: crm.id !== 'pipedrive'
+  }));
 
   return (
     <div className="flex min-h-screen bg-[#FBFBFB] font-jakarta">
@@ -255,14 +277,16 @@ export default function CRMPage() {
             {/* Main Integrations Grid */}
             <div className="grid grid-cols-1 gap-6">
               <AnimatePresence mode="popLayout">
-                {filteredIntegrations.map((crm) => (
+                {integrationsWithComingSoon.map((crm) => (
                   <motion.div
                     key={crm.id}
                     layout
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.98 }}
-                    className="bg-white rounded-[3rem] border border-gray-100 overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-[#745DF3]/5 transition-all"
+                    className={`bg-white rounded-[3rem] border border-gray-100 overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-[#745DF3]/5 transition-all ${
+                      crm.isComingSoon ? 'opacity-70 grayscale-[0.8]' : ''
+                    }`}
                   >
                     <div className="p-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                     <div className="flex items-center gap-8">
@@ -293,6 +317,8 @@ export default function CRMPage() {
                           <h3 className="text-3xl font-black text-[#101828] tracking-tight">{crm.name}</h3>
                           {crm.connected ? (
                             <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-emerald-100/50">Active</span>
+                          ) : crm.isComingSoon ? (
+                            <span className="px-3 py-1 bg-[#745DF3]/5 text-[#745DF3] text-[10px] font-black uppercase tracking-widest rounded-lg border border-[#745DF3]/10">Coming Soon</span>
                           ) : (
                             <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg ${
                               crm.status === 'Maintenance' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-gray-50 text-gray-400'
@@ -347,10 +373,19 @@ export default function CRMPage() {
                       ) : (
                         <button 
                           onClick={() => handleConnect(crm.id)}
-                          disabled={isConnecting === crm.id}
-                          className="flex items-center gap-3 px-10 py-4 bg-[#101828] rounded-[1.5rem] text-[13px] font-black text-white hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/20 group grow sm:grow-0 justify-center min-w-[200px]"
+                          disabled={isConnecting === crm.id || crm.isComingSoon}
+                          className={`flex items-center gap-3 px-10 py-4 rounded-[1.5rem] text-[13px] font-black transition-all shadow-xl group grow sm:grow-0 justify-center min-w-[200px] ${
+                            crm.isComingSoon 
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
+                              : 'bg-[#101828] text-white hover:bg-[#101828]/90 shadow-[#101828]/20'
+                          }`}
                         >
-                          {isConnecting === crm.id ? (
+                          {crm.isComingSoon ? (
+                            <>
+                              <Clock className="w-4 h-4" />
+                              Coming Soon
+                            </>
+                          ) : isConnecting === crm.id ? (
                             <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                           ) : (
                             <>

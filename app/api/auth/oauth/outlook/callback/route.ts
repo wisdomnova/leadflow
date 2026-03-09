@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase";
+import { getSessionContext } from "@/lib/auth-utils";
+import { verifySignedState } from "@/lib/oauth-state";
 
 const TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 const CLIENT_ID = process.env.AZURE_CLIENT_ID || process.env.MICROSOFT_CLIENT_ID;
@@ -16,11 +18,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { userId, orgId } = JSON.parse(Buffer.from(state, "base64").toString());
-
-    if (!orgId) {
-      throw new Error("Missing organization context");
+    // Verify HMAC-signed state
+    const statePayload = verifySignedState(state);
+    if (!statePayload || !statePayload.orgId) {
+      return NextResponse.redirect(`${APP_URL}/dashboard/providers/failed?error=invalid_state`);
     }
+
+    // Verify session matches state
+    const context = await getSessionContext();
+    if (!context || context.orgId !== statePayload.orgId) {
+      return NextResponse.redirect(`${APP_URL}/signin?error=session_expired`);
+    }
+
+    const { orgId } = statePayload;
 
     const tokenResponse = await fetch(TOKEN_URL, {
       method: "POST",
@@ -38,7 +48,7 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenResponse.json();
 
     if (!tokenResponse.ok) {
-      console.error("Token exchange failed", tokenData);
+      console.error("Token exchange failed for Outlook OAuth");
       return NextResponse.redirect(`${APP_URL}/dashboard/providers/failed?error=token_exchange`);
     }
 
@@ -51,6 +61,17 @@ export async function GET(request: NextRequest) {
 
     const supabase = getAdminClient();
     
+    // Check for existing account to preserve refresh_token if Microsoft doesn't return a new one
+    const { data: existingAccount } = await (supabase as any)
+      .from("email_accounts")
+      .select("config")
+      .eq("org_id", orgId)
+      .eq("email", email)
+      .single();
+
+    const existingConfig = existingAccount?.config || {};
+    const refreshToken = tokenData.refresh_token || existingConfig.refresh_token;
+
     // Save to email_accounts
     const { error } = await (supabase as any)
       .from("email_accounts")
@@ -61,7 +82,7 @@ export async function GET(request: NextRequest) {
         status: "active",
         config: {
           access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
+          refresh_token: refreshToken,
           expires_at: Date.now() + tokenData.expires_in * 1000,
           ms_id: userData.id
         }

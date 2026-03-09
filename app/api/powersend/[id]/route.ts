@@ -28,7 +28,7 @@ export async function DELETE(
     return new NextResponse(null, { status: 204 });
   } catch (error: any) {
     console.error('Error deleting smart server:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -48,9 +48,19 @@ export async function PATCH(
     const body = await req.json();
     const adminClient = getAdminClient();
 
+    // Whitelist allowed fields to prevent mass-assignment
+    const ALLOWED_FIELDS = ['name', 'status', 'daily_limit', 'warmup_config', 'reputation_score'];
+    const sanitizedBody: Record<string, any> = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (key in body) sanitizedBody[key] = body[key];
+    }
+    if (Object.keys(sanitizedBody).length === 0) {
+      return new NextResponse('No valid fields to update', { status: 400 });
+    }
+
     const { data: server, error } = await (adminClient as any)
       .from('smart_servers')
-      .update(body)
+      .update(sanitizedBody)
       .eq('id', id)
       .eq('org_id', orgId)
       .select()
@@ -61,6 +71,6 @@ export async function PATCH(
     return NextResponse.json(server);
   } catch (error: any) {
     console.error('Error updating smart server:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

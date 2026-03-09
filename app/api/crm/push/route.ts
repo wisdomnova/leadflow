@@ -21,11 +21,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Lead ID is required" }, { status: 400 });
     }
 
-    // Fetch lead details
+    // Fetch lead details (scoped to org)
     const { data: lead, error: leadError } = await context.supabase
       .from("leads")
       .select("*")
       .eq("id", leadId)
+      .eq("org_id", context.orgId)
       .single();
 
     if (leadError || !lead) {
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
         return { provider: integration.provider, success: true };
       } catch (err: any) {
         console.error(`Failed to push to ${integration.provider}:`, err);
-        return { provider: integration.provider, success: false, error: err.message };
+        return { provider: integration.provider, success: false, error: "Push failed" };
       }
     }));
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ results });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("CRM push error:", error);
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

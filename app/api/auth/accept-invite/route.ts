@@ -1,14 +1,33 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { resend } from "@/lib/resend";
+import { rateLimiters, getClientIp } from "@/lib/rate-limit";
+import { validatePassword } from "@/lib/password-validation";
+import { escapeHtml } from "@/lib/sanitize";
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rl = rateLimiters.auth(ip);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+      );
+    }
+
     const { token, password } = await req.json();
 
     if (!token || !password) {
       return NextResponse.json({ error: "Token and password are required" }, { status: 400 });
+    }
+
+    // Validate password strength
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.valid) {
+      return NextResponse.json({ error: pwCheck.errors[0] }, { status: 400 });
     }
 
     // Direct supabase client with service role since this is a sensitive auth operation
@@ -18,19 +37,25 @@ export async function POST(req: Request) {
     );
 
     // 1. Find user with this reset_token (acting as invite token)
+    // Hash the token to compare against the stored hash
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     const { data: user, error: findError } = await (supabase as any)
       .from("users")
       .select("*")
-      .eq("reset_token", token)
+      .eq("reset_token", tokenHash)
       .single();
 
     if (findError || !user) {
       return NextResponse.json({ error: "Invalid or expired invitation" }, { status: 401 });
     }
 
-    // 2. Hash the new password
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+    // Check token expiration
+    if ((user as any).reset_token_expires && new Date((user as any).reset_token_expires) < new Date()) {
+      return NextResponse.json({ error: "Invalid or expired invitation" }, { status: 401 });
+    }
+
+    // 2. Hash the new password (consistent cost factor of 12)
+    const passwordHash = await bcrypt.hash(password, 12);
 
     // 3. Update user: set password, verify them, and clear the token
     const { error: updateError } = await (supabase as any)
@@ -78,10 +103,10 @@ export async function POST(req: Request) {
                   <img src="https://www.tryleadflow.ai/_next/image?url=%2Fleadflow-black.png&w=256&q=75" alt="Leadflow" style="height: 32px; width: auto;" />
                 </div>
                 <h1 style="color: #101828; font-size: 24px; font-weight: 900; letter-spacing: -0.02em; margin-bottom: 8px;">New Member Alert</h1>
-                <p style="color: #667085; font-size: 16px; font-weight: 500; margin-bottom: 32px;"><strong>${newMemberName}</strong> has successfully accepted the invitation and joined <strong>${orgName}</strong> on Leadflow.</p>
+                <p style="color: #667085; font-size: 16px; font-weight: 500; margin-bottom: 32px;"><strong>${escapeHtml(newMemberName)}</strong> has successfully accepted the invitation and joined <strong>${escapeHtml(orgName)}</strong> on Leadflow.</p>
                 
                 <div style="background-color: #f9fafb; padding: 20px; border-radius: 12px; margin-bottom: 32px;">
-                  <p style="margin: 0; color: #101828; font-size: 14px; font-weight: 600;">Email: ${(user as any).email}</p>
+                  <p style="margin: 0; color: #101828; font-size: 14px; font-weight: 600;">Email: ${escapeHtml((user as any).email)}</p>
                   <p style="margin: 4px 0 0 0; color: #667085; font-size: 14px;">Role: ${(user as any).role === 'admin' ? 'Admin' : 'SDR'}</p>
                 </div>
 
@@ -101,7 +126,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
 
   } catch (error: any) {
-    console.error("Error accepting invite:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An error occurred while accepting the invitation" }, { status: 500 });
   }
 }

@@ -76,7 +76,7 @@ export async function refreshGoogleAccessToken(refreshToken: string): Promise<{ 
   const data = await res.json();
 
   if (!res.ok) {
-    console.error("Google token refresh failed:", JSON.stringify(data));
+    console.error("Google token refresh failed");
     throw new Error(`Google token refresh failed: ${data.error_description || data.error || "Unknown error"}`);
   }
 
@@ -96,7 +96,7 @@ async function sendViaGmailApi({ to, subject, bodyHtml, bodyText, fromEmail, fro
   fromName?: string;
   accessToken: string;
 }): Promise<{ success: boolean; messageId: string }> {
-  const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+  const from = fromName ? `${fromName.replace(/[\r\n"<>]/g, '').trim()} <${fromEmail}>` : fromEmail;
   const boundary = "leadflow_boundary_" + Date.now();
 
   // Build RFC 2822 MIME message
@@ -149,6 +149,9 @@ async function sendViaGmailApi({ to, subject, bodyHtml, bodyText, fromEmail, fro
 }
 
 export async function sendOutreachEmail({ to, subject, bodyHtml, fromName, account }: SendEmailParams) {
+  // Sanitize fromName to prevent email header injection
+  const safeName = fromName ? fromName.replace(/[\r\n"<>]/g, '').trim().slice(0, 128) : undefined;
+
   // Generate simple plain text version for better deliverability
   const bodyText = bodyHtml
     .replace(/<br\s*\/?>/gi, '\n')
@@ -163,7 +166,7 @@ export async function sendOutreachEmail({ to, subject, bodyHtml, fromName, accou
     const sesClient = getCachedSESClient(region, accessKeyId, secretAccessKey);
 
     const fromEmail = account.email;
-    const source = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+    const source = safeName ? `${safeName} <${fromEmail}>` : fromEmail;
 
     const command = new SendEmailCommand({
       FromEmailAddress: source,
@@ -198,14 +201,14 @@ export async function sendOutreachEmail({ to, subject, bodyHtml, fromName, accou
       // Token is still valid (with 60s buffer)
       freshToken = cached.token;
     } else {
-      console.log(`[Gmail API] Refreshing token for ${account.email}...`);
+      console.log(`[Gmail API] Refreshing token for account...`);
       const { access_token, expires_in } = await refreshGoogleAccessToken(config.refresh_token);
       freshToken = access_token;
       googleTokenCache.set(cacheKey, {
         token: access_token,
         expiresAt: Date.now() + expires_in * 1000,
       });
-      console.log(`[Gmail API] Token refreshed & cached (expires in ${expires_in}s). Sending to ${to}...`);
+      console.log(`[Gmail API] Token refreshed & cached (expires in ${expires_in}s).`);
     }
 
     const result = await sendViaGmailApi({
@@ -214,7 +217,7 @@ export async function sendOutreachEmail({ to, subject, bodyHtml, fromName, accou
       bodyHtml,
       bodyText,
       fromEmail: account.email,
-      fromName,
+      fromName: safeName,
       accessToken: freshToken,
     });
 
@@ -283,7 +286,7 @@ export async function sendOutreachEmail({ to, subject, bodyHtml, fromName, accou
     const transporter = getCachedSMTPTransporter(account.id, transportConfig);
 
     const fromEmail = account.email;
-    const source = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+    const source = safeName ? `${safeName} <${fromEmail}>` : fromEmail;
 
     const info = await transporter.sendMail({
       from: source,

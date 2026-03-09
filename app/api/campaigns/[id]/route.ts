@@ -19,6 +19,12 @@ export async function PATCH(
 
   const { status } = await req.json();
 
+  // Validate campaign status
+  const ALLOWED_STATUSES = ['draft', 'running', 'paused', 'completed', 'archived'];
+  if (!status || !ALLOWED_STATUSES.includes(status)) {
+    return NextResponse.json({ error: `Invalid status. Allowed: ${ALLOWED_STATUSES.join(', ')}` }, { status: 400 });
+  }
+
   const { error } = await context.supabase
     .from("campaigns")
     .update({ status })
@@ -26,7 +32,7 @@ export async function PATCH(
     .eq("org_id", context.orgId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
@@ -49,7 +55,7 @@ export async function DELETE(
     .eq("org_id", context.orgId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

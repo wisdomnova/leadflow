@@ -2,14 +2,27 @@ import { NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase";
 import crypto from "crypto";
 import { resend } from "@/lib/resend";
+import { rateLimiters, getClientIp } from "@/lib/rate-limit";
+import { escapeHtml } from "@/lib/sanitize";
 
 export async function POST(req: Request) {
   try {
-    const { email } = await req.json();
+    const ip = getClientIp(req);
+    const rl = rateLimiters.passwordReset(ip);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+      );
+    }
 
-    if (!email) {
+    const { email: rawEmail } = await req.json();
+
+    if (!rawEmail) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
+
+    const email = rawEmail.trim().toLowerCase();
 
     const supabase = getAdminClient();
 
@@ -25,15 +38,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: "If an account exists, a reset link has been sent." });
     }
 
-    // 2. Generate Reset Token
+    // 2. Generate Reset Token (store hash in DB, send raw token in email)
     const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
     const resetExpires = new Date(Date.now() + 3600000); // 1 hour
 
-    // 3. Update User
+    // 3. Update User with hashed token
     await (supabase as any)
       .from("users")
       .update({
-        reset_token: resetToken,
+        reset_token: resetTokenHash,
         reset_token_expires: resetExpires.toISOString(),
       })
       .eq("id", (user as any).id);
@@ -53,7 +67,7 @@ export async function POST(req: Request) {
             </div>
             <h1 style="font-size: 24px; font-weight: 800; margin-bottom: 16px; color: #101828;">Password Reset Request</h1>
             <p style="font-size: 16px; line-height: 1.6; color: #475467; margin-bottom: 24px;">
-              Hi ${(user as any).full_name}, we received a request to reset your password. Click the button below to choose a new one.
+              Hi ${escapeHtml((user as any).full_name)}, we received a request to reset your password. Click the button below to choose a new one.
             </p>
             <a href="${resetUrl}" style="display: inline-block; background-color: #745DF3; color: white; padding: 14px 28px; border-radius: 12px; font-weight: 700; text-decoration: none; margin-bottom: 24px; box-shadow: 0 10px 15px -3px rgba(116, 93, 243, 0.2);">
               Reset Password

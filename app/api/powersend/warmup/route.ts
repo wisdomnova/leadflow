@@ -71,7 +71,7 @@ export async function GET() {
     });
   } catch (error: any) {
     console.error('Error fetching PowerSend warmup data:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -178,6 +178,6 @@ export async function POST(req: Request) {
     }
   } catch (error: any) {
     console.error('Error managing PowerSend warmup:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

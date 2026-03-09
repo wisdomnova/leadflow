@@ -1,4 +1,0 @@
-npx inngest-cli@latest dev
-
-npm run dev
-npm run build

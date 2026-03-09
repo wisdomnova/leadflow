@@ -14,12 +14,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
  * This allows Supabase RLS to use our 'org_id' claim.
  */
 export const createAuthClient = (token?: string) => {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : "",
-      },
-    },
+    global: { headers },
   });
 };
 

@@ -2,10 +2,21 @@ import { NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase";
 import { resend } from "@/lib/resend";
 import { getSessionContext } from "@/lib/auth-utils";
+import { rateLimiters, getClientIp } from "@/lib/rate-limit";
+import { escapeHtml } from "@/lib/sanitize";
 
 // POST /api/team/join - Handle join or request access
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rl = rateLimiters.auth(ip);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+      );
+    }
+
     const { slug, token, action } = await req.json();
 
     if (!slug || !token) {
@@ -80,7 +91,7 @@ export async function POST(req: Request) {
             html: `
               <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; border: 1px solid #f0f0f0; border-radius: 24px; background-color: #ffffff;">
                 <h1 style="color: #101828; font-size: 24px; font-weight: 900; margin-bottom: 8px;">Access Request</h1>
-                <p style="color: #667085; font-size: 16px; font-weight: 500; margin-bottom: 32px;"><strong>${requesterEmail}</strong> is requesting to join <strong>${(org as any).name}</strong> on Leadflow.</p>
+                <p style="color: #667085; font-size: 16px; font-weight: 500; margin-bottom: 32px;"><strong>${escapeHtml(requesterEmail)}</strong> is requesting to join <strong>${escapeHtml((org as any).name)}</strong> on Leadflow.</p>
                 <p style="color: #667085; font-size: 14px; margin-bottom: 32px;">You can add them manually from your Team Dashboard.</p>
                 <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/team" style="display: inline-block; background-color: #101828; color: white; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px;">Review Request</a>
               </div>
@@ -96,6 +107,6 @@ export async function POST(req: Request) {
 
   } catch (err: any) {
     console.error("Team join error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

@@ -21,6 +21,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No leads provided" }, { status: 400 });
     }
 
+    const MAX_LEADS = 50000;
+    if (leads.length > MAX_LEADS) {
+      return NextResponse.json({ error: `Maximum ${MAX_LEADS} leads per import` }, { status: 400 });
+    }
+
     // Prepare leads for bulk insert — normalize all field name variants
     const leadsToInsert = leads
       .map((lead: any) => ({

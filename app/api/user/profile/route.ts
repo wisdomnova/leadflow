@@ -62,7 +62,25 @@ export async function GET(req: Request) {
       (supabase as any)
         .from("users")
         .select(`
-          *,
+          id,
+          full_name,
+          email,
+          avatar_url,
+          banner_url,
+          job_title,
+          location,
+          bio,
+          twitter_url,
+          linkedin_url,
+          website_url,
+          role,
+          timezone,
+          notification_prefs,
+          monthly_target_goal,
+          response_rate_goal,
+          is_verified,
+          created_at,
+          updated_at,
           organizations (
             name,
             plan,
@@ -185,7 +203,7 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString()
       })
       .eq("id", payload.userId)
-      .select()
+      .select("id, full_name, email, avatar_url, banner_url, job_title, location, bio, twitter_url, linkedin_url, website_url, role, timezone, notification_prefs, monthly_target_goal, response_rate_goal, is_verified, created_at, updated_at")
       .single();
 
     if (updateError) {

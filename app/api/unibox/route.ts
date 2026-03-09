@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
     if (error) {
       console.error("Unibox API Error:", error);
-      return NextResponse.json({ error: error.message, details: error }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     // Group messages by conversation key (lead_id if linked, else from_email for inbound)
@@ -130,7 +130,7 @@ export async function GET(req: Request) {
     return NextResponse.json(formatted);
   } catch (err: any) {
     console.error("Unibox Internal Error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -141,11 +141,30 @@ export async function PATCH(req: Request) {
   try {
     const { leadId, isStarred, status, sentiment, tags } = await req.json();
 
+    // Validate status and sentiment against allowed values
+    const ALLOWED_STATUSES = ['new', 'replied', 'Interested', 'Not Interested', 'Follow-up', 'Out of Office', 'Closed Won'];
+    const ALLOWED_SENTIMENTS = ['Positive', 'Neutral', 'Negative'];
+
     const updateData: any = {};
     if (typeof isStarred === 'boolean') updateData.is_starred = isStarred;
-    if (status) updateData.status = status;
-    if (sentiment) updateData.sentiment = sentiment;
-    if (tags) updateData.tags = tags;
+    if (status) {
+      if (!ALLOWED_STATUSES.includes(status)) {
+        return NextResponse.json({ error: `Invalid status. Allowed: ${ALLOWED_STATUSES.join(', ')}` }, { status: 400 });
+      }
+      updateData.status = status;
+    }
+    if (sentiment) {
+      if (!ALLOWED_SENTIMENTS.includes(sentiment)) {
+        return NextResponse.json({ error: `Invalid sentiment. Allowed: ${ALLOWED_SENTIMENTS.join(', ')}` }, { status: 400 });
+      }
+      updateData.sentiment = sentiment;
+    }
+    if (tags) {
+      if (!Array.isArray(tags) || tags.length > 20) {
+        return NextResponse.json({ error: "Tags must be an array with max 20 items" }, { status: 400 });
+      }
+      updateData.tags = tags;
+    }
 
     const { error } = await context.supabase
       .from("leads")
@@ -157,6 +176,6 @@ export async function PATCH(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

@@ -15,7 +15,8 @@ import {
   powersendWarmupScheduler,
   powersendWarmupProcessor,
   powersendWarmupRampUp,
-  planDowngradeApplier
+  planDowngradeApplier,
+  replyClassifier
 } from "@/lib/inngest/functions";
 
 // Serve all Inngest functions
@@ -36,6 +37,7 @@ export const { GET, POST, PUT } = serve({
     powersendWarmupScheduler,
     powersendWarmupProcessor,
     powersendWarmupRampUp,
-    planDowngradeApplier
+    planDowngradeApplier,
+    replyClassifier
   ],
 });

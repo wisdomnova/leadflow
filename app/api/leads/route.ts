@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
 import { logLeadActivity } from "@/lib/activity-utils";
+import { sanitizeSearchQuery } from "@/lib/sanitize";
+
+const MAX_PAGE_SIZE = 100;
 
 export async function GET(req: Request) {
   const context = await getSessionContext();
@@ -14,7 +17,7 @@ export async function GET(req: Request) {
   const tag = searchParams.get("tag");
   const source = searchParams.get("source");
   const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "10");
+  const limit = Math.min(parseInt(searchParams.get("limit") || "10"), MAX_PAGE_SIZE);
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
@@ -37,13 +40,14 @@ export async function GET(req: Request) {
   }
 
   if (search) {
-    query = query.or(`email.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,company.ilike.%${search}%,tags.cs.{${search}}`);
+    const s = sanitizeSearchQuery(search);
+    query = query.or(`email.ilike.%${s}%,first_name.ilike.%${s}%,last_name.ilike.%${s}%,company.ilike.%${s}%`);
   }
 
   const { data, error, count } = await query.range(from, to);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
   // Get stats for the overview cards
@@ -98,7 +102,7 @@ export async function POST(req: Request) {
       if (error.code === '23505') {
         return NextResponse.json({ error: "Lead already exists in this organization" }, { status: 400 });
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     // Log the activity

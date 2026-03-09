@@ -1,7 +1,13 @@
 import { SignJWT, jwtVerify } from "jose";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-fallback-secret-for-dev-only-change-in-prod";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required. Never use a fallback secret in production.");
+}
 const secret = new TextEncoder().encode(JWT_SECRET);
+
+const ISSUER = "leadflow";
+const AUDIENCE = "leadflow-app";
 
 export interface UserPayload {
   userId: string;
@@ -17,6 +23,7 @@ export interface UserPayload {
 export async function signUserJWT(payload: UserPayload) {
   return await new SignJWT({
     ...payload,
+    type: "session",
     // Custom claim for Supabase RLS
     org_id: payload.orgId, 
     // We override regular Supabase 'role' to 'authenticated' to avoid DB errors,
@@ -26,7 +33,9 @@ export async function signUserJWT(payload: UserPayload) {
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("24h")
+    .setIssuer(ISSUER)
+    .setAudience(AUDIENCE)
+    .setExpirationTime("4h")
     .sign(secret);
 }
 
@@ -34,10 +43,25 @@ export async function signUserJWT(payload: UserPayload) {
  * Signs a short-lived token specifically for email verification.
  */
 export async function signVerificationJWT(email: string) {
-  return await new SignJWT({ email })
+  return await new SignJWT({ email, type: "verification" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("48h") // 48 hours for verification
+    .setIssuer(ISSUER)
+    .setAudience(AUDIENCE)
+    .setExpirationTime("24h")
+    .sign(secret);
+}
+
+/**
+ * Signs a short-lived token specifically for password reset.
+ */
+export async function signPasswordResetJWT(email: string) {
+  return await new SignJWT({ email, type: "password_reset" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setIssuer(ISSUER)
+    .setAudience(AUDIENCE)
+    .setExpirationTime("1h")
     .sign(secret);
 }
 
@@ -46,9 +70,29 @@ export async function signVerificationJWT(email: string) {
  */
 export async function verifyVerificationJWT(token: string): Promise<{ email: string } | null> {
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+    });
+    if ((payload as any).type !== "verification") return null;
     return payload as unknown as { email: string };
-  } catch (err) {
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Verifies a password reset token.
+ */
+export async function verifyPasswordResetJWT(token: string): Promise<{ email: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, secret, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+    });
+    if ((payload as any).type !== "password_reset") return null;
+    return payload as unknown as { email: string };
+  } catch {
     return null;
   }
 }
@@ -58,10 +102,13 @@ export async function verifyVerificationJWT(token: string): Promise<{ email: str
  */
 export async function verifyUserJWT(token: string): Promise<UserPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+    });
+    if ((payload as any).type !== "session") return null;
     return payload as unknown as UserPayload;
-  } catch (err) {
-    console.error("JWT verification failed:", err);
+  } catch {
     return null;
   }
 }

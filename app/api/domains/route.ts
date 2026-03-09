@@ -10,10 +10,11 @@ export async function GET() {
   const { data, error } = await context.supabase
     .from("sending_domains")
     .select("*")
+    .eq("org_id", context.orgId)
     .order("created_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
   return NextResponse.json(data);
@@ -30,6 +31,12 @@ export async function POST(req: Request) {
 
     if (!domainName) {
       return NextResponse.json({ error: "Domain name is required" }, { status: 400 });
+    }
+
+    // Validate domain format
+    const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+    if (typeof domainName !== 'string' || domainName.length > 253 || !domainRegex.test(domainName)) {
+      return NextResponse.json({ error: "Invalid domain name format" }, { status: 400 });
     }
 
     // Unlimited domains for all plans in current version
@@ -54,7 +61,7 @@ export async function POST(req: Request) {
       if (error.code === '23505') {
         return NextResponse.json({ error: "Domain already exists" }, { status: 400 });
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     return NextResponse.json(data);

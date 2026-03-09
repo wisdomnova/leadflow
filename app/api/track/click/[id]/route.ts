@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase";
+import { isSafeRedirectUrl } from "@/lib/sanitize";
+import { rateLimiters, getClientIp } from "@/lib/rate-limit";
+
+const FALLBACK_URL = process.env.NEXT_PUBLIC_APP_URL || "https://tryleadflow.ai";
 
 export async function GET(
   req: NextRequest,
@@ -11,6 +15,19 @@ export async function GET(
 
   if (!recipientId || !url) {
     return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+  }
+
+  // Validate redirect URL to prevent open redirect attacks
+  if (!isSafeRedirectUrl(url)) {
+    return NextResponse.redirect(FALLBACK_URL);
+  }
+
+  // Rate limit tracking requests to prevent abuse
+  const ip = getClientIp(req);
+  const rl = rateLimiters.tracking(ip);
+  if (!rl.allowed) {
+    // Still redirect but don't track (prevents stat inflation attacks)
+    return NextResponse.redirect(url);
   }
 
   const supabase = getAdminClient();
@@ -54,7 +71,6 @@ export async function GET(
     // 2. Redirect to the original URL
     return NextResponse.redirect(url);
   } catch (err) {
-    console.error("Click Tracking Error:", err);
     return NextResponse.redirect(url); // Redirect anyway so the user isn't stuck
   }
 }

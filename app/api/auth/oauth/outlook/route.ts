@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
+import { createSignedState } from "@/lib/oauth-state";
 
 const MS_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
 const CLIENT_ID = process.env.AZURE_CLIENT_ID || process.env.MICROSOFT_CLIENT_ID;
@@ -13,7 +14,6 @@ export async function GET(request: NextRequest) {
   }
 
   if (!CLIENT_ID) {
-    console.error("Missing Microsoft Client ID");
     return NextResponse.redirect(`${APP_URL}/dashboard/providers?error=misconfigured`);
   }
 
@@ -27,10 +27,10 @@ export async function GET(request: NextRequest) {
     "https://graph.microsoft.com/User.Read"
   ].join(" ");
 
-  const state = Buffer.from(JSON.stringify({ 
+  const state = createSignedState({ 
     userId: context.userId, 
     orgId: context.orgId 
-  })).toString("base64");
+  });
 
   const params = new URLSearchParams({
     client_id: CLIENT_ID,

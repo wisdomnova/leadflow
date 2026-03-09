@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
+import { createSignedState } from "@/lib/oauth-state";
 
 export async function GET(
   req: Request,
@@ -11,7 +12,7 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const state = btoa(JSON.stringify({ orgId: context.orgId, provider }));
+  const state = createSignedState({ orgId: context.orgId, provider });
 
   if (provider === 'hubspot') {
     const clientId = process.env.HUBSPOT_CLIENT_ID;

@@ -3,16 +3,29 @@ import bcrypt from "bcryptjs";
 import { getAdminClient } from "@/lib/supabase";
 import { signUserJWT } from "@/lib/jwt";
 import { cookies } from "next/headers";
+import { rateLimiters, getClientIp } from "@/lib/rate-limit";
+
+// Dummy hash for timing-safe comparison when user not found
+const DUMMY_HASH = "$2a$12$LJ3m4ys3Sz8n2a0Oj6MxEe0000000000000000000000000000000";
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
-    console.log("[SIGNIN] Attempt for email:", email);
+    const ip = getClientIp(req);
+    const rl = rateLimiters.auth(ip);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+      );
+    }
 
-    if (!email || !password) {
-      console.log("[SIGNIN] Missing fields - email:", !!email, "password:", !!password);
+    const { email: rawEmail, password } = await req.json();
+
+    if (!rawEmail || !password) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    const email = rawEmail.trim().toLowerCase();
 
     const supabase = getAdminClient();
 
@@ -23,21 +36,18 @@ export async function POST(req: Request) {
       .eq("email", email)
       .single();
 
-    if (userError || !user) {
-      console.log("[SIGNIN] User lookup failed - error:", userError?.message, "| user found:", !!user);
+    // Always run bcrypt comparison to prevent timing-based user enumeration
+    const hashToCompare = user ? (user as any).password_hash : DUMMY_HASH;
+    const isPasswordValid = await bcrypt.compare(password, hashToCompare);
+
+    if (userError || !user || !isPasswordValid) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    console.log("[SIGNIN] User found - id:", (user as any).id, "| has password_hash:", !!(user as any).password_hash, "| org_id:", (user as any).org_id);
-
-    // 2. Compare Password
-    const isPasswordValid = await bcrypt.compare(password, (user as any).password_hash);
-    if (!isPasswordValid) {
-      console.log("[SIGNIN] Password mismatch for user:", (user as any).id);
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    // Check email verification status
+    if (!(user as any).is_verified) {
+      return NextResponse.json({ error: "Please verify your email address before signing in. Check your inbox for the verification link." }, { status: 403 });
     }
-
-    console.log("[SIGNIN] Password valid, generating JWT...");
 
     // 3. Generate Session JWT
     const token = await signUserJWT({
@@ -48,12 +58,13 @@ export async function POST(req: Request) {
     });
 
     // 4. Set Cookie
+    // TODO: Add server-side session revocation (store session ID in DB, validate on each request)
     const cookieStore = await cookies();
     cookieStore.set("session_token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       sameSite: "lax",
-      maxAge: 60 * 60 * 24, // 24 hours
+      maxAge: 60 * 60 * 4, // 4 hours (matches JWT expiry)
       path: "/",
     });
 
@@ -62,7 +73,6 @@ export async function POST(req: Request) {
       user: { email: (user as any).email, fullName: (user as any).full_name, orgName: (user as any).organizations?.name } 
     });
   } catch (err) {
-    console.error("Signin error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

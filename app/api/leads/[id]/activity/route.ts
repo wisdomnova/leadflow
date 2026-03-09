@@ -23,7 +23,7 @@ export async function GET(
     if (error.code === 'PGRST116' || error.message.includes('relation "activity_log" does not exist')) {
       return NextResponse.json([]);
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
   return NextResponse.json(data || []);

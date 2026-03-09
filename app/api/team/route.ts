@@ -4,6 +4,7 @@ import { resend } from "@/lib/resend";
 import { getAdminClient } from "@/lib/supabase";
 import { checkSubscription } from "@/lib/subscription-check";
 import crypto from "crypto";
+import { escapeHtml } from "@/lib/sanitize";
 
 // GET /api/team - List all team members for an organization
 export async function GET() {
@@ -19,10 +20,10 @@ export async function GET() {
 
   try {
     const adminClient = getAdminClient();
-    // Fetch users (relationship with campaigns is not direct, so we fetch separately or remove for now)
+    // Fetch users with explicit columns (avoid loading password_hash into memory)
     const { data: users, error } = await (adminClient as any)
       .from("users")
-      .select("*")
+      .select("id, full_name, email, role, is_verified, avatar_url, created_at, updated_at, org_id")
       .eq("org_id", context.orgId)
       .order("created_at", { ascending: false });
 
@@ -38,7 +39,7 @@ export async function GET() {
     // Fetch Organization details for settings
     const { data: org, error: orgError } = await (adminClient as any)
       .from("organizations")
-      .select("*")
+      .select("id, name, slug, plan, plan_tier, subscription_status, join_token, auto_join_enabled")
       .eq("id", context.orgId)
       .single();
 
@@ -74,7 +75,7 @@ export async function GET() {
       openRate: "0%",
       replyRate: "0%",
       activeCampaigns: 0, 
-      status: (u.is_verified || u.password_hash !== 'INVITED_USER_NO_PASSWORD') ? 'Active' : 'Invited',
+      status: u.is_verified ? 'Active' : 'Invited',
       avatar: (u.full_name || u.email).substring(0, 2).toUpperCase(),
       joinedDate: new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
     }));
@@ -102,7 +103,7 @@ export async function GET() {
         slug: (org as any)?.slug,
         plan: (org as any)?.plan_tier || (org as any)?.plan || 'starter',
         memberLimit: ((org as any)?.plan_tier || (org as any)?.plan) === 'enterprise' ? 500 : ((org as any)?.plan_tier || (org as any)?.plan) === 'pro' ? 50 : 5,
-        joinToken: (org as any)?.join_token,
+        joinToken: context.role === 'admin' ? (org as any)?.join_token : undefined,
         autoJoinEnabled: (org as any)?.auto_join_enabled
       },
       logs: formattedLogs
@@ -111,7 +112,7 @@ export async function GET() {
     return NextResponse.json({ members: formattedUsers, stats });
   } catch (error: any) {
     console.error("Error fetching team members:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -139,6 +140,7 @@ export async function POST(req: Request) {
 
     // 1. Generate unique invitation token
     const inviteToken = crypto.randomBytes(32).toString('hex');
+    const inviteTokenHash = crypto.createHash('sha256').update(inviteToken).digest('hex');
     const inviteExpires = new Date();
     inviteExpires.setHours(inviteExpires.getHours() + 48); // 48 hour expiry
 
@@ -175,9 +177,9 @@ export async function POST(req: Request) {
         email,
         full_name: full_name || email.split('@')[0],
         role: dbRole,
-        password_hash: 'INVITED_USER_NO_PASSWORD', 
+        password_hash: await (await import('bcryptjs')).default.hash(crypto.randomBytes(32).toString('hex'), 12), 
         is_verified: false,
-        reset_token: inviteToken,
+        reset_token: inviteTokenHash,
         reset_token_expires: inviteExpires.toISOString()
       }] as any)
       .select()
@@ -198,8 +200,8 @@ export async function POST(req: Request) {
             <div style="margin-bottom: 32px;">
               <img src="https://www.tryleadflow.ai/_next/image?url=%2Fleadflow-black.png&w=256&q=75" alt="Leadflow" style="height: 32px; width: auto;" />
             </div>
-            <h1 style="color: #101828; font-size: 24px; font-weight: 900; letter-spacing: -0.02em; margin-bottom: 8px;">Join ${orgName}</h1>
-            <p style="color: #667085; font-size: 16px; font-weight: 500; margin-bottom: 32px;">You've been invited to join the <strong>${role}</strong> team at ${orgName} on Leadflow.</p>
+            <h1 style="color: #101828; font-size: 24px; font-weight: 900; letter-spacing: -0.02em; margin-bottom: 8px;">Join ${escapeHtml(orgName)}</h1>
+            <p style="color: #667085; font-size: 16px; font-weight: 500; margin-bottom: 32px;">You've been invited to join the <strong>${escapeHtml(role)}</strong> team at ${escapeHtml(orgName)} on Leadflow.</p>
             
             <a href="${inviteUrl}" style="display: inline-block; background-color: #745DF3; color: white; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; box-shadow: 0 10px 15px -3px rgba(116, 93, 243, 0.2);">Accept Invitation</a>
             
@@ -215,7 +217,7 @@ export async function POST(req: Request) {
     return NextResponse.json(newUser);
   } catch (error: any) {
     console.error("Error inviting team member:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -259,7 +261,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting team member:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -294,6 +296,6 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Error updating team member:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

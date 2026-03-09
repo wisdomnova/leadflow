@@ -17,7 +17,7 @@ export async function GET() {
 
   if (error) {
     console.error("Failed to fetch email accounts:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
   return NextResponse.json(data);
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
           error: `${email} is already connected to your account. You can connect multiple different email addresses, but each email address can only be added once.` 
         }, { status: 409 });
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     return NextResponse.json(data);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase';
+import { getSessionContext } from '@/lib/auth-utils';
 
 /**
  * POST /api/powersend/health-check
@@ -8,15 +9,34 @@ import { getAdminClient } from '@/lib/supabase';
  * Calculates reputation based on actual send metrics from the last 24h.
  * 
  * Can be triggered:
- * 1. Manually from the PowerSend dashboard (Refresh button)
- * 2. Automatically by the Inngest cron every 15 minutes
+ * 1. Manually from the PowerSend dashboard (Refresh button) — requires session auth
+ * 2. Automatically by the Inngest cron — requires internal signing key
  */
 export async function POST(req: Request) {
   const supabase = getAdminClient();
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { orgId, serverId } = body;
+    const { serverId } = body;
+
+    // Authentication: either session-based or internal cron key
+    const internalKey = req.headers.get("x-internal-key");
+    let orgId: string | undefined;
+
+    if (internalKey === process.env.INNGEST_SIGNING_KEY) {
+      // Trusted internal call from Inngest cron
+      orgId = body.orgId;
+      if (!orgId && !serverId) {
+        return NextResponse.json({ error: "orgId is required for internal calls" }, { status: 400 });
+      }
+    } else {
+      // User-initiated: require session
+      const context = await getSessionContext();
+      if (!context) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      orgId = context.orgId;
+    }
 
     // Build query — either one server or all servers for an org
     let query = supabase
@@ -110,6 +130,6 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error('Health check error:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: 'Health check failed' }, { status: 500 });
   }
 }

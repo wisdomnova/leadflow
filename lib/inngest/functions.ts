@@ -6,6 +6,7 @@ import { syncAccountInbox } from "../services/unibox";
 import { createNotification } from "../notifications";
 import { calculateOptimalSendTime, getInngestDelay } from "../smart-scheduling";
 import { checkSubscription } from "../subscription-check";
+import { classifyReply } from "../services/ai";
 
 /**
  * Unibox Sync Engine
@@ -345,16 +346,20 @@ export const emailProcessor = inngest.createFunction(
     // 2. Variable Replacement & Tracking Injection
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     
-    // Dynamic Variable Replacement
+    // Dynamic Variable Replacement (HTML-escape values to prevent XSS in emails)
     let processedBody = currentStep.body;
     let subject = currentStep.subject;
 
+    // HTML-escape helper to sanitize user-supplied lead data
+    const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
     // Replace variables case-insensitively using lead data keys
     Object.keys(((data as any).lead as any) || {}).forEach((key: any) => {
-      const value = ((data as any).lead as any)[key] || '';
+      const rawValue = ((data as any).lead as any)[key] || '';
+      const safeValue = esc(rawValue);
       const regex = new RegExp(`{{${key}}}`, 'gi');
-      processedBody = processedBody.replace(regex, value);
-      subject = subject.replace(regex, value);
+      processedBody = processedBody.replace(regex, safeValue);
+      subject = subject.replace(regex, rawValue); // Subject is plain text, no HTML escaping needed
     });
 
     // Provide defaults for common missing fields if they weren't matched
@@ -1166,5 +1171,57 @@ export const planDowngradeApplier = inngest.createFunction(
     }
 
     return { applied };
+  }
+);
+
+// ─── Reply AI Classification ─────────────────────────────────────────────────
+// Triggered when a new inbound reply is stored in unibox_messages.
+// Classifies the reply using GPT-4o-mini and updates the lead status.
+export const replyClassifier = inngest.createFunction(
+  { id: "reply-classifier", concurrency: 10 },
+  { event: "unibox/reply.classify" },
+  async ({ event, step }) => {
+    const { leadId, orgId, snippet, subject, leadName } = event.data;
+
+    const result = await step.run("classify-reply", async () => {
+      return classifyReply({
+        replyText: snippet || "",
+        originalSubject: subject,
+        leadName,
+      });
+    });
+
+    await step.run("update-lead-status", async () => {
+      const supabase = getAdminClient();
+
+      // Map classification to sentiment
+      const sentimentMap: Record<string, string> = {
+        "Interested": "Positive",
+        "Closed Won": "Positive",
+        "Not Interested": "Negative",
+        "Out of Office": "Neutral",
+        "Follow-up": "Neutral",
+      };
+
+      await (supabase as any).from("leads").update({
+        status: result.classification,
+        sentiment: sentimentMap[result.classification] || "Neutral",
+      }).eq("id", leadId).eq("org_id", orgId);
+
+      // Log the classification activity
+      await (supabase as any).from("activity_log").insert([{
+        org_id: orgId,
+        action_type: "ai.reply_classified",
+        description: `AI classified reply as "${result.classification}" (${Math.round(result.confidence * 100)}% confidence)`,
+        metadata: {
+          lead_id: leadId,
+          classification: result.classification,
+          confidence: result.confidence,
+          reasoning: result.reasoning,
+        }
+      }] as any);
+    });
+
+    return result;
   }
 );

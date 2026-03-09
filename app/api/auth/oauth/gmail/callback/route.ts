@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase";
+import { getSessionContext } from "@/lib/auth-utils";
+import { verifySignedState } from "@/lib/oauth-state";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -16,11 +18,19 @@ export async function GET(request: NextRequest) {
   }
     
   try {
-    const { userId, orgId } = JSON.parse(Buffer.from(state, "base64").toString());
-
-    if (!orgId) {
-      throw new Error("Missing organization context");
+    // Verify HMAC-signed state
+    const statePayload = verifySignedState(state);
+    if (!statePayload || !statePayload.orgId) {
+      return NextResponse.redirect(`${APP_URL}/dashboard/providers/failed?error=invalid_state`);
     }
+
+    // Verify session matches state (prevents cross-user attacks)
+    const context = await getSessionContext();
+    if (!context || context.orgId !== statePayload.orgId) {
+      return NextResponse.redirect(`${APP_URL}/signin?error=session_expired`);
+    }
+
+    const { orgId } = statePayload;
 
     const tokenResponse = await fetch(TOKEN_URL, {
       method: "POST",
@@ -37,7 +47,7 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenResponse.json();
 
     if (!tokenResponse.ok) {
-      console.error("Token exchange failed", tokenData);
+      console.error("Token exchange failed for Gmail OAuth");
       return NextResponse.redirect(`${APP_URL}/dashboard/providers/failed?error=token_exchange`);
     }
 
@@ -65,7 +75,7 @@ export async function GET(request: NextRequest) {
     const refreshToken = tokenData.refresh_token || existingConfig.refresh_token;
 
     if (!refreshToken) {
-      console.error("WARNING: No refresh_token available for", email, "— token data:", JSON.stringify(tokenData));
+      console.error("WARNING: No refresh_token available for account. User may need to re-authorize with prompt=consent.");
     }
 
     // Save to email_accounts

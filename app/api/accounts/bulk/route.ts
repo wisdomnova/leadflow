@@ -113,7 +113,7 @@ export async function POST(req: Request) {
 
     if (insertError) {
       console.error("Bulk insert error:", insertError);
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      return NextResponse.json({ error: "Failed to import accounts. Please try again." }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     console.error("Bulk import error:", err);
-    return NextResponse.json({ error: err.message || "Invalid request" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
 

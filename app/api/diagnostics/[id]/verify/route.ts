@@ -33,13 +33,13 @@ export async function POST(
     if (seedError || !seeds) throw seedError;
 
     // 3. For each seed, check its inbox/spam via IMAP
-    // NOTE: This requires the system to have credentials for the SEED accounts.
-    // Since this is a demo/dev environment, we will simulate the check
-    // unless real credentials are found in the environment.
+    // WARNING: This currently returns SIMULATED results because real IMAP
+    // credentials for seed accounts are not configured. Do NOT show these
+    // results to users as real deliverability data.
+    // TODO: Implement real IMAP verification with seed account credentials.
     
-    // Placeholder for real IMAP logic:
     const results = await Promise.all(seeds.map(async (seed) => {
-      // simulate check
+      // SIMULATED — replace with real IMAP check when credentials are available
       const folders = ['INBOX', 'Spam', 'Promotions'];
       const randomFolder = folders[Math.floor(Math.random() * folders.length)];
       
@@ -47,7 +47,8 @@ export async function POST(
         email: seed.email,
         folder: randomFolder,
         provider: seed.provider,
-        verified_at: new Date().toISOString()
+        verified_at: new Date().toISOString(),
+        simulated: true  // Flag to indicate this is not real data
       };
     }));
 
@@ -79,6 +80,6 @@ export async function POST(
 
   } catch (error: any) {
     console.error("Diagnostic verify error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

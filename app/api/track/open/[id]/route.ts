@@ -1,11 +1,29 @@
 import { NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase";
 import { logLeadActivity } from "@/lib/activity-utils";
+import { rateLimiters, getClientIp } from "@/lib/rate-limit";
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Rate limit tracking requests to prevent abuse
+  const ip = getClientIp(req);
+  const rl = rateLimiters.tracking(ip);
+  if (!rl.allowed) {
+    // Still return the pixel to avoid breaking email clients, but don't track
+    const pixel = Buffer.from(
+      "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+      "base64"
+    );
+    return new NextResponse(pixel, {
+      headers: {
+        "Content-Type": "image/gif",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+      },
+    });
+  }
+
   const { id } = await params;
   const supabase = getAdminClient();
 

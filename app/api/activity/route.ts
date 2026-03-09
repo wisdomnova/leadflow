@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const filter = searchParams.get('filter') || 'all';
-    const type = searchParams.get('type');
+    const types = searchParams.getAll('type');
     const limit = parseInt(searchParams.get('limit') || '50');
 
     const cookieStore = await cookies();
@@ -29,8 +29,9 @@ export async function GET(request: Request) {
       .select("*")
       .eq("org_id", payload.orgId);
 
-    if (type) {
-      query = query.eq("action_type", type);
+    // If multiple types specified, use 'in' filter; otherwise use 'eq' if single type
+    if (types.length > 0) {
+      query = query.in("action_type", types);
     }
 
     query = query.order("created_at", { ascending: false })
@@ -49,11 +50,11 @@ export async function GET(request: Request) {
     const { data, error } = await query;
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 
     return NextResponse.json(data);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

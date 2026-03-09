@@ -48,7 +48,7 @@ export async function GET() {
     return NextResponse.json({ servers: serverList, stats });
   } catch (error: any) {
     console.error('Error fetching powersend data:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }
 
@@ -114,6 +114,6 @@ export async function POST(req: Request) {
     return NextResponse.json(server);
   } catch (error: any) {
     console.error('Error adding smart server:', error);
-    return new NextResponse(error.message, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

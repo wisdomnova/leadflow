@@ -74,3 +74,96 @@ export async function generateCampaignContent({
   const content = response.choices[0].message.content;
   return content ? JSON.parse(content) : null;
 }
+
+// ─── Reply Classification ────────────────────────────────────────────────────
+
+export type ReplyClassification = 
+  | "Interested" 
+  | "Not Interested" 
+  | "Out of Office" 
+  | "Follow-up" 
+  | "Closed Won";
+
+export interface ClassifyResult {
+  classification: ReplyClassification;
+  confidence: number;
+  reasoning: string;
+}
+
+/**
+ * Classify a campaign reply using GPT-4o-mini.
+ * Returns the classification label, confidence (0-1), and brief reasoning.
+ */
+export async function classifyReply({
+  replyText,
+  originalSubject,
+  leadName,
+  campaignContext,
+}: {
+  replyText: string;
+  originalSubject?: string;
+  leadName?: string;
+  campaignContext?: string;
+}): Promise<ClassifyResult> {
+  const prompt = `Classify this email reply from a cold outreach campaign into exactly one category.
+
+CATEGORIES:
+- "Interested": The lead shows genuine interest, wants to learn more, asks for a demo, pricing, or next steps.
+- "Not Interested": The lead declines, asks to be removed, says no, or shows clear disinterest.
+- "Out of Office": Auto-reply, vacation notice, OOO, or any automated "not available" response.
+- "Follow-up": The lead asks a question, requests more info but hasn't committed, or gives a neutral/ambiguous reply.
+- "Closed Won": The lead explicitly agrees to a deal, signs up, confirms a purchase, or says "let's do it".
+
+CONTEXT:
+${originalSubject ? `- Original Subject: ${originalSubject}` : ''}
+${leadName ? `- Lead Name: ${leadName}` : ''}
+${campaignContext ? `- Campaign: ${campaignContext}` : ''}
+
+REPLY:
+"""
+${replyText.slice(0, 2000)}
+"""
+
+Return a JSON object:
+{
+  "classification": "<one of the 5 categories exactly>",
+  "confidence": <0.0 to 1.0>,
+  "reasoning": "<one sentence explanation>"
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: "You are an expert B2B sales assistant. You classify email replies from cold outreach campaigns with high accuracy. Be concise. Always return valid JSON."
+      },
+      { role: "user", content: prompt }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.1,
+    max_tokens: 150,
+  });
+
+  const content = response.choices[0].message.content;
+  if (!content) {
+    return { classification: "Follow-up", confidence: 0.5, reasoning: "Unable to classify" };
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    const validCategories: ReplyClassification[] = ["Interested", "Not Interested", "Out of Office", "Follow-up", "Closed Won"];
+    
+    if (!validCategories.includes(parsed.classification)) {
+      return { classification: "Follow-up", confidence: 0.5, reasoning: "Unknown classification returned" };
+    }
+    
+    return {
+      classification: parsed.classification,
+      confidence: Math.min(1, Math.max(0, parsed.confidence || 0.5)),
+      reasoning: parsed.reasoning || "",
+    };
+  } catch {
+    return { classification: "Follow-up", confidence: 0.5, reasoning: "Failed to parse AI response" };
+  }
+}

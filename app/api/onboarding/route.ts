@@ -8,6 +8,18 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { role, goal, industry, teamSize, skipped } = body;
 
+    // Validate input lengths to prevent abuse
+    const ALLOWED_ROLES = ['founder', 'sales_lead', 'sdr', 'marketer', 'agency', 'other'];
+    if (role && !ALLOWED_ROLES.includes(role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+    if (goal && typeof goal === 'string' && goal.length > 500) {
+      return NextResponse.json({ error: "Goal too long" }, { status: 400 });
+    }
+    if (industry && typeof industry === 'string' && industry.length > 200) {
+      return NextResponse.json({ error: "Industry too long" }, { status: 400 });
+    }
+
     const cookieStore = await cookies();
     const token = cookieStore.get("session_token")?.value;
 

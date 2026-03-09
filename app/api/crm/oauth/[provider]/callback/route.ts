@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminClient } from "@/lib/supabase";
+import { getSessionContext } from "@/lib/auth-utils";
+import { verifySignedState } from "@/lib/oauth-state";
 
 export async function GET(
   req: Request,
@@ -14,13 +16,19 @@ export async function GET(
     return NextResponse.json({ error: "Missing code or state" }, { status: 400 });
   }
 
-  let orgId: string;
-  try {
-    const decodedState = JSON.parse(atob(state));
-    orgId = decodedState.orgId;
-  } catch (e) {
+  // Verify HMAC-signed state
+  const statePayload = verifySignedState(state);
+  if (!statePayload || !statePayload.orgId) {
     return NextResponse.json({ error: "Invalid state" }, { status: 400 });
   }
+
+  // Verify session matches state (prevents cross-tenant injection)
+  const context = await getSessionContext();
+  if (!context || context.orgId !== statePayload.orgId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const orgId = statePayload.orgId;
 
   const supabase = getAdminClient();
 
@@ -110,7 +118,8 @@ export async function GET(
       // Store instance_url for API calls
       accountName = `${accountName}`;
       // We need to also store instance_url in config
-      (globalThis as any).__sf_instance_url = data.instance_url;
+      // Use a local variable instead of globalThis to avoid race conditions
+      var sfInstanceUrl: string | undefined = data.instance_url;
     } else {
       throw new Error("Unsupported provider");
     }
@@ -126,20 +135,17 @@ export async function GET(
           refreshToken,
           expiresAt,
           accountName,
-          ...((globalThis as any).__sf_instance_url ? { instanceUrl: (globalThis as any).__sf_instance_url } : {})
+          ...(sfInstanceUrl ? { instanceUrl: sfInstanceUrl } : {})
         },
         status: 'active',
         last_sync: new Date().toISOString()
       }, { onConflict: 'org_id,provider' });
-
-    // Clean up
-    delete (globalThis as any).__sf_instance_url;
 
     if (error) throw error;
 
     return NextResponse.redirect(new URL("/dashboard/crm?success=true", req.url));
   } catch (error: any) {
     console.error("OAuth Callback Error:", error);
-    return NextResponse.redirect(new URL(`/dashboard/crm?error=${encodeURIComponent(error.message)}`, req.url));
+    return NextResponse.redirect(new URL(`/dashboard/crm?error=connection_failed`, req.url));
   }
 }

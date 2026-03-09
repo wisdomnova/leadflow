@@ -23,6 +23,6 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("Error updating team settings:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 }

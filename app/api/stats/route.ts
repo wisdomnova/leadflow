@@ -41,7 +41,8 @@ export async function GET() {
   ]);
 
   if (campaignError) {
-    return NextResponse.json({ error: campaignError.message }, { status: 500 });
+    console.error("Stats campaign error:", campaignError);
+    return NextResponse.json({ error: "Failed to fetch statistics" }, { status: 500 });
   }
 
   const totals = {

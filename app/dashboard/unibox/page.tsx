@@ -18,7 +18,8 @@ import {
   Send,
   Loader2,
   X,
-  Database
+  Database,
+  Sparkles
 } from 'lucide-react';
 
 const filters = ['All', 'Interested', 'Follow-up', 'Out of Office', 'Not Interested', 'Closed Won'];
@@ -57,6 +58,7 @@ export default function UniboxPage() {
   const [showCrmModal, setShowCrmModal] = useState(false);
   const [crmIntegrations, setCrmIntegrations] = useState<any[]>([]);
   const [pushingProvider, setPushingProvider] = useState<string | null>(null);
+  const [isClassifying, setIsClassifying] = useState(false);
 
   useEffect(() => {
     fetchConversations();
@@ -149,6 +151,8 @@ export default function UniboxPage() {
       const result = await res.json();
       if (res.ok) {
         setToastMsg('Lead successfully pushed to CRM');
+        // Refresh local state to reflect change
+        fetchConversations();
       } else {
         setToastMsg(result.error || 'Failed to push to CRM');
       }
@@ -185,6 +189,40 @@ export default function UniboxPage() {
     }
   };
 
+  const handleClassify = async (leadId?: string) => {
+    const targetId = leadId || selectedId;
+    const conv = conversations.find(c => c.id === targetId);
+    if (!targetId || !conv?.isLinkedToLead) return;
+    setIsClassifying(true);
+    try {
+      const res = await fetch('/api/unibox/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: targetId })
+      });
+      const result = await res.json();
+      if (res.ok) {
+        // Update the conversation locally
+        setConversations(prev => prev.map(c =>
+          c.id === targetId ? { ...c, status: result.classification, aiClassified: true, aiConfidence: result.confidence } : c
+        ));
+        setToastMsg(`AI classified as "${result.classification}" (${Math.round(result.confidence * 100)}%)`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      } else {
+        setToastMsg(result.error || 'Classification failed');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }
+    } catch {
+      setToastMsg('Classification failed');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } finally {
+      setIsClassifying(false);
+    }
+  };
+
   const handleUpdateStatus = async (newStatus: string) => {
     const current = conversations.find(c => c.id === selectedId);
     if (!selectedId || !current?.isLinkedToLead) return;
@@ -200,6 +238,8 @@ export default function UniboxPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId: selectedId, status: newStatus })
       });
+      // Final sync with server state
+      fetchConversations();
     } catch (error) {
       console.error('Failed to update status:', error);
     }
@@ -358,13 +398,27 @@ export default function UniboxPage() {
                       </span>
                     </div>
                     <div className="pl-14">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className={`text-[13px] mb-1 line-clamp-1 ${conv.unread ? 'font-black text-[#101828]' : 'font-bold text-gray-600'}`}>
+                      <div className="flex items-center justify-between gap-3 mb-1">
+                        <p className={`text-[13px] line-clamp-1 flex-1 ${conv.unread ? 'font-black text-[#101828]' : 'font-bold text-gray-600'}`}>
                           {conv.subject}
                         </p>
-                        {conv.isStarred && (
-                          <Star className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />
-                        )}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {conv.isStarred && (
+                            <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                          )}
+                          {conv.isLinkedToLead && conv.status && !['new', 'replied'].includes(conv.status) && (
+                            <div className={`p-1 rounded-md ${
+                              conv.status === 'Interested' ? 'bg-emerald-50 text-emerald-600' :
+                              conv.status === 'Not Interested' ? 'bg-red-50 text-red-500' :
+                              conv.status === 'Out of Office' ? 'bg-orange-50 text-orange-500' :
+                              conv.status === 'Closed Won' ? 'bg-[#745DF3]/10 text-[#745DF3]' :
+                              conv.status === 'Follow-up' ? 'bg-blue-50 text-blue-500' :
+                              'bg-gray-50 text-gray-500'
+                            }`} title={conv.status}>
+                              <Sparkles className="w-2.5 h-2.5" />
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-gray-400 line-clamp-1 font-medium leading-relaxed">
                         {cleanMessage(conv.preview)}
@@ -387,92 +441,104 @@ export default function UniboxPage() {
           <div className="flex-1 flex flex-col bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden min-w-0">
             {selectedConversation ? (
               <>
-                <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-white z-10 shrink-0">
-                  <div className="flex items-center gap-5">
-                    <div className="w-16 h-16 rounded-[2rem] bg-gray-50 border border-gray-100 flex items-center justify-center text-2xl font-black text-[#745DF3]">
-                      {selectedConversation.avatar || selectedConversation.name.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-2xl font-black text-[#101828] tracking-tight">{selectedConversation.name}</h3>
-                        {selectedConversation.isLinkedToLead && (
-                        <div className="relative">
-                          <button 
-                            onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all outline-none border cursor-pointer hover:shadow-md ${
-                              selectedConversation.status === 'Interested' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' : 
-                              selectedConversation.status === 'Follow-up' ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100' :
-                              selectedConversation.status === 'Closed Won' ? 'bg-[#745DF3] text-white border-[#745DF3] hover:bg-[#6349e0]' :
-                              selectedConversation.status === 'replied' ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' :
-                              'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-                            }`}
-                          >
-                            {selectedConversation.status}
-                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
-                          </button>
-
-                          <AnimatePresence>
-                            {showStatusDropdown && (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                className="absolute left-0 mt-2 w-48 bg-white rounded-2xl border border-gray-100 shadow-2xl z-20 py-2"
+                <div className="px-6 py-5 border-b border-gray-100 bg-white z-10 shrink-0">
+                  {/* Row 1: Identity and Status */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-lg font-black text-[#745DF3]">
+                        {selectedConversation.avatar || selectedConversation.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-0.5">
+                          <h3 className="text-xl font-black text-[#101828] tracking-tight leading-none">{selectedConversation.name}</h3>
+                          {selectedConversation.isLinkedToLead && (
+                            <div className="relative">
+                              <button 
+                                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                                className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all border cursor-pointer hover:shadow-md ${
+                                  selectedConversation.status === 'Interested' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
+                                  selectedConversation.status === 'Follow-up' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                  selectedConversation.status === 'Closed Won' ? 'bg-[#745DF3] text-white border-[#745DF3]' :
+                                  selectedConversation.status === 'replied' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                  'bg-gray-100 text-gray-500 border-gray-200'
+                                }`}
                               >
-                                {filters.filter(f => f !== 'All').map(status => (
-                                  <button 
-                                    key={status}
-                                    onClick={() => handleUpdateStatus(status)}
-                                    className="w-full text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50"
+                                {selectedConversation.status}
+                                <ChevronDown className={`w-3 h-3 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
+                              </button>
+
+                              <AnimatePresence>
+                                {showStatusDropdown && (
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: 8 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                                    className="absolute left-0 mt-2 w-44 bg-white rounded-xl border border-gray-100 shadow-xl z-20 py-1.5"
                                   >
-                                    {status}
-                                  </button>
-                                ))}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                                    {filters.filter(f => f !== 'All').map(status => (
+                                      <button 
+                                        key={status}
+                                        onClick={() => handleUpdateStatus(status)}
+                                        className="w-full text-left px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 hover:text-[#745DF3] transition-colors"
+                                      >
+                                        {status}
+                                      </button>
+                                    ))}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          )}
                         </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-sm font-bold text-gray-400">{selectedConversation.company}</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-gray-200" />
-                        <span className="text-sm font-bold text-gray-400">{selectedConversation.email}</span>
+                        <div className="flex items-center gap-2.5 text-xs font-bold text-gray-400">
+                          <span>{selectedConversation.company}</span>
+                          <span className="w-1 h-1 rounded-full bg-gray-200" />
+                          <span>{selectedConversation.email}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {selectedConversation.isLinkedToLead && (
+
+                    <div className="flex items-center gap-2">
                       <button 
                         onClick={handleToggleStar}
-                        className={`p-3.5 rounded-2xl transition-all ${
+                        className={`p-2 rounded-xl transition-all ${
                           selectedConversation.isStarred 
                             ? 'bg-amber-50 text-amber-500' 
                             : 'bg-gray-50 text-gray-400 hover:text-[#745DF3]'
                         }`}
                       >
-                        <Star className={`w-5 h-5 ${selectedConversation.isStarred ? 'fill-amber-500' : ''}`} />
+                        <Star className={`w-4 h-4 ${selectedConversation.isStarred ? 'fill-amber-500' : ''}`} />
                       </button>
-                    )}
-                    {selectedConversation.isLinkedToLead && (
-                      <>
-                        <div className="w-[1px] h-8 bg-gray-100 mx-2" />
-                        <button 
-                          onClick={handleOpenCrmModal}
-                          disabled={isPushing}
-                          className="flex items-center gap-2 px-6 py-3.5 bg-[#101828] rounded-2xl text-[13px] font-black text-white hover:bg-[#101828]/90 transition-all shadow-xl shadow-[#101828]/20 group disabled:opacity-50"
-                        >
-                          {isPushing ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Database className="w-4 h-4 text-[#745DF3]" />
-                          )}
-                          Sync to CRM
-                          <SquareArrowOutUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </button>
-                      </>
-                    )}
+                    </div>
+                  </div>
+                  
+                  {/* Row 2: Compact Actions */}
+                  <div className="flex items-center gap-2 pt-4 border-t border-gray-50">
+                    <button
+                      onClick={() => handleClassify()}
+                      disabled={isClassifying}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#745DF3]/5 hover:bg-[#745DF3]/10 border border-[#745DF3]/10 rounded-xl text-[11px] font-black text-[#745DF3] uppercase tracking-widest transition-all disabled:opacity-50"
+                    >
+                      {isClassifying ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5" />
+                      )}
+                      {isClassifying ? '...' : 'AI Classify'}
+                    </button>
+
+                    <button 
+                      onClick={handleOpenCrmModal}
+                      disabled={isPushing}
+                      className="flex-[1.5] flex items-center justify-center gap-2 px-6 py-2.5 bg-[#101828] rounded-xl text-[12px] font-black text-white hover:bg-black transition-all shadow-lg shadow-black/5"
+                    >
+                      {isPushing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Database className="w-3.5 h-3.5 text-[#745DF3]" />
+                      )}
+                      Sync to CRM
+                    </button>
                   </div>
                 </div>
 
