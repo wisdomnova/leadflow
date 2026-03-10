@@ -13,7 +13,7 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
-      - docker build --build-arg JWT_SECRET=build-dummy-secret --build-arg NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy-key -t $REPOSITORY_URI:latest .
+      - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
 
   post_build:
