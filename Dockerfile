@@ -1,6 +1,9 @@
 # Build stage
 FROM public.ecr.aws/docker/library/node:20-alpine AS builder
 
+ARG JWT_SECRET=build-dummy-secret
+ENV JWT_SECRET=$JWT_SECRET
+
 WORKDIR /app
 
 # Install pnpm
