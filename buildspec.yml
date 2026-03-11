@@ -25,20 +25,11 @@ phases:
       - echo Writing image definitions file...
       - printf '[{"name":"leadflow-container","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
       - echo Deploying to ECS...
-      - aws ecs describe-task-definition --task-definition leadflow-task --region us-east-1 --query taskDefinition > task-def.json
-      - |
-        python3 << 'EOF'
-        import json, os
-        with open('task-def.json') as f:
-            td = json.load(f)
-        td['containerDefinitions'][0]['image'] = os.environ['REPOSITORY_URI'] + ':' + os.environ['IMAGE_TAG']
-        for key in ['taskDefinitionArn', 'revision', 'status', 'requiresAttributes', 'compatibilities', 'registeredAt', 'registeredBy']:
-            td.pop(key, None)
-        with open('new-task-def.json', 'w') as f:
-            json.dump(td, f)
-        EOF
+      - aws ecs describe-task-definition --task-definition leadflow-task --region us-east-1 --query taskDefinition --output json > task-def.json
+      - sed -i.bak "s|\"image\": \".*\"|\"image\": \"${REPOSITORY_URI}:${IMAGE_TAG}\"|" task-def.json
+      - jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' task-def.json > new-task-def.json
       - aws ecs register-task-definition --cli-input-json file://new-task-def.json --region us-east-1 > reg-output.json
-      - NEW_REV=$(cat reg-output.json | python3 -c "import sys, json; print(json.load(sys.stdin)['taskDefinition']['revision'])")
+      - NEW_REV=$(jq '.taskDefinition.revision' reg-output.json)
       - echo "New revision: $NEW_REV"
       - aws ecs update-service --cluster tryleadflow-prod --service leadflow-task-service --task-definition leadflow-task:$NEW_REV --force-new-deployment --region us-east-1
       - echo ECS deployment triggered successfully
