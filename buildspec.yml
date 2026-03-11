@@ -23,14 +23,13 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo Deploying to ECS...
-      - echo "Updating ECS with new image: ${REPOSITORY_URI}:${IMAGE_TAG}"
-      - aws ecs describe-task-definition --task-definition leadflow-task --region us-east-1 --query taskDefinition --output json > task-def.json
-      - cat task-def.json | jq ".containerDefinitions[0].image = \"${REPOSITORY_URI}:${IMAGE_TAG}\" | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)" > new-task-def.json
-      - aws ecs register-task-definition --cli-input-json file://new-task-def.json --region us-east-1 --output json > reg-output.json
-      - NEW_REV=$(cat reg-output.json | jq '.taskDefinition.revision')
-      - echo "New task definition revision: $NEW_REV"
+      - aws ecs describe-task-definition --task-definition leadflow-task --region us-east-1 --query taskDefinition --output json > /tmp/task-def.json
+      - 'jq ".containerDefinitions[0].image = \"${REPOSITORY_URI}:${IMAGE_TAG}\" | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)" /tmp/task-def.json > /tmp/new-task-def.json'
+      - aws ecs register-task-definition --cli-input-json file:///tmp/new-task-def.json --region us-east-1 > /tmp/reg-output.json
+      - NEW_REV=$(jq -r '.taskDefinition.revision' /tmp/reg-output.json)
+      - echo "New task definition revision $NEW_REV"
       - aws ecs update-service --cluster tryleadflow-prod --service leadflow-task-service --task-definition leadflow-task:$NEW_REV --force-new-deployment --region us-east-1
-      - echo ECS deployment triggered successfully
+      - echo ECS deployment triggered
 
 artifacts:
   files: imagedefinitions.json
