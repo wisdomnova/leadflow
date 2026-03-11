@@ -1,0 +1,26 @@
+{
+  "name": "LeadFlow - AI Cold Email Automation",
+  "short_name": "LeadFlow",
+  "description": "Scale B2B outreach with AI-powered cold email automation. Manage replies, sync CRM, close more deals.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#745DF3",
+  "background_color": "#FBFBFB",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/leadflow-black.png",
+      "sizes": "540x720",
+      "form_factor": "narrow"
+    }
+  ]
+}
