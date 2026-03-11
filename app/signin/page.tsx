@@ -1,11 +1,18 @@
 'use client';
 
+import { Metadata } from 'next';
 import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Mail, Lock, ChevronRight, Eye, EyeOff, Loader2, AlertTriangle, X } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: "Sign In - LeadFlow",
+  description: "Access your LeadFlow account to manage cold email campaigns and track replies.",
+  robots: "noindex, nofollow",
+};
 
 function SignInPageContent() {
   const router = useRouter();

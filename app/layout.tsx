@@ -11,15 +11,66 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "LeadFlow",
-  description: "LeadFlow - AI-powered cold email automation platform",
-  keywords: ["leadflow", "cold email", "outreach", "automation", "AI"],
-  authors: [{ name: "LeadFlow" }],
-  openGraph: {
-    title: "LeadFlow",
-    description: "LeadFlow - AI-powered cold email automation platform",
-    type: "website",
+  metadataBase: new URL("https://tryleadflow.ai"),
+  title: "LeadFlow - AI Cold Email Automation for Sales Teams",
+  description: "Scale outbound with AI. LeadFlow automates cold email campaigns, unifies inbox management, syncs with CRM, and generates qualified leads without manual work.",
+  keywords: ["cold email", "email automation", "outreach software", "sales automation", "lead generation", "AI email", "sales engagement"],
+  authors: [{ name: "LeadFlow", url: "https://tryleadflow.ai" }],
+  creator: "LeadFlow",
+  publisher: "LeadFlow",
+  formatDetection: {
+    telephone: false,
   },
+  icons: {
+    icon: "/favicon.ico",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  other: {
+    "og:locale": "en_US",
+    "og:site_name": "LeadFlow",
+  },
+  openGraph: {
+    title: "LeadFlow - AI Cold Email Automation for Sales Teams",
+    description: "Scale outbound with AI. LeadFlow automates cold email campaigns, unifies inbox management, syncs with CRM, and generates qualified leads.",
+    type: "website",
+    url: "https://tryleadflow.ai",
+    siteName: "LeadFlow",
+    locale: "en_US",
+    images: [
+      {
+        url: "https://tryleadflow.ai/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "LeadFlow - AI Cold Email Automation",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LeadFlow - AI Cold Email Automation",
+    description: "Automate cold email, manage replies, sync to CRM. Scale B2B outreach with AI.",
+    site: "@tryleadflow",
+    creator: "@tryleadflow",
+    images: {
+      url: "https://tryleadflow.ai/og-image.png",
+      alt: "LeadFlow",
+    },
+  },
+  verification: {
+    google: "Lo08LJJpwR7kcsKKwSmhnJv3FA-FAAk6uBCnlM0x4Bo",
+  },
+  category: "Business",
+  applicationName: "LeadFlow",
 };
 
 export default function RootLayout({
@@ -28,8 +79,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+        <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+        <link rel="canonical" href="https://tryleadflow.ai" />
+        <link rel="alternate" hrefLang="en" href="https://tryleadflow.ai" />
+        <meta name="theme-color" content="#745DF3" />
+        <meta name="msapplication-TileColor" content="#745DF3" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="LeadFlow" />
         <Script
           id="gtm-script"
           strategy="afterInteractive"

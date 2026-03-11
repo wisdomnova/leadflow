@@ -1,10 +1,20 @@
 'use client';
 
 import React from 'react';
-import Navbar from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
-import CTASection from "@/components/CTASection";
+import { Metadata } from 'next';
+import Navbar from \"@/components/Navbar\";
+import { Footer } from \"@/components/Footer\";
+import CTASection from \"@/components/CTASection\";
 import { motion } from 'framer-motion';
+
+export const metadata: Metadata = {
+  title: \"About LeadFlow - Cold Email Automation Platform\",
+  description: \"Learn about LeadFlow's mission to help sales teams scale B2B outreach with AI-powered cold email automation without manual work.\",
+  openGraph: {
+    title: \"About LeadFlow\",
+    description: \"Discover how LeadFlow helps sales teams automate cold email and scale outreach.\",
+  },
+};
 
 export default function AboutPage() {
   return (

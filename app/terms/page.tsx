@@ -1,8 +1,15 @@
 'use client';
 
 import React from 'react';
+import { Metadata } from 'next';
 import Navbar from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+
+export const metadata: Metadata = {
+  title: 'Terms of Service - LeadFlow',
+  description: 'Read the terms of service for LeadFlow cold email automation platform.',
+  robots: 'index, follow',
+};
 
 export default function TermsPage() {
   const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });

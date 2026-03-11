@@ -1,8 +1,15 @@
 'use client';
 
 import React from 'react';
+import { Metadata } from 'next';
 import Navbar from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+
+export const metadata: Metadata = {
+  title: 'Cookie Policy - LeadFlow',
+  description: 'Understand how LeadFlow uses cookies and tracking technologies.',
+  robots: 'index, follow',
+};
 
 export default function CookiesPage() {
   const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });

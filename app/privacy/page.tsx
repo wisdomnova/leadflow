@@ -1,8 +1,15 @@
 'use client';
 
 import React from 'react';
+import { Metadata } from 'next';
 import Navbar from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy - LeadFlow',
+  description: 'Learn how LeadFlow protects your data and privacy. Read our complete privacy policy.',
+  robots: 'index, follow',
+};
 
 export default function PrivacyPage() {
   const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });

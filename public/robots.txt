@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /signin
+Disallow: /signup
+Disallow: /*.json$
+Disallow: /*?*sort=
+Disallow: /*?*filter=
+
+User-agent: AdsBot-Google
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+Sitemap: https://tryleadflow.ai/sitemap.xml
+Host: https://tryleadflow.ai
