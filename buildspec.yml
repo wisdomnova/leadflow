@@ -26,8 +26,11 @@ phases:
       - printf '[{"name":"leadflow-container","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
       - echo Deploying to ECS...
       - aws ecs describe-task-definition --task-definition leadflow-task --region us-east-1 --query taskDefinition --output json > task-def.json
-      - sed -i.bak "s|\"image\": \".*\"|\"image\": \"${REPOSITORY_URI}:${IMAGE_TAG}\"|" task-def.json
-      - jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' task-def.json > new-task-def.json
+      - >-
+        jq --arg image "${REPOSITORY_URI}:${IMAGE_TAG}"
+        '.containerDefinitions[0].image = $image
+        | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)'
+        task-def.json > new-task-def.json
       - aws ecs register-task-definition --cli-input-json file://new-task-def.json --region us-east-1 > reg-output.json
       - NEW_REV=$(jq '.taskDefinition.revision' reg-output.json)
       - echo "New revision: $NEW_REV"
