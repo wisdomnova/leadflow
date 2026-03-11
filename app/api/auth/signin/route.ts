@@ -26,8 +26,10 @@ export async function POST(req: Request) {
     }
 
     const email = rawEmail.trim().toLowerCase();
+    console.log(`[AUTH] Sign-in attempt for: ${email}`);
 
     const supabase = getAdminClient();
+    console.log(`[AUTH] Supabase client created`);
 
     // 1. Fetch user by email
     const { data: user, error: userError } = await (supabase as any)
@@ -36,11 +38,16 @@ export async function POST(req: Request) {
       .eq("email", email)
       .single();
 
+    console.log(`[AUTH] Supabase query result - Error: ${userError?.message || "none"}, User found: ${!!user}`);
+
     // Always run bcrypt comparison to prevent timing-based user enumeration
     const hashToCompare = user ? (user as any).password_hash : DUMMY_HASH;
     const isPasswordValid = await bcrypt.compare(password, hashToCompare);
 
+    console.log(`[AUTH] Password valid: ${isPasswordValid}, User exists: ${!!user}`);
+
     if (userError || !user || !isPasswordValid) {
+      console.log(`[AUTH] Sign-in failed - Error: ${userError?.message}, User: ${user ? "found" : "not found"}, PasswordValid: ${isPasswordValid}`);
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
@@ -73,6 +80,7 @@ export async function POST(req: Request) {
       user: { email: (user as any).email, fullName: (user as any).full_name, orgName: (user as any).organizations?.name } 
     });
   } catch (err) {
+    console.error(`[AUTH] Unexpected error:`, err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
