@@ -3,13 +3,13 @@ FROM public.ecr.aws/docker/library/node:20-alpine AS builder
 
 WORKDIR /app
 
-# All env vars needed at build time (dummy values for Next.js static analysis)
-# Real values are injected at runtime via ECS task definition
-ENV JWT_SECRET=build-placeholder \
-    NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key \
+# NEXT_PUBLIC_* vars are inlined at build time by Next.js (both client & server bundles).
+# They MUST be real values here. All other secrets use runtime env vars from ECS task definition.
+ENV NEXT_PUBLIC_SUPABASE_URL=https://eqksgmbcyvfllcaeqgbj.supabase.co \
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxa3NnbWJjeXZmbGxjYWVxZ2JqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NTE0NjAsImV4cCI6MjA4NTQyNzQ2MH0.zCs_fM-_RpY4fd8NKKCekI3fNvB9vMgSG3ti84qYrHw \
+    NEXT_PUBLIC_APP_URL=https://tryleadflow.ai \
+    JWT_SECRET=build-placeholder \
     SUPABASE_SERVICE_ROLE_KEY=placeholder-service-key \
-    NEXT_PUBLIC_APP_URL=https://placeholder.app \
     OPENAI_API_KEY=sk-placeholder \
     RESEND_API_KEY=re_placeholder \
     STRIPE_SECRET_KEY=sk_test_placeholder \
@@ -29,18 +29,18 @@ ENV JWT_SECRET=build-placeholder \
     AZURE_CLIENT_SECRET=placeholder \
     HUBSPOT_CLIENT_ID=placeholder \
     HUBSPOT_CLIENT_SECRET=placeholder \
-    HUBSPOT_REDIRECT_URI=https://placeholder.app/api/crm/hubspot/callback \
+    HUBSPOT_REDIRECT_URI=https://tryleadflow.ai/api/crm/hubspot/callback \
     PIPEDRIVE_CLIENT_ID=placeholder \
     PIPEDRIVE_CLIENT_SECRET=placeholder \
-    PIPEDRIVE_REDIRECT_URI=https://placeholder.app/api/crm/pipedrive/callback \
+    PIPEDRIVE_REDIRECT_URI=https://tryleadflow.ai/api/crm/pipedrive/callback \
     SALESFORCE_CLIENT_ID=placeholder \
     SALESFORCE_CLIENT_SECRET=placeholder \
     SALESFORCE_LOGIN_URL=https://login.salesforce.com \
-    SALESFORCE_REDIRECT_URI=https://placeholder.app/api/crm/salesforce/callback \
+    SALESFORCE_REDIRECT_URI=https://tryleadflow.ai/api/crm/salesforce/callback \
     AWS_ACCESS_KEY_ID=placeholder \
     AWS_SECRET_ACCESS_KEY=placeholder \
     AWS_REGION=us-east-1 \
-    AWS_SES_FROM_EMAIL=noreply@placeholder.app
+    AWS_SES_FROM_EMAIL=noreply@tryleadflow.ai
 
 # Install pnpm
 RUN npm install -g pnpm
