@@ -37,7 +37,7 @@ const Hero = () => {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-[2rem] md:text-[4.5rem] font-black tracking-tighter text-[#101828] max-w-5xl mb-8 leading-[1.05]"
           >
-            Everything you need to run cold Outreach at scale in one place.
+            The Cold Outreach OS for High-Growth Agencies.
           </motion.h1>
 
           {/* Subheadline */}
@@ -45,9 +45,9 @@ const Hero = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-base md:text-xl text-[#101828]/60 max-w-2xl mb-12 font-medium leading-tight"
+            className="text-sm md:text-base lg:text-lg text-[#101828]/60 max-w-5xl mb-12 font-medium leading-relaxed text-center"
           >
-            Leadflow helps you scale cold outreach with smart sequences, AI personalization, inbox rotation, and a unified Unibox without killing deliverability.
+            Manage 50+ client campaigns from a single dashboard. From automated mailbox setup to AI-driven personalization<br className="hidden lg:block" /> and lead classification, scale your agency without the operational headache.
           </motion.p>
 
           {/* CTAs */}
