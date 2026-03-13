@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { name, steps, status, sender_id, sender_ids, config, lead_ids, use_powersend, powersend_server_id } = await req.json();
+    const { name, steps, status, sender_id, sender_ids, config, lead_ids, use_powersend, powersend_server_id, powersend_server_ids } = await req.json();
 
     if (!name || !steps || !Array.isArray(steps)) {
       return NextResponse.json({ error: "Name and steps are required" }, { status: 400 });
@@ -76,6 +76,9 @@ export async function POST(req: Request) {
         sender_id: sender_id || null,
         sender_ids: Array.isArray(sender_ids) && sender_ids.length > 0 ? sender_ids : [],
         use_powersend: use_powersend || false,
+        powersend_server_ids: Array.isArray(powersend_server_ids) && powersend_server_ids.length > 0 
+          ? powersend_server_ids 
+          : (use_powersend && powersend_server_id ? [powersend_server_id] : []),
         powersend_config: use_powersend && powersend_server_id 
           ? { server_id: powersend_server_id } 
           : {},

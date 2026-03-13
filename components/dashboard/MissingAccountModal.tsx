@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, X, Plus, ChevronRight } from 'lucide-react';
+import { AlertCircle, X, Plus, ChevronRight, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface MissingAccountModalProps {
@@ -45,7 +45,7 @@ export default function MissingAccountModal({
                 Sender Profile Required
               </h3>
               <p className="text-gray-500 font-medium leading-relaxed mb-10 px-4">
-                You haven't connected any sending accounts yet. You need at least one active sender profile to create and launch a campaign.
+                You need at least one active sender profile or PowerSend server to create and launch a campaign.
               </p>
 
               <div className="flex flex-col gap-3 w-full">
@@ -58,6 +58,17 @@ export default function MissingAccountModal({
                 >
                   <Plus className="w-4 h-4" />
                   Connect Sender Profile
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    onClose();
+                    router.push('/dashboard/powersend');
+                  }}
+                  className="w-full px-6 py-4 bg-emerald-600 text-white rounded-2xl text-sm font-black hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-4 h-4" />
+                  Set Up PowerSend
                   <ChevronRight className="w-4 h-4" />
                 </button>
                 <button

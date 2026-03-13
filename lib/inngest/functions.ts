@@ -213,9 +213,20 @@ export const emailProcessor = inngest.createFunction(
       let powersendNodeId: string | null = null;
 
       if (isPowerSend) {
-        // Use PowerSend rotation logic — pick best available node
+        // Build server filter: use campaign's selected servers, fall back to org-wide rotation
+        const psConfig = (campaignRes.data as any)?.powersend_config || {};
+        const psServerIds: string[] = (campaignRes.data as any)?.powersend_server_ids || [];
+        // Support legacy single server_id in powersend_config
+        const serverFilter = psServerIds.length > 0 
+          ? psServerIds 
+          : psConfig.server_id ? [psConfig.server_id] : null;
+
+        // Use PowerSend rotation logic — pick best available node (includes warming nodes)
         const { data: node, error: nodeError } = await (supabase as any)
-          .rpc('get_next_powersend_node', { org_id_param: orgId })
+          .rpc('get_next_powersend_node', { 
+            org_id_param: orgId,
+            server_ids_param: serverFilter 
+          })
           .single();
         
         if (node && !nodeError) {
