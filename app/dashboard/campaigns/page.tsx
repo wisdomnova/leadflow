@@ -39,6 +39,7 @@ export default function CampaignsPage() {
   const router = useRouter();
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [hasPowerSendProfiles, setHasPowerSendProfiles] = useState(false);
   const [statsData, setStatsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('All');
@@ -81,10 +82,11 @@ export default function CampaignsPage() {
 
   const fetchCampaigns = async () => {
     try {
-      const [campaignsRes, accountsRes, statsRes] = await Promise.all([
+      const [campaignsRes, accountsRes, statsRes, psRes] = await Promise.all([
         fetch('/api/campaigns'),
         fetch('/api/accounts'),
-        fetch('/api/stats')
+        fetch('/api/stats'),
+        fetch('/api/powersend')
       ]);
       
       if (campaignsRes.ok) {
@@ -101,6 +103,17 @@ export default function CampaignsPage() {
         const data = await statsRes.json();
         setStatsData(data);
       }
+
+      // Check for PowerSend profiles (active or warming servers count as sender profiles)
+      try {
+        if (psRes.ok) {
+          const psData = await psRes.json();
+          const usableServers = (psData.servers || []).filter(
+            (s: any) => s.status === 'active' || s.status === 'warming'
+          );
+          setHasPowerSendProfiles(usableServers.length > 0);
+        }
+      } catch {}
     } catch (err) {
       console.error("Failed to fetch dashboard data", err);
     } finally {
@@ -154,7 +167,7 @@ export default function CampaignsPage() {
   };
 
   const handleCreateCampaignClick = () => {
-    if (accounts.length === 0) {
+    if (accounts.length === 0 && !hasPowerSendProfiles) {
       setIsMissingAccountModalOpen(true);
     } else {
       router.push('/dashboard/campaigns/create');
@@ -269,8 +282,8 @@ export default function CampaignsPage() {
               )}
             </AnimatePresence>
 
-            {/* Warning Banner if no accounts */}
-            {!loading && accounts.length === 0 && (
+            {/* Warning Banner if no accounts and no PowerSend profiles */}
+            {!loading && accounts.length === 0 && !hasPowerSendProfiles && (
               <motion.div 
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -283,15 +296,24 @@ export default function CampaignsPage() {
                   <div className="flex-1">
                     <h3 className="text-amber-900 font-bold text-lg mb-1">No sending profiles connected</h3>
                     <p className="text-amber-700 font-medium mb-4">
-                      You haven't connected any sending accounts yet. You need at least one active sender profile to launch a campaign.
+                      You haven't connected any sending accounts yet. You need at least one active sender profile or PowerSend server to launch a campaign.
                     </p>
-                    <Link 
-                      href="/dashboard/providers"
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-amber-600/20"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Connect Sender Profile
-                    </Link>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Link 
+                        href="/dashboard/providers"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-amber-600/20"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Connect Sender Profile
+                      </Link>
+                      <Link 
+                        href="/dashboard/powersend"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-emerald-600/20"
+                      >
+                        <Zap className="w-4 h-4" />
+                        Set Up PowerSend
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </motion.div>
