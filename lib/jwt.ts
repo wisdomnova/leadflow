@@ -1,10 +1,16 @@
 import { SignJWT, jwtVerify } from "jose";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET environment variable is required. Never use a fallback secret in production.");
+// Read JWT_SECRET lazily at call time, NOT at module load time.
+// This is critical because Next.js middleware is compiled at build time,
+// and module-level code would capture the build-time placeholder value
+// instead of the real runtime env var injected by ECS.
+function getSecret() {
+  const JWT_SECRET = process.env.JWT_SECRET;
+  if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET environment variable is required. Never use a fallback secret in production.");
+  }
+  return new TextEncoder().encode(JWT_SECRET);
 }
-const secret = new TextEncoder().encode(JWT_SECRET);
 
 const ISSUER = "leadflow";
 const AUDIENCE = "leadflow-app";
@@ -36,7 +42,7 @@ export async function signUserJWT(payload: UserPayload) {
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setExpirationTime("4h")
-    .sign(secret);
+    .sign(getSecret());
 }
 
 /**
@@ -49,7 +55,7 @@ export async function signVerificationJWT(email: string) {
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setExpirationTime("24h")
-    .sign(secret);
+    .sign(getSecret());
 }
 
 /**
@@ -62,7 +68,7 @@ export async function signPasswordResetJWT(email: string) {
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setExpirationTime("1h")
-    .sign(secret);
+    .sign(getSecret());
 }
 
 /**
@@ -70,7 +76,7 @@ export async function signPasswordResetJWT(email: string) {
  */
 export async function verifyVerificationJWT(token: string): Promise<{ email: string } | null> {
   try {
-    const { payload } = await jwtVerify(token, secret, {
+    const { payload } = await jwtVerify(token, getSecret(), {
       issuer: ISSUER,
       audience: AUDIENCE,
     });
@@ -86,7 +92,7 @@ export async function verifyVerificationJWT(token: string): Promise<{ email: str
  */
 export async function verifyPasswordResetJWT(token: string): Promise<{ email: string } | null> {
   try {
-    const { payload } = await jwtVerify(token, secret, {
+    const { payload } = await jwtVerify(token, getSecret(), {
       issuer: ISSUER,
       audience: AUDIENCE,
     });
@@ -102,7 +108,7 @@ export async function verifyPasswordResetJWT(token: string): Promise<{ email: st
  */
 export async function verifyUserJWT(token: string): Promise<UserPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, secret, {
+    const { payload } = await jwtVerify(token, getSecret(), {
       issuer: ISSUER,
       audience: AUDIENCE,
     });
