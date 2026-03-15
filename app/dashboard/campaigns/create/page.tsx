@@ -62,6 +62,8 @@ export default function CreateCampaignPage() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [availableLeads, setAvailableLeads] = useState<any[]>([]);
   const [isLoadingLeads, setIsLoadingLeads] = useState(false);
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
+  const [selectAllProgress, setSelectAllProgress] = useState(0);
   const [totalLeads, setTotalLeads] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [tagFilter, setTagFilter] = useState('');
@@ -1064,18 +1066,21 @@ export default function CreateCampaignPage() {
                            Select Page ({availableLeads.length})
                         </button>
                         <button 
+                           disabled={isSelectingAll}
                            onClick={async () => {
-                             setIsLoadingLeads(true);
+                             if (isSelectingAll) return;
+                             setIsSelectingAll(true);
+                             setSelectAllProgress(0);
                              try {
                                // Fetch ALL lead IDs matching current filters (paginated, ids_only for speed)
                                const allIds: string[] = [];
-                               let currentPage = 1;
+                               let fetchPage = 1;
                                const PAGE_SIZE = 1000; // matches Supabase max_rows default
                                while (true) {
                                  const params = new URLSearchParams({
                                    ids_only: 'true',
                                    limit: String(PAGE_SIZE),
-                                   page: String(currentPage),
+                                   page: String(fetchPage),
                                  });
                                  if (searchQuery) params.append('search', searchQuery);
                                  if (tagFilter) params.append('tag', tagFilter);
@@ -1085,21 +1090,30 @@ export default function CreateCampaignPage() {
                                  const data = await res.json();
                                  const pageIds = (data.leads || []).map((l: any) => l.id);
                                  allIds.push(...pageIds);
+                                 setSelectAllProgress(allIds.length);
                                  // If we got fewer than PAGE_SIZE, we've fetched everything
                                  if (pageIds.length < PAGE_SIZE) break;
-                                 currentPage++;
+                                 fetchPage++;
                                }
                                setSelectedLeadIds(allIds);
                                showToast(`Selected all ${allIds.length} matching leads`);
                              } catch (err) {
                                showToast("Failed to select all", "error");
                              } finally {
-                               setIsLoadingLeads(false);
+                               setIsSelectingAll(false);
+                               setSelectAllProgress(0);
                              }
                            }}
-                           className="text-xs font-black text-[#745DF3] hover:underline transition-all uppercase tracking-widest"
+                           className={`text-xs font-black transition-all uppercase tracking-widest ${
+                             isSelectingAll 
+                               ? 'text-gray-400 cursor-wait' 
+                               : 'text-[#745DF3] hover:underline cursor-pointer'
+                           }`}
                         >
-                           Select All Matching ({totalLeads})
+                           {isSelectingAll 
+                             ? `Selecting... ${selectAllProgress.toLocaleString()} / ${totalLeads.toLocaleString()}`
+                             : `Select All Matching (${totalLeads.toLocaleString()})`
+                           }
                         </button>
                       </div>
                       <button 
