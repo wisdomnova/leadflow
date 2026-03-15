@@ -1070,7 +1070,7 @@ export default function CreateCampaignPage() {
                                // Fetch ALL lead IDs matching current filters (paginated, ids_only for speed)
                                const allIds: string[] = [];
                                let currentPage = 1;
-                               const PAGE_SIZE = 5000;
+                               const PAGE_SIZE = 1000; // matches Supabase max_rows default
                                while (true) {
                                  const params = new URLSearchParams({
                                    ids_only: 'true',

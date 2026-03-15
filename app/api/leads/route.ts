@@ -4,7 +4,7 @@ import { logLeadActivity } from "@/lib/activity-utils";
 import { sanitizeSearchQuery } from "@/lib/sanitize";
 
 const MAX_PAGE_SIZE = 100;
-const MAX_IDS_PAGE_SIZE = 5000;
+const MAX_IDS_PAGE_SIZE = 1000; // Supabase PostgREST default max_rows is 1000
 
 export async function GET(req: Request) {
   const context = await getSessionContext();
