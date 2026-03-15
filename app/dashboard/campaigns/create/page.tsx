@@ -1067,15 +1067,28 @@ export default function CreateCampaignPage() {
                            onClick={async () => {
                              setIsLoadingLeads(true);
                              try {
-                               // Fetch ALL leads IDs matching current filters
-                               const params = new URLSearchParams({ limit: '1000' });
-                               if (searchQuery) params.append('search', searchQuery);
-                               if (tagFilter) params.append('tag', tagFilter);
-                               if (sourceFilter) params.append('source', sourceFilter);
-                               
-                               const res = await fetch(`/api/leads?${params.toString()}`);
-                               const data = await res.json();
-                               const allIds = (data.leads || []).map((l: any) => l.id);
+                               // Fetch ALL lead IDs matching current filters (paginated, ids_only for speed)
+                               const allIds: string[] = [];
+                               let currentPage = 1;
+                               const PAGE_SIZE = 5000;
+                               while (true) {
+                                 const params = new URLSearchParams({
+                                   ids_only: 'true',
+                                   limit: String(PAGE_SIZE),
+                                   page: String(currentPage),
+                                 });
+                                 if (searchQuery) params.append('search', searchQuery);
+                                 if (tagFilter) params.append('tag', tagFilter);
+                                 if (sourceFilter) params.append('source', sourceFilter);
+                                 
+                                 const res = await fetch(`/api/leads?${params.toString()}`);
+                                 const data = await res.json();
+                                 const pageIds = (data.leads || []).map((l: any) => l.id);
+                                 allIds.push(...pageIds);
+                                 // If we got fewer than PAGE_SIZE, we've fetched everything
+                                 if (pageIds.length < PAGE_SIZE) break;
+                                 currentPage++;
+                               }
                                setSelectedLeadIds(allIds);
                                showToast(`Selected all ${allIds.length} matching leads`);
                              } catch (err) {

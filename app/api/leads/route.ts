@@ -4,6 +4,7 @@ import { logLeadActivity } from "@/lib/activity-utils";
 import { sanitizeSearchQuery } from "@/lib/sanitize";
 
 const MAX_PAGE_SIZE = 100;
+const MAX_IDS_PAGE_SIZE = 5000;
 
 export async function GET(req: Request) {
   const context = await getSessionContext();
@@ -16,14 +17,17 @@ export async function GET(req: Request) {
   const search = searchParams.get("search");
   const tag = searchParams.get("tag");
   const source = searchParams.get("source");
+  const idsOnly = searchParams.get("ids_only") === "true";
   const page = parseInt(searchParams.get("page") || "1");
-  const limit = Math.min(parseInt(searchParams.get("limit") || "10"), MAX_PAGE_SIZE);
+  const limit = idsOnly
+    ? Math.min(parseInt(searchParams.get("limit") || "5000"), MAX_IDS_PAGE_SIZE)
+    : Math.min(parseInt(searchParams.get("limit") || "10"), MAX_PAGE_SIZE);
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
   let query = context.supabase
     .from("leads")
-    .select("*", { count: "exact" })
+    .select(idsOnly ? "id" : "*", { count: "exact" })
     .eq("org_id", context.orgId)
     .order("created_at", { ascending: false });
 
@@ -48,6 +52,11 @@ export async function GET(req: Request) {
 
   if (error) {
     return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
+  }
+
+  // For ids_only requests, skip stats (used for bulk selection, not UI rendering)
+  if (idsOnly) {
+    return NextResponse.json({ leads: data, total: count });
   }
 
   // Get stats for the overview cards
