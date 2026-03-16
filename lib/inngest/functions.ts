@@ -59,12 +59,12 @@ export const campaignLauncher = inngest.createFunction(
   { id: "campaign-launcher" },
   { event: "campaign/launch" },
   async ({ event, step }) => {
-    const { campaignId, orgId, leadIds } = event.data;
+    const { campaignId, orgId, leadIds, listId } = event.data;
     const supabase = getAdminClient();
 
     // 1. Get leads for this campaign
     const leads = await step.run("fetch-leads", async () => {
-      // If specific leadIds provided, use them. Otherwise, fetch all 'new' leads (legacy behavior)
+      // Priority: explicit leadIds > listId > legacy fallback (all 'new' leads)
       if (leadIds && leadIds.length > 0) {
         // Supabase .in() has a practical limit ~1000 items — batch for safety
         const allLeads: any[] = [];
@@ -78,6 +78,11 @@ export const campaignLauncher = inngest.createFunction(
           if (batchData) allLeads.push(...batchData);
         }
         return allLeads;
+      } else if (listId) {
+        // Resolve leads from the list via RPC
+        const { data: listLeads } = await (supabase as any)
+          .rpc("get_leads_in_list", { p_list_id: listId });
+        return listLeads || [];
       } else {
         const { data } = await supabase
           .from("leads")

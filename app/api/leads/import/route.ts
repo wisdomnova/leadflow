@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { leads } = await req.json();
+    const { leads, list_id } = await req.json();
 
     if (!Array.isArray(leads) || leads.length === 0) {
       return NextResponse.json({ error: "No leads provided" }, { status: 400 });
@@ -78,6 +78,22 @@ export async function POST(req: Request) {
         for (const row of data) {
           allInsertedIds.push({ id: row.id, orgId: context.orgId });
         }
+      }
+    }
+
+    // --- Assign to list if specified ---
+    if (list_id && allInsertedIds.length > 0) {
+      const membershipRows = allInsertedIds.map((r) => ({
+        list_id,
+        lead_id: r.id,
+      }));
+      for (let i = 0; i < membershipRows.length; i += UPSERT_CHUNK) {
+        await context.supabase
+          .from("lead_list_memberships")
+          .upsert(membershipRows.slice(i, i + UPSERT_CHUNK), {
+            onConflict: "list_id,lead_id",
+            ignoreDuplicates: true,
+          });
       }
     }
 

@@ -17,6 +17,7 @@ export async function GET(req: Request) {
   const search = searchParams.get("search");
   const tag = searchParams.get("tag");
   const source = searchParams.get("source");
+  const listId = searchParams.get("list_id");
   const idsOnly = searchParams.get("ids_only") === "true";
   const page = parseInt(searchParams.get("page") || "1");
   const limit = idsOnly
@@ -25,11 +26,20 @@ export async function GET(req: Request) {
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
+  // When filtering by list, use an inner join so the DB does the filtering server-side.
+  // This avoids fetching all member IDs and passing them via .in() which breaks for large lists.
+  const selectBase = idsOnly ? "id" : "*";
+  const selectStr = listId ? `${selectBase}, lead_list_memberships!inner(list_id)` : selectBase;
+
   let query = context.supabase
     .from("leads")
-    .select(idsOnly ? "id" : "*", { count: "exact" })
+    .select(selectStr, { count: "exact" })
     .eq("org_id", context.orgId)
     .order("created_at", { ascending: false });
+
+  if (listId) {
+    query = query.eq("lead_list_memberships.list_id", listId);
+  }
 
   if (status && status !== 'All') {
     query = query.eq("status", status.toLowerCase());
@@ -85,7 +95,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { email, first_name, last_name, company, job_title, tags, custom_fields } = body;
+    const { email, first_name, last_name, company, job_title, tags, custom_fields, list_id } = body;
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -122,6 +132,13 @@ export async function POST(req: Request) {
       type: 'lead_created',
       description: `Lead created manually: ${data.email}`
     });
+
+    // Assign to list if specified
+    if (list_id) {
+      await (context.supabase as any)
+        .from("lead_list_memberships")
+        .upsert([{ list_id, lead_id: data.id }], { onConflict: "list_id,lead_id", ignoreDuplicates: true });
+    }
 
     return NextResponse.json(data);
   } catch (err) {

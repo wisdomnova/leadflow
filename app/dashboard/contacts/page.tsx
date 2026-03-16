@@ -6,7 +6,7 @@ import Papa from 'papaparse';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
 import SubscriptionGuard from '@/components/dashboard/SubscriptionGuard';
-import { 
+import {
   Users, 
   UserPlus, 
   Upload, 
@@ -30,6 +30,7 @@ import {
   Clock,
   Activity,
   AlertTriangle,
+  List,
 } from 'lucide-react';
 import ConfirmModal from '@/components/dashboard/ConfirmModal';
 
@@ -65,6 +66,13 @@ export default function ContactsPage() {
   const [bulkTagName, setBulkTagName] = useState('');
   const [bulkStatus, setBulkStatus] = useState('');
 
+  // Lists State
+  const [lists, setLists] = useState<any[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [uploadListId, setUploadListId] = useState<string>('');
+  const [newListName, setNewListName] = useState('');
+  const [isCreatingList, setIsCreatingList] = useState(false);
+
   const [isPushing, setIsPushing] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [toast, setToast] = useState<{ show: boolean, msg: string, type: 'success' | 'error' }>({ show: false, msg: '', type: 'success' });
@@ -84,11 +92,46 @@ export default function ContactsPage() {
   });
 
   // New Contact State
-  const [newContact, setNewContact] = useState({ firstName: '', lastName: '', email: '', company: '', tag: 'Enterprise' });
+  const [newContact, setNewContact] = useState({ firstName: '', lastName: '', email: '', company: '', tag: 'Enterprise', list_id: '' });
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, msg, type });
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
+
+  // Fetch all lists for the org
+  const fetchLists = async () => {
+    try {
+      const res = await fetch('/api/lists');
+      if (res.ok) {
+        const data = await res.json();
+        setLists(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch lists:', err);
+    }
+  };
+
+  const createList = async (name: string): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/lists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        const list = await res.json();
+        await fetchLists();
+        return list.id;
+      } else {
+        const err = await res.json();
+        showToast(err.error || 'Failed to create list', 'error');
+        return null;
+      }
+    } catch {
+      showToast('Failed to create list', 'error');
+      return null;
+    }
   };
 
   const handlePushToCRM = async (id: string) => {
@@ -140,11 +183,15 @@ export default function ContactsPage() {
   }, [searchQuery, statusFilter]);
 
   useEffect(() => {
+    fetchLists();
+  }, []);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       fetchContacts();
     }, searchQuery ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [searchQuery, statusFilter, currentPage]);
+  }, [searchQuery, statusFilter, currentPage, selectedListId]);
 
   useEffect(() => {
     if (selectedContact) {
@@ -175,6 +222,7 @@ export default function ContactsPage() {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
       if (tagFilter) params.append('tag', tagFilter);
+      if (selectedListId) params.append('list_id', selectedListId);
       params.append('page', currentPage.toString());
       params.append('limit', '10');
 
@@ -403,14 +451,15 @@ export default function ContactsPage() {
           last_name: newContact.lastName,
           email: newContact.email,
           company: newContact.company,
-          tags: [newContact.tag]
+          tags: [newContact.tag],
+          list_id: newContact.list_id || undefined
         })
       });
 
       if (res.ok) {
         const contact = await res.json();
         setContacts(prev => [contact, ...prev]);
-        setNewContact({ firstName: '', lastName: '', email: '', company: '', tag: 'Enterprise' });
+        setNewContact({ firstName: '', lastName: '', email: '', company: '', tag: 'Enterprise', list_id: '' });
         setShowAddModal(false);
         showToast('Contact added successfully');
         fetchContacts(); // Refresh stats cards
@@ -452,7 +501,7 @@ export default function ContactsPage() {
       const res = await fetch('/api/leads/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leads }),
+        body: JSON.stringify({ leads, list_id: uploadListId || undefined }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -776,6 +825,16 @@ export default function ContactsPage() {
                       <X className="w-3 h-3" />
                     </button>
                   )}
+                  {selectedListId && (
+                    <button 
+                      onClick={() => setSelectedListId(null)}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-[#745DF3]/10 text-[#745DF3] rounded-lg text-xs font-bold border border-[#745DF3]/20 hover:bg-[#745DF3]/20 transition-all"
+                    >
+                      <List className="w-3 h-3" />
+                      {lists.find(l => l.id === selectedListId)?.name || 'List'}
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="relative group/filter">
@@ -793,6 +852,33 @@ export default function ContactsPage() {
                           {status}
                         </button>
                       ))}
+                    </div>
+                  </div>
+                  <div className="relative group/listfilter">
+                    <button className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:text-[#101828] transition-all">
+                      <List className="w-4 h-4" />
+                      List
+                    </button>
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-gray-100 shadow-2xl z-20 py-2 hidden group-hover/listfilter:block">
+                      <button
+                        onClick={() => setSelectedListId(null)}
+                        className={`w-full text-left px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${!selectedListId ? 'text-[#745DF3] bg-[#745DF3]/5' : 'text-gray-500 hover:bg-gray-50'}`}
+                      >
+                        All Contacts
+                      </button>
+                      {lists.map(list => (
+                        <button
+                          key={list.id}
+                          onClick={() => setSelectedListId(list.id)}
+                          className={`w-full text-left px-5 py-2.5 text-xs font-bold transition-colors flex items-center justify-between ${selectedListId === list.id ? 'text-[#745DF3] bg-[#745DF3]/5' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                          <span className="uppercase tracking-widest truncate">{list.name}</span>
+                          <span className="text-[10px] text-gray-400 ml-2 shrink-0">{list.lead_count?.toLocaleString()}</span>
+                        </button>
+                      ))}
+                      {lists.length === 0 && (
+                        <p className="px-5 py-2.5 text-xs text-gray-400">No lists yet</p>
+                      )}
                     </div>
                   </div>
                   <button 
@@ -1194,6 +1280,49 @@ export default function ContactsPage() {
               </div>
 
               <div className="p-8 space-y-6">
+                {/* List selector for imports */}
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 pl-1">Import Into List</label>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={uploadListId}
+                      onChange={(e) => setUploadListId(e.target.value)}
+                      className="flex-1 bg-gray-50 border border-gray-100 focus:border-[#745DF3] focus:bg-white rounded-2xl py-3 px-4 text-sm font-medium outline-none transition-all appearance-none"
+                    >
+                      <option value="">No list (global)</option>
+                      {lists.map(list => (
+                        <option key={list.id} value={list.id}>{list.name} ({list.lead_count})</option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="New list name..."
+                        value={newListName}
+                        onChange={(e) => setNewListName(e.target.value)}
+                        className="bg-gray-50 border border-gray-100 focus:border-[#745DF3] focus:bg-white rounded-2xl py-3 px-4 text-sm font-medium outline-none transition-all w-40"
+                      />
+                      <button
+                        type="button"
+                        disabled={!newListName.trim() || isCreatingList}
+                        onClick={async () => {
+                          setIsCreatingList(true);
+                          const id = await createList(newListName.trim());
+                          if (id) {
+                            setUploadListId(id);
+                            setNewListName('');
+                            showToast('List created');
+                          }
+                          setIsCreatingList(false);
+                        }}
+                        className="px-4 py-3 bg-[#745DF3] text-white rounded-2xl text-xs font-bold hover:opacity-90 transition-all disabled:opacity-50 shrink-0"
+                      >
+                        {isCreatingList ? '...' : '+ Create'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {!isUploading ? (
                   <label 
                     className={`p-12 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center text-center group transition-all cursor-pointer ${
@@ -1372,6 +1501,19 @@ export default function ContactsPage() {
                     <option value="SaaS Founder">SaaS Founder</option>
                     <option value="High Priority">High Priority</option>
                     <option value="Inbound">Inbound</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 pl-1">Add to List</label>
+                  <select 
+                    className="w-full bg-gray-50 border border-gray-100 focus:border-[#745DF3] focus:bg-white rounded-2xl py-4 px-6 text-sm font-medium outline-none transition-all appearance-none"
+                    value={newContact.list_id}
+                    onChange={(e) => setNewContact({...newContact, list_id: e.target.value})}
+                  >
+                    <option value="">No list</option>
+                    {lists.map(list => (
+                      <option key={list.id} value={list.id}>{list.name}</option>
+                    ))}
                   </select>
                 </div>
 
