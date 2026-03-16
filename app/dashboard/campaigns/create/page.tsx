@@ -70,6 +70,12 @@ export default function CreateCampaignPage() {
   const [sourceFilter, setSourceFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const leadsPerPage = 10;
+
+  // List States
+  const [lists, setLists] = useState<any[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [showNewListInput, setShowNewListInput] = useState(false);
+  const [newListName, setNewListName] = useState('');
   
   // Real Data States
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -120,6 +126,7 @@ export default function CreateCampaignPage() {
       if (search) params.append('search', search);
       if (tag) params.append('tag', tag);
       if (source) params.append('source', source);
+      if (selectedListId) params.append('list_id', selectedListId);
       
       const res = await fetch(`/api/leads?${params.toString()}`);
       const data = await res.json();
@@ -154,6 +161,15 @@ export default function CreateCampaignPage() {
         }
         setSavedTemplates(Array.isArray(tempData) ? tempData : []);
         
+        // Fetch lists
+        try {
+          const listsRes = await fetch('/api/lists');
+          if (listsRes.ok) {
+            const listsData = await listsRes.json();
+            setLists(Array.isArray(listsData) ? listsData : []);
+          }
+        } catch {}
+        
         // Check if user has PowerSend nodes available
         try {
           const psData = await psRes.json();
@@ -187,7 +203,7 @@ export default function CreateCampaignPage() {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [searchQuery, tagFilter, sourceFilter, currentPage]);
+  }, [searchQuery, tagFilter, sourceFilter, currentPage, selectedListId]);
 
   useEffect(() => {
     if (!isLoadingData && accounts.length === 0 && !hasPowerSendNodes) {
@@ -350,6 +366,7 @@ export default function CreateCampaignPage() {
           sender_id: selectedAccountIds[0],
           sender_ids: selectedAccountIds,
           lead_ids: selectedLeadIds,
+          list_id: selectedListId || undefined,
           steps: emailSteps,
           status: 'running',
           use_powersend: usePowerSend,
@@ -387,6 +404,7 @@ export default function CreateCampaignPage() {
           sender_id: selectedAccountIds[0] || null,
           sender_ids: selectedAccountIds,
           lead_ids: selectedLeadIds,
+          list_id: selectedListId || undefined,
           steps: emailSteps,
           status: 'draft',
           use_powersend: usePowerSend,
@@ -916,6 +934,91 @@ export default function CreateCampaignPage() {
                       </div>
                     </div>
 
+                    {/* List Selector */}
+                    <div className="mb-6 p-5 bg-gray-50/80 rounded-2xl border border-gray-100">
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Contact List</label>
+                      <div className="flex items-center gap-3">
+                        <select
+                          value={selectedListId || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSelectedListId(val || null);
+                            setSelectedLeadIds([]);
+                            setCurrentPage(1);
+                          }}
+                          className="flex-1 bg-white border border-gray-200 focus:border-[#745DF3] rounded-xl py-3 px-4 text-sm font-bold outline-none transition-all appearance-none cursor-pointer"
+                        >
+                          <option value="">All Contacts (no list filter)</option>
+                          {lists.map(list => (
+                            <option key={list.id} value={list.id}>{list.name} ({list.lead_count?.toLocaleString()} contacts)</option>
+                          ))}
+                        </select>
+                        {!showNewListInput ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowNewListInput(true);
+                              setNewListName(campaignName || '');
+                            }}
+                            className="px-4 py-3 bg-[#745DF3] text-white rounded-xl text-xs font-bold hover:opacity-90 transition-all shrink-0"
+                          >
+                            + New List
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="List name..."
+                              value={newListName}
+                              onChange={(e) => setNewListName(e.target.value)}
+                              autoFocus
+                              className="bg-white border border-gray-200 focus:border-[#745DF3] rounded-xl py-3 px-4 text-sm font-medium outline-none transition-all w-48"
+                            />
+                            <button
+                              type="button"
+                              disabled={!newListName.trim()}
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch('/api/lists', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ name: newListName.trim() }),
+                                  });
+                                  if (res.ok) {
+                                    const list = await res.json();
+                                    setLists(prev => [{ ...list, lead_count: 0 }, ...prev]);
+                                    setSelectedListId(list.id);
+                                    setNewListName('');
+                                    setShowNewListInput(false);
+                                    setSelectedLeadIds([]);
+                                    showToast(`List "${list.name}" created`);
+                                  } else {
+                                    const err = await res.json();
+                                    showToast(err.error || 'Failed to create list', 'error');
+                                  }
+                                } catch {
+                                  showToast('Failed to create list', 'error');
+                                }
+                              }}
+                              className="px-4 py-3 bg-[#745DF3] text-white rounded-xl text-xs font-bold hover:opacity-90 transition-all disabled:opacity-50 shrink-0"
+                            >
+                              Create
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setShowNewListInput(false); setNewListName(''); }}
+                              className="px-3 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:text-[#101828] transition-all"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {selectedListId && (
+                        <p className="mt-2 text-[10px] font-medium text-gray-400">Only contacts in this list will be shown below. The campaign will target this list.</p>
+                      )}
+                    </div>
+
                     {/* Search and Filters */}
                     <div className="flex flex-col md:flex-row gap-4 mb-8">
                       <div className="flex-1 relative">
@@ -1085,6 +1188,7 @@ export default function CreateCampaignPage() {
                                  if (searchQuery) params.append('search', searchQuery);
                                  if (tagFilter) params.append('tag', tagFilter);
                                  if (sourceFilter) params.append('source', sourceFilter);
+                                 if (selectedListId) params.append('list_id', selectedListId);
                                  
                                  const res = await fetch(`/api/leads?${params.toString()}`);
                                  const data = await res.json();
