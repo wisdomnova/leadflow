@@ -31,7 +31,7 @@ phases:
       - aws ecs update-service --cluster tryleadflow-prod --service leadflow-task-service --task-definition leadflow-task:$NEW_REV --force-new-deployment --region us-east-1
       - echo ECS deployment triggered
       - echo Triggering Inngest function sync...
-      - curl -X PUT "https://tryleadflow.ai/api/inngest" -H "Authorization: Bearer ${INNGEST_SIGNING_KEY}" && echo "Inngest sync triggered successfully"
+      - 'curl -X PUT "https://tryleadflow.ai/api/inngest" -H "Authorization: Bearer ${INNGEST_SIGNING_KEY}" && echo "Inngest sync triggered successfully" || echo "Inngest sync failed"'
 
 artifacts:
   files: imagedefinitions.json
