@@ -33,8 +33,8 @@ const plans = [
   {
     id: 'starter',
     name: 'Starter',
-    monthlyPrice: 49,
-    annualPrice: 468,
+    monthlyPrice: 39,
+    annualPrice: 372,
     description: 'Perfect for individual founders and solo sales reps.',
     features: ['10,000 Monthly Emails', 'Unlimited Sending Domains', 'Warm-up & Unibox', 'Full CRM Access', 'AI Personalization (Limited)', 'Basic Analytics'],
     button: 'Switch to Starter',
@@ -44,8 +44,8 @@ const plans = [
   {
     id: 'pro',
     name: 'Pro',
-    monthlyPrice: 124,
-    annualPrice: 1188,
+    monthlyPrice: 99,
+    annualPrice: 948,
     description: 'Best for growing teams and scaling outbound efforts.',
     features: ['100,000 Monthly Emails', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Priority Support', 'Custom Tracking Domains'],
     button: 'Switch to Pro',
@@ -55,8 +55,8 @@ const plans = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    monthlyPrice: 399,
-    annualPrice: 3828,
+    monthlyPrice: 319,
+    annualPrice: 3060,
     description: 'For large agencies and enterprise sales organizations.',
     features: ['500,000 Monthly Emails', '1 PowerSend Node Included', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Dedicated Account Manager'],
     button: 'Switch to Enterprise',
