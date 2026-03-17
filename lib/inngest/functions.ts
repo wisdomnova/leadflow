@@ -681,6 +681,36 @@ export const powersendReputationMonitor = inngest.createFunction(
       return data || [];
     });
 
+    // 3b. Safety guard: re-correct any user-initiated warmup nodes wrongly restored
+    const warmupCorrections = await step.run("protect-warmup-nodes", async () => {
+      // Find nodes where user explicitly enabled warmup but guard restored them to active
+      const { data: wronglyRestored } = await supabase
+        .from("smart_servers")
+        .select("id, warmup_day")
+        .eq("warmup_enabled", true)
+        .eq("status", "active");
+
+      if (wronglyRestored && wronglyRestored.length > 0) {
+        for (const node of wronglyRestored as any[]) {
+          // Get the correct warmup daily limit for this node's current day
+          const { data: limit } = await (supabase as any).rpc("get_powersend_warmup_limit", {
+            server_id_param: node.id,
+          });
+
+          await (supabase as any)
+            .from("smart_servers")
+            .update({
+              status: "warming",
+              daily_limit: limit || 10,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", node.id);
+        }
+        return { corrected: wronglyRestored.length };
+      }
+      return { corrected: 0 };
+    });
+
     // 4. Notify orgs if any nodes were demoted
     if (guardActions && (guardActions as any[]).length > 0) {
       await step.run("notify-demotions", async () => {
@@ -711,6 +741,7 @@ export const powersendReputationMonitor = inngest.createFunction(
     return {
       checked: results.length,
       guardActions: (guardActions as any[])?.length || 0,
+      warmupNodesCorrected: (warmupCorrections as any)?.corrected || 0,
     };
   }
 );
