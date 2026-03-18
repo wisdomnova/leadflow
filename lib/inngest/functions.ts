@@ -803,11 +803,11 @@ export const powersendWarmupProcessor = inngest.createFunction(
     if (!data || !(data as any).warmup_enabled) return { skipped: true };
 
     const server = data as any;
-    const currentHour = new Date().getHours();
-    // Spread daily_limit over 16 waking hours (6am-10pm)
-    const sendingHours = 16;
-    const targetSentByNow = Math.ceil((server.daily_limit / sendingHours) * Math.min(currentHour - 5, sendingHours));
-    const remaining = targetSentByNow - (server.warmup_daily_sends || 0);
+    const currentHour = new Date().getUTCHours();
+    // Spread daily_limit evenly across 24 hours (warmup sends to seeds, not prospects)
+    const sendsPerHour = Math.max(1, Math.ceil(server.daily_limit / 24));
+    const targetSentByNow = sendsPerHour * (currentHour + 1);
+    const remaining = Math.min(targetSentByNow, server.daily_limit) - (server.warmup_daily_sends || 0);
 
     if (remaining <= 0 || (server.warmup_daily_sends || 0) >= server.daily_limit) {
       return { message: "Quota reached for this hour or day", node: server.name };
