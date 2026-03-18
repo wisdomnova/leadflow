@@ -848,14 +848,18 @@ export const powersendWarmupProcessor = inngest.createFunction(
           if (hasPool) {
             // Rotate through pool mailboxes round-robin
             const mb = poolMailboxes[i % poolMailboxes.length] as any;
+            const host = mb.smtp_host || server.default_smtp_host;
+            const port = mb.smtp_port || server.default_smtp_port || 465;
             syntheticAccount = {
               id: mb.id,
               email: mb.email,
-              smtp_host: mb.smtp_host || server.default_smtp_host,
-              smtp_port: mb.smtp_port || server.default_smtp_port || 465,
-              smtp_username: mb.smtp_username || mb.email,
-              smtp_password: mb.smtp_password,
-              provider: "smtp",
+              provider: "custom_smtp",
+              config: {
+                smtpHost: host,
+                smtpPort: String(port),
+                smtpUser: mb.smtp_username || mb.email,
+                smtpPass: mb.smtp_password,
+              },
             };
 
             // Increment mailbox usage
@@ -866,11 +870,13 @@ export const powersendWarmupProcessor = inngest.createFunction(
             syntheticAccount = {
               id: serverId,
               email: smtpConfig.from_email || `warmup@${server.domain_name}`,
-              smtp_host: smtpConfig.host,
-              smtp_port: parseInt(smtpConfig.port || "465"),
-              smtp_username: smtpConfig.username,
-              smtp_password: smtpConfig.password,
-              provider: "smtp",
+              provider: "custom_smtp",
+              config: {
+                smtpHost: smtpConfig.host,
+                smtpPort: String(smtpConfig.port || "465"),
+                smtpUser: smtpConfig.username,
+                smtpPass: smtpConfig.password,
+              },
             };
           }
 
