@@ -815,7 +815,7 @@ export const powersendWarmupProcessor = inngest.createFunction(
 
     // Send warmup emails (1-3 per invocation to be gentle)
     const toSend = Math.min(remaining, 3);
-
+ 
     await step.run("send-warmup-emails", async () => {
       // Fetch pool mailboxes for this server (new architecture)
       const { data: poolMailboxes } = await supabase
@@ -926,21 +926,21 @@ export const powersendWarmupRampUp = inngest.createFunction(
     });
 
     // 3. Notify on completions
-    const completions = (results as any[]).filter((r: any) => r.completed);
+    const completions = (results as any[]).filter((r: any) => r.out_completed);
     if (completions.length > 0) {
       await step.run("notify-completions", async () => {
         for (const c of completions) {
           const { data: server } = await supabase
             .from("smart_servers")
             .select("org_id, name")
-            .eq("id", c.server_id)
+            .eq("id", c.out_server_id)
             .single();
 
           if (server) {
             await createNotification({
               orgId: (server as any).org_id,
               title: "Node Warmup Complete",
-              description: `"${(server as any).name}" has completed its ${c.new_day}-day IP warmup and is now active at full capacity.`,
+              description: `"${(server as any).name}" has completed its ${c.out_new_day}-day IP warmup and is now active at full capacity.`,
               type: "success",
               category: "system" as any,
               link: "/dashboard/powersend",
