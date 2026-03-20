@@ -112,21 +112,21 @@ export default function DashboardPage() {
   ]);
 
   const dateRangeOptions = [
-    { label: 'Last 7 Days', days: 7 },
-    { label: 'Last 30 Days', days: 30 },
-    { label: 'Last 90 Days', days: 90 },
-    { label: 'All Time', days: 365 },
+    { label: 'Last 7 Days', days: '7' },
+    { label: 'Last 30 Days', days: '30' },
+    { label: 'Last 90 Days', days: '90' },
+    { label: 'All Time', days: 'all' },
   ];
 
   const getDaysFromRange = (range: string) => {
-    return dateRangeOptions.find(o => o.label === range)?.days || 7;
+    return dateRangeOptions.find(o => o.label === range)?.days || '7';
   };
 
   useEffect(() => {
     fetchDashboardData(getDaysFromRange(dateRange));
   }, [dateRange]);
 
-  const fetchDashboardData = async (days: number = 7) => {
+  const fetchDashboardData = async (days: string = '7') => {
     try {
       setLoading(true);
       const res = await fetch(`/api/dashboard/init?days=${days}`);
