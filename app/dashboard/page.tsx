@@ -79,6 +79,7 @@ export default function DashboardPage() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
   const [dateRange, setDateRange] = useState('Last 7 Days');
+  const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [isBookingSession, setIsBookingSession] = useState(false);
   const [statsData, setStatsData] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -110,14 +111,25 @@ export default function DashboardPage() {
     },
   ]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const dateRangeOptions = [
+    { label: 'Last 7 Days', days: 7 },
+    { label: 'Last 30 Days', days: 30 },
+    { label: 'Last 90 Days', days: 90 },
+    { label: 'All Time', days: 365 },
+  ];
 
-  const fetchDashboardData = async () => {
+  const getDaysFromRange = (range: string) => {
+    return dateRangeOptions.find(o => o.label === range)?.days || 7;
+  };
+
+  useEffect(() => {
+    fetchDashboardData(getDaysFromRange(dateRange));
+  }, [dateRange]);
+
+  const fetchDashboardData = async (days: number = 7) => {
     try {
       setLoading(true);
-      const res = await fetch('/api/dashboard/init');
+      const res = await fetch(`/api/dashboard/init?days=${days}`);
       if (!res.ok) throw new Error('Failed to fetch dashboard data');
       
       const data = await res.json();
@@ -278,22 +290,38 @@ export default function DashboardPage() {
                 <p className="text-gray-500 font-medium mt-1">Welcome back, {userProfile?.user?.full_name?.split(' ')[0] || 'there'}. Here's what's happening with your sequences today.</p>
               </div>
               <div className="flex items-center gap-3">
-                <div className="relative group">
+                <div className="relative">
                   <button 
-                    onClick={() => {
-                      const ranges = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'All Time'];
-                      const currentIdx = ranges.indexOf(dateRange);
-                      const nextRange = ranges[(currentIdx + 1) % ranges.length];
-                      setDateRange(nextRange);
-                      setNotificationMsg(`Updating view to ${nextRange}...`);
-                      setShowNotification(true);
-                      setTimeout(() => setShowNotification(false), 2000);
-                    }}
+                    onClick={() => setDateRangeOpen(!dateRangeOpen)}
                     className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-[#101828] hover:bg-gray-50 transition-all shadow-sm"
                   >
                     <Clock className="w-4 h-4 text-[#745DF3]" />
                     {dateRange}
+                    <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${dateRangeOpen ? 'rotate-90' : ''}`} />
                   </button>
+                  {dateRangeOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setDateRangeOpen(false)} />
+                      <div className="absolute right-0 top-full mt-2 z-50 w-48 bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden">
+                        {dateRangeOptions.map((option) => (
+                          <button
+                            key={option.label}
+                            onClick={() => {
+                              setDateRange(option.label);
+                              setDateRangeOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-3 text-sm font-bold transition-colors ${
+                              dateRange === option.label
+                                ? 'bg-[#745DF3]/5 text-[#745DF3]'
+                                : 'text-[#101828] hover:bg-gray-50'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
                 <button 
                   onClick={() => router.push('/dashboard/campaigns/create')}
@@ -419,7 +447,7 @@ export default function DashboardPage() {
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Volume distribution by day</p>
                     </div>
                     <div className="px-3 py-1 bg-[#745DF3]/5 rounded-lg">
-                      <span className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest">Last 7 Days</span>
+                      <span className="text-[10px] font-black text-[#745DF3] uppercase tracking-widest">{dateRange}</span>
                     </div>
                   </div>
 
