@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
 import { getAdminClient } from "@/lib/supabase";
 
-export async function GET() {
+export async function GET(request: Request) {
   const context = await getSessionContext();
   if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -12,9 +12,13 @@ export async function GET() {
   const orgId = context.orgId;
   const userId = context.userId;
 
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+  // Parse days param (default 7)
+  const { searchParams } = new URL(request.url);
+  const days = Math.min(Math.max(parseInt(searchParams.get('days') || '7', 10) || 7, 1), 365);
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  const startDateStr = startDate.toISOString().split('T')[0];
 
   try {
     // 1. Fetch EVERYTHING in parallel
@@ -32,7 +36,7 @@ export async function GET() {
       supabase.from("campaigns").select("sent_count, open_count, reply_count, total_leads").eq("org_id", orgId),
       supabase.from("campaigns").select("id", { count: 'exact', head: true }).eq("org_id", orgId).eq("status", "running"),
       supabase.from("campaigns").select("id, name, status, sent_count, reply_count").eq("org_id", orgId).order("created_at", { ascending: false }).limit(3),
-      supabase.from("analytics_daily").select("*").eq("org_id", orgId).gte("date", sevenDaysAgoStr).order("date", { ascending: true }),
+      supabase.from("analytics_daily").select("*").eq("org_id", orgId).gte("date", startDateStr).order("date", { ascending: true }),
       // Profile
       supabase.from("users").select("full_name").eq("id", userId).single(),
       // Activities
