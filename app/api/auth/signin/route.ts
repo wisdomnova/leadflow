@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { email: rawEmail, password } = await req.json();
+    const { email: rawEmail, password, rememberMe } = await req.json();
 
     if (!rawEmail || !password) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -57,12 +57,14 @@ export async function POST(req: Request) {
     }
 
     // 3. Generate Session JWT
+    const sessionDuration = rememberMe ? "30d" : "4h";
+    const cookieMaxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 4; // 30 days or 4 hours
     const token = await signUserJWT({
       userId: (user as any).id,
       orgId: (user as any).org_id,
       email: (user as any).email,
       role: (user as any).role,
-    });
+    }, sessionDuration);
 
     // 4. Set Cookie
     // TODO: Add server-side session revocation (store session ID in DB, validate on each request)
@@ -71,7 +73,7 @@ export async function POST(req: Request) {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
-      maxAge: 60 * 60 * 4, // 4 hours (matches JWT expiry)
+      maxAge: cookieMaxAge,
       path: "/",
     });
 

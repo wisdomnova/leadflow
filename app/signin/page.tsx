@@ -15,6 +15,7 @@ function SignInPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [showExpiredModal, setShowExpiredModal] = useState(false);
 
+  const [rememberMe, setRememberMe] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -37,7 +38,7 @@ function SignInPageContent() {
       const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, rememberMe })
       });
 
       const data = await response.json();
@@ -216,7 +217,9 @@ function SignInPageContent() {
                   <input 
                     id="remember-me" 
                     name="remember-me" 
-                    type="checkbox" 
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     className="w-5 h-5 rounded-lg border-gray-100 bg-gray-50 text-[#745DF3] focus:ring-[#745DF3]/20" 
                   />
                   <label htmlFor="remember-me" className="text-sm font-bold text-[#101828]/40 uppercase tracking-widest cursor-pointer">
