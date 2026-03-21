@@ -26,7 +26,7 @@ export interface UserPayload {
  * Signs a JWT specifically for Custom Auth + Supabase RLS.
  * It includes an 'org_id' claim which we will use in Supabase Policies.
  */
-export async function signUserJWT(payload: UserPayload) {
+export async function signUserJWT(payload: UserPayload, expiresIn: string = "4h") {
   return await new SignJWT({
     ...payload,
     type: "session",
@@ -41,7 +41,7 @@ export async function signUserJWT(payload: UserPayload) {
     .setIssuedAt()
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
-    .setExpirationTime("4h")
+    .setExpirationTime(expiresIn)
     .sign(getSecret());
 }
 
