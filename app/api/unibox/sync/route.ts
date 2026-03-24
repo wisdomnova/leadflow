@@ -20,26 +20,48 @@ export async function POST(req: Request) {
   }
 
   try {
-    // Fetch all accounts for the org
+    // Fetch all email_accounts for the org
     const { data: accounts } = await context.supabase
       .from("email_accounts")
       .select("id")
       .eq("org_id", context.orgId)
       .eq("status", "active");
 
-    if (!accounts || accounts.length === 0) {
+    // Also fetch PowerSend server mailboxes with IMAP configured
+    const { data: psMailboxes } = await (context.supabase as any)
+      .from("server_mailboxes")
+      .select("id")
+      .eq("org_id", context.orgId)
+      .in("status", ["active", "warming"])
+      .not("imap_host", "is", null);
+
+    const totalAccounts = (accounts?.length || 0) + (psMailboxes?.length || 0);
+
+    if (totalAccounts === 0) {
       return NextResponse.json({ message: "No active accounts to sync" });
     }
 
-    // Trigger Inngest sync for each account
-    for (const account of accounts) {
-      await inngest.send({
-        name: "unibox/account.sync",
-        data: { accountId: account.id }
-      });
+    // Trigger Inngest sync for each email account
+    if (accounts) {
+      for (const account of accounts) {
+        await inngest.send({
+          name: "unibox/account.sync",
+          data: { accountId: account.id }
+        });
+      }
     }
 
-    return NextResponse.json({ success: true, count: accounts.length });
+    // Trigger Inngest sync for each PowerSend mailbox
+    if (psMailboxes) {
+      for (const mb of psMailboxes as any[]) {
+        await inngest.send({
+          name: "unibox/powersend.sync",
+          data: { mailboxId: mb.id }
+        });
+      }
+    }
+
+    return NextResponse.json({ success: true, count: totalAccounts });
   } catch (err: any) {
     return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }

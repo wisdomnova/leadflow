@@ -469,3 +469,218 @@ export async function syncAccountInbox(accountId: string) {
     await client.logout();
   }
 }
+
+// ─── PowerSend Mailbox Sync ──────────────────────────────────────────────────
+// Syncs a single PowerSend server_mailbox via IMAP for reply detection + Unibox.
+export async function syncPowerSendMailbox(mailboxId: string) {
+  const supabase = getAdminClient();
+  const { data: mailbox } = await (supabase as any)
+    .from("server_mailboxes")
+    .select("*, smart_servers(org_id)")
+    .eq("id", mailboxId)
+    .single();
+
+  if (!mailbox) {
+    console.error(`[PowerSend Sync] Mailbox ${mailboxId} not found`);
+    return;
+  }
+
+  const orgId = mailbox.org_id || mailbox.smart_servers?.org_id;
+  if (!orgId) {
+    console.error(`[PowerSend Sync] No org_id for mailbox ${mailboxId}`);
+    return;
+  }
+
+  const imapHost = mailbox.imap_host;
+  const imapPort = parseInt(mailbox.imap_port || '993');
+
+  if (!imapHost) {
+    console.log(`[PowerSend Sync] No IMAP configured for mailbox ${mailbox.email}. Skipping.`);
+    return;
+  }
+
+  console.log(`[PowerSend Sync] Connecting to ${imapHost}:${imapPort} for ${mailbox.email}...`);
+
+  const client = new ImapFlow({
+    host: imapHost,
+    port: imapPort,
+    secure: true,
+    auth: {
+      user: mailbox.imap_username || mailbox.email,
+      pass: mailbox.imap_password || mailbox.smtp_password,
+    },
+    logger: false,
+    greetingTimeout: 30000,
+    connectionTimeout: 30000,
+  });
+
+  try {
+    await client.connect();
+  } catch (err) {
+    console.error(`[PowerSend Sync] IMAP connection failed for ${mailbox.email}:`, err);
+    return;
+  }
+
+  const lastUid = mailbox.last_sync_uid || 0;
+  let maxUid = lastUid;
+
+  let lock;
+  try {
+    lock = await client.getMailboxLock('INBOX');
+  } catch (err) {
+    console.error(`[PowerSend Sync] IMAP Lock error for ${mailbox.email}:`, err);
+    await client.logout();
+    return;
+  }
+
+  try {
+    let fetchRange: string;
+    if (lastUid === 0) {
+      // First sync — last 24 hours
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const innerLock = await client.getMailboxLock('INBOX');
+      try {
+        const uids = await client.search({ since: yesterday });
+        if (uids && Array.isArray(uids) && uids.length > 0) {
+          fetchRange = uids.join(',');
+        } else {
+          console.log(`[PowerSend Sync] No messages for ${mailbox.email}`);
+          return;
+        }
+      } finally {
+        innerLock.release();
+      }
+    } else {
+      fetchRange = `${lastUid + 1}:*`;
+    }
+
+    for await (let msg of client.fetch(fetchRange, { envelope: true, source: true }, { uid: true })) {
+      if (msg.uid > maxUid) maxUid = msg.uid;
+      if (!msg.source) continue;
+
+      const parsed = await simpleParser(msg.source);
+      const fromEmail = parsed.from?.value[0]?.address?.toLowerCase();
+      if (!fromEmail) continue;
+
+      const isSelfEmail = fromEmail === mailbox.email.toLowerCase();
+
+      // ── Reply Detection ────────────────────────────────────────────────
+      if (!isSelfEmail) {
+        const { data: recipients } = await supabase
+          .from("campaign_recipients")
+          .select("id, campaign_id, lead_id, leads!inner(email)")
+          .eq("leads.email", fromEmail)
+          .in("status", ["active", "completed"]);
+
+        if (recipients && recipients.length > 0) {
+          for (const recipient of recipients) {
+            await (supabase as any).from("campaign_recipients").update({
+              status: 'replied',
+              replied_at: new Date().toISOString()
+            } as any).eq("id", (recipient as any).id);
+
+            await (supabase as any).from("activity_log").insert([{
+              org_id: orgId,
+              action_type: "email.reply",
+              description: `Lead replied: ${fromEmail}`,
+              metadata: {
+                campaign_id: (recipient as any).campaign_id,
+                lead_id: (recipient as any).lead_id,
+                subject: parsed.subject,
+                via: 'powersend'
+              }
+            }] as any);
+
+            await (supabase as any).rpc('increment_campaign_stat', {
+              campaign_id_param: (recipient as any).campaign_id,
+              column_param: 'reply_count'
+            });
+
+            await (supabase as any).from("leads").update({
+              last_message_received_at: parsed.date || new Date().toISOString(),
+              status: 'replied'
+            } as any).eq("id", (recipient as any).lead_id);
+
+            await createNotification({
+              orgId,
+              title: "New Reply Received",
+              description: `${fromEmail} replied (via PowerSend). Click to view in Unibox.`,
+              type: "success",
+              category: "email_events",
+              link: "/dashboard/unibox"
+            });
+          }
+        }
+
+        // Warmup detection
+        const { data: isWarmup } = await (supabase as any).rpc('is_warmup_sender', { sender_email: fromEmail });
+        if (isWarmup) {
+          await inngest.send({
+            name: "warmup/message.received",
+            data: {
+              accountId: mailboxId,
+              senderEmail: fromEmail,
+              subject: parsed.subject,
+              bodyText: parsed.text,
+              messageId: (msg.envelope as any)?.messageId
+            }
+          });
+          await (supabase as any).rpc('increment_warmup_stat', {
+            account_id_param: mailboxId,
+            date_param: new Date().toISOString().split('T')[0],
+            column_param: 'inbox_count'
+          });
+        }
+      }
+
+      // ── Store in unibox_messages (campaign leads only) ─────────────────
+      if (parsed.messageId && !isSelfEmail) {
+        const { data: campaignLead } = await (supabase as any)
+          .from("campaign_recipients")
+          .select("lead_id, leads!inner(id, email)")
+          .eq("leads.email", fromEmail)
+          .eq("leads.org_id", orgId)
+          .limit(1)
+          .maybeSingle();
+
+        if (campaignLead) {
+          await (supabase as any).from("unibox_messages").upsert([{
+            account_id: mailboxId,
+            org_id: orgId,
+            lead_id: (campaignLead as any).lead_id,
+            message_id: parsed.messageId,
+            from_email: fromEmail,
+            subject: parsed.subject || "(No Subject)",
+            snippet: (parsed.text || "").substring(0, 200),
+            received_at: parsed.date || new Date().toISOString(),
+            is_read: false,
+            direction: 'inbound',
+            sender_name: parsed.from?.value[0]?.name || ""
+          }], { onConflict: 'message_id' }) as any;
+
+          await inngest.send({
+            name: "unibox/reply.classify",
+            data: {
+              leadId: (campaignLead as any).lead_id,
+              orgId,
+              snippet: (parsed.text || "").substring(0, 500),
+              subject: parsed.subject || "",
+              leadName: parsed.from?.value[0]?.name || "",
+            }
+          });
+        }
+      }
+    }
+
+    // Update last sync UID
+    if (maxUid > lastUid) {
+      await (supabase as any).from("server_mailboxes").update({ last_sync_uid: maxUid } as any).eq("id", mailboxId);
+    }
+  } finally {
+    lock.release();
+    await client.logout();
+  }
+
+  console.log(`[PowerSend Sync] Completed for ${mailbox.email}.`);
+}
