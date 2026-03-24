@@ -2,7 +2,7 @@ import { inngest } from "../services/inngest";
 import { getAdminClient } from "../supabase";
 import { sendOutreachEmail } from "../services/email-sender";
 import { logLeadActivity } from "../activity-utils";
-import { syncAccountInbox } from "../services/unibox";
+import { syncAccountInbox, syncPowerSendMailbox } from "../services/unibox";
 import { createNotification } from "../notifications";
 import { calculateOptimalSendTime, getInngestDelay } from "../smart-scheduling";
 import { checkSubscription } from "../subscription-check";
@@ -24,16 +24,32 @@ export const uniboxSyncScheduler = inngest.createFunction(
       .select("id")
       .eq("status", "active");
 
-    if (!accounts || accounts.length === 0) return { message: "No accounts to sync" };
+    // Also sync PowerSend server mailboxes that have IMAP configured
+    const { data: psMailboxes } = await (supabase as any)
+      .from("server_mailboxes")
+      .select("id")
+      .in("status", ["active", "warming"])
+      .not("imap_host", "is", null);
 
-    const events = (accounts as any).map((acc: any) => ({
-      name: "unibox/account.sync",
-      data: { accountId: acc.id }
-    }));
+    const events: any[] = [];
+
+    if (accounts && accounts.length > 0) {
+      for (const acc of accounts as any[]) {
+        events.push({ name: "unibox/account.sync", data: { accountId: acc.id } });
+      }
+    }
+
+    if (psMailboxes && psMailboxes.length > 0) {
+      for (const mb of psMailboxes as any[]) {
+        events.push({ name: "unibox/powersend.sync", data: { mailboxId: mb.id } });
+      }
+    }
+
+    if (events.length === 0) return { message: "No accounts to sync" };
 
     await step.sendEvent("fan-out-sync", events);
     
-    return { count: accounts.length };
+    return { accounts: accounts?.length || 0, powersendMailboxes: psMailboxes?.length || 0 };
   }
 );
 
@@ -45,6 +61,19 @@ export const accountSyncProcessor = inngest.createFunction(
     
     await step.run("sync-imap", async () => {
       await syncAccountInbox(accountId);
+      return { success: true };
+    });
+  }
+);
+
+export const powersendSyncProcessor = inngest.createFunction(
+  { id: "powersend-sync-processor", concurrency: 5 },
+  { event: "unibox/powersend.sync" },
+  async ({ event, step }) => {
+    const { mailboxId } = event.data;
+    
+    await step.run("sync-powersend-mailbox", async () => {
+      await syncPowerSendMailbox(mailboxId);
       return { success: true };
     });
   }
