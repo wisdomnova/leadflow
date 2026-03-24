@@ -31,7 +31,7 @@ const plans = [
     monthlyPrice: 319,
     annualPrice: 3060,
     description: 'For large agencies and enterprise sales organizations.',
-    features: ['500,000 Monthly Emails', '1 PowerSend Node Included', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Dedicated Account Manager'],
+    features: ['500,000 Monthly Emails', 'PowerSend Infrastructure', 'Unlimited AI Personalization', 'Team Dashboard', 'Advanced Analytics', 'Dedicated Account Manager'],
     color: 'black'
   }
 ];
