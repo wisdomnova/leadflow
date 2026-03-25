@@ -30,10 +30,13 @@ import {
   Settings2,
   Trash2,
   Edit,
-  RotateCcw
+  RotateCcw,
+  Archive,
+  Eye,
+  Copy
 } from 'lucide-react';
 
-const statusFilters = ['All', 'Sending', 'Paused', 'Scheduled', 'Draft', 'Completed'];
+const statusFilters = ['All', 'Sending', 'Paused', 'Scheduled', 'Draft', 'Completed', 'Archived'];
 
 export default function CampaignsPage() {
   const router = useRouter();
@@ -166,6 +169,68 @@ export default function CampaignsPage() {
     }
   };
 
+  const handleArchiveCampaign = async (id: string) => {
+    try {
+      const resp = await fetch(`/api/campaigns/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'archived' }),
+      });
+      if (resp.ok) {
+        setCampaigns(prev => prev.map(c => c.id === id ? { ...c, status: 'archived' } : c));
+        showToast('Campaign archived successfully!');
+      }
+    } catch {
+      showToast('Failed to archive campaign', 'error');
+    }
+    setActiveMenuId(null);
+  };
+
+  const handleRestoreCampaign = async (id: string) => {
+    try {
+      const resp = await fetch(`/api/campaigns/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'paused' }),
+      });
+      if (resp.ok) {
+        setCampaigns(prev => prev.map(c => c.id === id ? { ...c, status: 'paused' } : c));
+        showToast('Campaign restored successfully!');
+      }
+    } catch {
+      showToast('Failed to restore campaign', 'error');
+    }
+    setActiveMenuId(null);
+  };
+
+  const handleDuplicateCampaign = async (campaign: any) => {
+    try {
+      const resp = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${campaign.name} (Copy)`,
+          steps: campaign.steps,
+          config: campaign.config,
+          use_powersend: campaign.use_powersend,
+          powersend_config: campaign.powersend_config,
+          sender_id: campaign.sender_id,
+          sender_ids: campaign.sender_ids,
+          powersend_server_ids: campaign.powersend_server_ids,
+        }),
+      });
+      if (resp.ok) {
+        showToast('Campaign duplicated as draft!');
+        fetchCampaigns();
+      } else {
+        showToast('Failed to duplicate campaign', 'error');
+      }
+    } catch {
+      showToast('Failed to duplicate campaign', 'error');
+    }
+    setActiveMenuId(null);
+  };
+
   const handleCreateCampaignClick = () => {
     if (accounts.length === 0 && !hasPowerSendProfiles) {
       setIsMissingAccountModalOpen(true);
@@ -198,7 +263,8 @@ export default function CampaignsPage() {
         'Paused': 'paused',
         'Scheduled': 'scheduled',
         'Draft': 'draft',
-        'Completed': 'completed'
+        'Completed': 'completed',
+        'Archived': 'archived'
       };
       matchesFilter = c.status === statusMap[activeFilter];
     }
@@ -420,13 +486,17 @@ export default function CampaignsPage() {
                                 campaign.status === 'running' ? 'bg-emerald-50 text-emerald-600' :
                                 campaign.status === 'paused' ? 'bg-amber-50 text-amber-600' :
                                 campaign.status === 'draft' ? 'bg-gray-100 text-gray-500' :
-                                'bg-blue-50 text-blue-600'
+                                campaign.status === 'completed' ? 'bg-blue-50 text-blue-600' :
+                                campaign.status === 'archived' ? 'bg-slate-50 text-slate-400' :
+                                'bg-purple-50 text-purple-600'
                               }`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${
                                   campaign.status === 'running' ? 'bg-emerald-500 animate-pulse' :
                                   campaign.status === 'paused' ? 'bg-amber-500' :
                                   campaign.status === 'draft' ? 'bg-gray-400' :
-                                  'bg-blue-500'
+                                  campaign.status === 'completed' ? 'bg-blue-500' :
+                                  campaign.status === 'archived' ? 'bg-slate-400' :
+                                  'bg-purple-500'
                                 }`} />
                                 {campaign.status === 'running' ? 'Sending' : campaign.status}
                               </div>
@@ -476,7 +546,8 @@ export default function CampaignsPage() {
                             </td>
                             <td className="px-8 py-6 text-right relative">
                               <div className="flex items-center justify-end gap-2">
-                                {campaign.status === 'running' ? (
+                                {/* Quick action button based on status */}
+                                {campaign.status === 'running' && (
                                   <button 
                                     onClick={() => handleToggleStatus(campaign.id, campaign.status)}
                                     className="p-2 text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
@@ -484,7 +555,8 @@ export default function CampaignsPage() {
                                   >
                                     <Pause className="w-5 h-5 fill-current" />
                                   </button>
-                                ) : (campaign.status === 'paused' || campaign.status === 'draft') ? (
+                                )}
+                                {(campaign.status === 'paused' || campaign.status === 'draft') && (
                                   <button 
                                     onClick={() => handleToggleStatus(campaign.id, campaign.status)}
                                     className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
@@ -492,7 +564,16 @@ export default function CampaignsPage() {
                                   >
                                     <Play className="w-5 h-5 fill-current" />
                                   </button>
-                                ) : null}
+                                )}
+                                {campaign.status === 'completed' && (
+                                  <Link
+                                    href={`/dashboard/campaigns/${campaign.id}/edit`}
+                                    className="p-2 text-[#745DF3] hover:bg-[#745DF3]/10 rounded-xl transition-all"
+                                    title="View Analytics"
+                                  >
+                                    <Eye className="w-5 h-5" />
+                                  </Link>
+                                )}
                                 
                                 <div className="relative group/menu">
                                   <button 
@@ -517,29 +598,143 @@ export default function CampaignsPage() {
                                           exit={{ opacity: 0, scale: 0.95, y: 10 }}
                                           className="absolute right-0 mt-2 w-48 bg-white rounded-2xl border border-gray-100 shadow-2xl z-[101] py-2"
                                         >
-                                          <Link 
-                                            href={`/dashboard/campaigns/${campaign.id}/edit`}
-                                            className="w-full flex items-center gap-3 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                                          {/* Running: Pause, Edit, Duplicate, Delete */}
+                                          {campaign.status === 'running' && (
+                                            <>
+                                              <button
+                                                onClick={() => { handleToggleStatus(campaign.id, campaign.status); setActiveMenuId(null); }}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-amber-600 hover:bg-amber-50 transition-colors"
+                                              >
+                                                <Pause className="w-4 h-4" />
+                                                Pause Campaign
+                                              </button>
+                                              <Link 
+                                                href={`/dashboard/campaigns/${campaign.id}/edit`}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                                              >
+                                                <Edit className="w-4 h-4 text-gray-400" />
+                                                Edit Details
+                                              </Link>
+                                            </>
+                                          )}
+
+                                          {/* Paused: Resume, Edit, Duplicate, Delete */}
+                                          {campaign.status === 'paused' && (
+                                            <>
+                                              <button
+                                                onClick={() => { handleToggleStatus(campaign.id, campaign.status); setActiveMenuId(null); }}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                              >
+                                                <Play className="w-4 h-4" />
+                                                Resume Campaign
+                                              </button>
+                                              <Link 
+                                                href={`/dashboard/campaigns/${campaign.id}/edit`}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                                              >
+                                                <Edit className="w-4 h-4 text-gray-400" />
+                                                Edit Details
+                                              </Link>
+                                            </>
+                                          )}
+
+                                          {/* Draft: Start, Edit, Duplicate, Delete */}
+                                          {campaign.status === 'draft' && (
+                                            <>
+                                              <button
+                                                onClick={() => { handleToggleStatus(campaign.id, campaign.status); setActiveMenuId(null); }}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                              >
+                                                <Play className="w-4 h-4" />
+                                                Start Campaign
+                                              </button>
+                                              <Link 
+                                                href={`/dashboard/campaigns/${campaign.id}/edit`}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                                              >
+                                                <Edit className="w-4 h-4 text-gray-400" />
+                                                Edit Details
+                                              </Link>
+                                            </>
+                                          )}
+
+                                          {/* Completed: View, Duplicate, Archive */}
+                                          {campaign.status === 'completed' && (
+                                            <>
+                                              <Link 
+                                                href={`/dashboard/campaigns/${campaign.id}/edit`}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                                              >
+                                                <Eye className="w-4 h-4 text-[#745DF3]" />
+                                                View Details
+                                              </Link>
+                                            </>
+                                          )}
+
+                                          {/* Scheduled: Edit, Duplicate, Cancel */}
+                                          {campaign.status === 'scheduled' && (
+                                            <>
+                                              <Link 
+                                                href={`/dashboard/campaigns/${campaign.id}/edit`}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                                              >
+                                                <Edit className="w-4 h-4 text-gray-400" />
+                                                Edit Details
+                                              </Link>
+                                              <button
+                                                onClick={() => { handleToggleStatus(campaign.id, 'running'); setActiveMenuId(null); }}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-amber-600 hover:bg-amber-50 transition-colors"
+                                              >
+                                                <Pause className="w-4 h-4" />
+                                                Cancel Schedule
+                                              </button>
+                                            </>
+                                          )}
+
+                                          {/* Archived: Restore only */}
+                                          {campaign.status === 'archived' && (
+                                            <button
+                                              onClick={() => handleRestoreCampaign(campaign.id)}
+                                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-[#745DF3] hover:bg-[#745DF3]/5 transition-colors"
+                                            >
+                                              <RotateCcw className="w-4 h-4" />
+                                              Restore Campaign
+                                            </button>
+                                          )}
+
+                                          {/* Duplicate — available for all statuses */}
+                                          <button
+                                            onClick={() => handleDuplicateCampaign(campaign)}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
                                           >
-                                            <Edit className="w-4 h-4 text-gray-400" />
-                                            Edit Details
-                                          </Link>
-                                          <button className="w-full flex items-center gap-3 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors">
-                                            <Zap className="w-4 h-4 text-[#745DF3]" />
+                                            <Copy className="w-4 h-4 text-gray-400" />
                                             Duplicate
                                           </button>
+
                                           <div className="my-1 border-t border-gray-50" />
-                                          <button 
-                                            onClick={() => {
-                                              setCampaignToDelete(campaign.id);
-                                              setIsDeleteModalOpen(true);
-                                              setActiveMenuId(null);
-                                            }}
-                                            className="w-full flex items-center gap-3 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
-                                          >
-                                            <Trash2 className="w-4 h-4" />
-                                            Delete
-                                          </button>
+
+                                          {/* Archive — for completed campaigns instead of delete */}
+                                          {campaign.status === 'completed' ? (
+                                            <button 
+                                              onClick={() => handleArchiveCampaign(campaign.id)}
+                                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+                                            >
+                                              <Archive className="w-4 h-4" />
+                                              Archive
+                                            </button>
+                                          ) : (
+                                            <button 
+                                              onClick={() => {
+                                                setCampaignToDelete(campaign.id);
+                                                setIsDeleteModalOpen(true);
+                                                setActiveMenuId(null);
+                                              }}
+                                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                              Delete
+                                            </button>
+                                          )}
                                         </motion.div>
                                       </>
                                     )}

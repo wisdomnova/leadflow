@@ -70,36 +70,15 @@ const CTASection = () => {
             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
             className="flex-1 relative translate-x-12 lg:translate-x-32 scale-110"
           >
-            <div className="w-[600px] h-[400px] bg-white rounded-3xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden relative rotate-[-5deg] transform-gpu">
-                {/* Simplified Analytics Mockup */}
-                <div className="flex h-full">
-                  <div className="w-1/4 border-r border-gray-100 p-6 bg-gray-50/50">
-                     <div className="w-10 h-10 bg-[#745DF3]/10 rounded-xl mb-10" />
-                     <div className="space-y-6">
-                        {[1, 2, 3, 4, 5].map(i => (
-                          <div key={i} className="h-2 bg-gray-100 rounded-full w-full" />
-                        ))}
-                     </div>
-                  </div>
-                  <div className="flex-1 p-10">
-                     <div className="flex justify-between mb-12">
-                        <div className="w-32 h-6 bg-gray-100 rounded-lg" />
-                        <div className="w-24 h-6 bg-[#745DF3]/10 rounded-lg" />
-                     </div>
-                     <div className="grid grid-cols-3 gap-6 mb-12">
-                        {[1, 2, 3].map(i => (
-                          <div key={i} className="h-24 bg-gray-50 border border-gray-100 rounded-2xl" />
-                        ))}
-                     </div>
-                     <div className="w-full h-32 bg-gray-50/50 rounded-2xl relative overflow-hidden p-6">
-                        <div className="absolute inset-0 flex items-end gap-2 px-6 pb-6 mt-12">
-                           {[40, 70, 45, 90, 65, 80, 50, 85, 30, 70, 40, 60, 45, 90].map((h, i) => (
-                             <div key={i} style={{ height: `${h}%` }} className="flex-1 bg-[#745DF3]/20 rounded-t-lg" />
-                           ))}
-                        </div>
-                     </div>
-                  </div>
-                </div>
+            <div className="w-[600px] h-[400px] rounded-3xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden relative rotate-[-5deg] transform-gpu">
+              <Image
+                src="/mockups/Team Performance.png"
+                alt="LeadFlow Team Performance — manage your outbound team from one dashboard"
+                width={1400}
+                height={900}
+                quality={90}
+                className="w-full h-full object-cover object-top"
+              />
             </div>
           </motion.div>
         </div>

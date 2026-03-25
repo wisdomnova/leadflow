@@ -42,8 +42,8 @@ export async function GET(request: Request) {
         supabase.from("analytics_daily").select("*").eq("org_id", orgId).gte("date", startDateStr).order("date", { ascending: true }),
         // Profile
         supabase.from("users").select("full_name").eq("id", userId).single(),
-        // Activities
-        supabase.from("activity_log").select("*").eq("org_id", orgId).order("created_at", { ascending: false }).limit(4),
+        // Activities (filtered to same date range as stats for consistency)
+        supabase.from("activity_log").select("*").eq("org_id", orgId).gte("created_at", startDateStr).order("created_at", { ascending: false }).limit(10),
         // Services
         supabase.from("email_accounts").select("id").eq("org_id", orgId),
         supabase.from("organizations").select("subscription_status, trial_ends_at, plan_tier").eq("id", orgId).single(),
@@ -85,7 +85,11 @@ export async function GET(request: Request) {
       }
 
     const chartData = (dailyStats.data as any[])?.map(d => ({
-      name: d.date ? new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }) : '',
+      name: d.date 
+        ? (days <= 7 
+            ? new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }) 
+            : new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+        : '',
       sent: d.sent_count || 0,
       replies: d.reply_count || 0
     })) || [];
