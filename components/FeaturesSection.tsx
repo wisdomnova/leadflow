@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Zap } from 'lucide-react';
+import Image from 'next/image';
 
 const FeaturesSection = () => {
   return (
@@ -39,26 +40,15 @@ const FeaturesSection = () => {
               <h3 className="text-3xl font-black text-[#101828] mb-4 tracking-tight">One inbox for it all.</h3>
               <p className="text-lg text-[#101828]/50 max-w-sm font-medium">Handle replies quickly, understand intent, and move leads forward without switching tools.</p>
             </div>
-            <div className="mt-auto relative bg-gray-50/50 rounded-[2rem] border border-gray-100/50 p-6 h-[260px]">
-              {/* Mock Inbox UI */}
-              <div className="flex h-full gap-4">
-                <div className="w-1/3 bg-white border border-gray-100 rounded-2xl p-4 space-y-4 shadow-sm">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="h-10 bg-gray-50 rounded-lg p-2 flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-gray-200/50" />
-                      <div className="w-full h-2 bg-gray-200/30 rounded" />
-                    </div>
-                  ))}
-                </div>
-                <div className="flex-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-                  <div className="w-1/2 h-4 bg-gray-100 rounded-md mb-6" />
-                  <div className="space-y-3">
-                    <div className="w-full h-3 bg-gray-50 rounded" />
-                    <div className="w-5/6 h-3 bg-gray-50 rounded" />
-                    <div className="w-4/6 h-3 bg-gray-50 rounded" />
-                  </div>
-                </div>
-              </div>
+            <div className="mt-auto relative rounded-[2rem] border border-gray-100/50 overflow-hidden h-[260px]">
+              <Image
+                src="/mockups/Unibox.png"
+                alt="LeadFlow Unified Inbox — manage all replies in one place"
+                width={1400}
+                height={700}
+                quality={90}
+                className="w-full h-full object-cover object-top"
+              />
             </div>
           </motion.div>
 
@@ -71,18 +61,15 @@ const FeaturesSection = () => {
               <h3 className="text-3xl font-black text-[#101828] mb-4 tracking-tight">Native CRM handoff.</h3>
               <p className="text-lg text-[#101828]/50 font-medium">LeadFlow qualifies responses, your CRM closes the deal. No manual sync.</p>
             </div>
-            <div className="mt-auto bg-[#101828] rounded-[2rem] p-8 h-[260px] relative overflow-hidden">
-               <div className="absolute top-0 right-0 w-32 h-32 bg-[#745DF3]/20 blur-3xl rounded-full" />
-               <div className="grid grid-cols-2 gap-4 h-full">
-                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col justify-between">
-                    <div className="w-10 h-10 rounded-lg bg-[#745DF3]/20" />
-                    <div className="w-full h-4 bg-white/10 rounded" />
-                 </div>
-                 <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-end">
-                    <div className="w-full h-2 bg-white/5 rounded mb-2" />
-                    <div className="w-2/3 h-2 bg-white/5 rounded" />
-                 </div>
-               </div>
+            <div className="mt-auto rounded-[2rem] overflow-hidden h-[260px] relative">
+              <Image
+                src="/mockups/CRM.png"
+                alt="LeadFlow CRM — automatic deal creation and pipeline management"
+                width={1000}
+                height={600}
+                quality={90}
+                className="w-full h-full object-cover object-top"
+              />
             </div>
           </motion.div>
 
@@ -103,23 +90,15 @@ const FeaturesSection = () => {
                  </div>
               </div>
             </div>
-            <div className="md:w-1/2 w-full bg-white/5 border border-white/10 rounded-3xl p-8 h-[300px] relative">
-               <div className="space-y-4">
-                 <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
-                    <div className="w-10 h-10 rounded-full bg-[#745DF3]" />
-                    <div className="flex-1 h-3 bg-white/10 rounded" />
-                 </div>
-                 <div className="ml-10 space-y-4">
-                    <div className="flex items-center gap-4 bg-white/[0.02] p-4 rounded-xl border border-white/5">
-                      <div className="w-8 h-8 rounded-lg bg-white/10" />
-                      <div className="flex-1 h-2 bg-white/5 rounded" />
-                    </div>
-                    <div className="flex items-center gap-4 bg-white/[0.02] p-4 rounded-xl border border-white/5 opcity-50 scale-95">
-                      <div className="w-8 h-8 rounded-lg bg-white/10" />
-                      <div className="flex-1 h-2 bg-white/5 rounded" />
-                    </div>
-                 </div>
-               </div>
+            <div className="md:w-1/2 w-full rounded-3xl overflow-hidden h-[300px] relative border border-white/10 shadow-2xl shadow-black/20">
+              <Image
+                src="/mockups/Analytics.png"
+                alt="LeadFlow Analytics — track campaign performance at scale"
+                width={1400}
+                height={800}
+                quality={90}
+                className="w-full h-full object-cover object-top"
+              />
             </div>
           </motion.div>
 

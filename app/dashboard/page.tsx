@@ -190,7 +190,7 @@ export default function DashboardPage() {
 
   const dashboardStats = statsData ? [
     { name: 'Total Emails Sent', value: (statsData.totalSent || 0).toLocaleString(), change: '', icon: Send },
-    { name: 'Average Open Rate', value: (statsData.totalSent || 0) > 0 ? `${((statsData.totalOpened || 0) / statsData.totalSent * 100).toFixed(1)}%` : '0%', change: '', icon: MousePointer2 },
+    { name: 'Unique Open Rate', value: (statsData.totalSent || 0) > 0 ? `${((statsData.totalOpened || 0) / statsData.totalSent * 100).toFixed(1)}%` : '0%', change: '', icon: MousePointer2 },
     { name: 'Average Reply Rate', value: (statsData.totalSent || 0) > 0 ? `${((statsData.totalReplied || 0) / statsData.totalSent * 100).toFixed(1)}%` : '0%', change: '', icon: MessageSquare },
     { name: 'Active Campaigns', value: (statsData.activeCampaigns || 0).toString(), change: '', icon: Target },
   ] : [
@@ -573,7 +573,7 @@ export default function DashboardPage() {
                       activities.map((item, i) => {
                         const Icon = getEventIcon(item.action_type);
                         return (
-                          <div key={item.id} className="group flex gap-4">
+                          <div key={item.id} className="group flex gap-4 cursor-pointer" onClick={() => router.push('/dashboard/activity')}>
                             <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[#101828] group-hover:text-white transition-all shrink-0">
                               <Icon className="w-4 h-4" />
                             </div>

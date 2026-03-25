@@ -470,6 +470,24 @@ export const emailProcessor = inngest.createFunction(
           });
           // Mark recipient as bounced so we don't retry forever
           await (supabase as any).from("campaign_recipients").update({ status: 'bounced' }).eq("campaign_id", campaignId).eq("lead_id", leadId);
+
+          // Check if all recipients are done → auto-complete the campaign
+          const { count: activeCount } = await (supabase as any)
+            .from("campaign_recipients")
+            .select("id", { count: "exact", head: true })
+            .eq("campaign_id", campaignId)
+            .eq("status", "active");
+          
+          if (activeCount === 0) {
+            await (supabase as any).from("campaigns").update({ status: "completed" }).eq("id", campaignId).eq("status", "running");
+            
+            await (supabase as any).from("activity_log").insert([{
+              org_id: orgId,
+              action_type: "campaign_completed",
+              description: "Campaign has finished sending to all recipients.",
+              metadata: { campaign_id: campaignId }
+            }]);
+          }
         }
         
         // Re-throw to trigger Inngest retry if it's a transient error
@@ -558,6 +576,26 @@ export const emailProcessor = inngest.createFunction(
     } else {
       await step.run("mark-completed", async () => {
         await (supabase as any).from("campaign_recipients").update({ status: 'completed' }).eq("campaign_id", campaignId).eq("lead_id", leadId);
+      });
+
+      // Check if all recipients are done (completed/bounced/replied/unsubscribed) → auto-complete the campaign
+      await step.run("check-campaign-completion", async () => {
+        const { count } = await (supabase as any)
+          .from("campaign_recipients")
+          .select("id", { count: "exact", head: true })
+          .eq("campaign_id", campaignId)
+          .eq("status", "active");
+        
+        if (count === 0) {
+          await (supabase as any).from("campaigns").update({ status: "completed" }).eq("id", campaignId).eq("status", "running");
+          
+          await (supabase as any).from("activity_log").insert([{
+            org_id: orgId,
+            action_type: "campaign_completed",
+            description: "Campaign has finished sending to all recipients.",
+            metadata: { campaign_id: campaignId }
+          }]);
+        }
       });
     }
 
@@ -842,8 +880,8 @@ export const powersendWarmupProcessor = inngest.createFunction(
       return { message: "Quota reached for this hour or day", node: server.name };
     }
 
-    // Send warmup emails (1-3 per invocation to be gentle)
-    const toSend = Math.min(remaining, 3);
+    // Send warmup emails — match the hourly target to stay on pace for the daily limit
+    const toSend = Math.min(remaining, sendsPerHour);
  
     await step.run("send-warmup-emails", async () => {
       // Fetch pool mailboxes for this server (new architecture)

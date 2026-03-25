@@ -671,6 +671,15 @@ export default function PowerSendPage() {
     { day: '22-28', limit: 500 },
   ];
 
+  // Map a warmup day number to its schedule step index
+  const getWarmupStepIndex = (day: number): number => {
+    const endDays = [1, 2, 3, 4, 5, 7, 10, 14, 21, 28];
+    for (let i = 0; i < endDays.length; i++) {
+      if (day <= endDays[i]) return i;
+    }
+    return endDays.length - 1;
+  };
+
   const warmingNodes = servers.filter(s => s.warmup_enabled && s.status === 'warming');
 
   const filteredServers = servers.filter(s => 
@@ -830,7 +839,9 @@ export default function PowerSendPage() {
                       </tr>
                     ))
                   ) : filteredServers.length > 0 ? (
-                    filteredServers.map((server) => (
+                    filteredServers.map((server) => {
+                      const dailyUsage = server.status === 'warming' ? (server.warmup_daily_sends || 0) : (server.current_usage || 0);
+                      return (
                       <React.Fragment key={server.id}>
                       <tr className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => toggleExpandServer(server.id)}>
                         <td className="px-8 py-6">
@@ -904,13 +915,13 @@ export default function PowerSendPage() {
                         <td className="px-6 py-6">
                           <div className="flex flex-col gap-1.5">
                             <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-tight">
-                              <span>{server.current_usage || 0} sends</span>
+                              <span>{dailyUsage} sends</span>
                               <span>{server.daily_limit} max</span>
                             </div>
                             <div className="w-full h-1.5 bg-gray-50 rounded-full overflow-hidden border border-gray-100">
                               <div 
                                 className="h-full bg-[#745DF3] rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(116,93,243,0.3)]"
-                                style={{ width: `${((server.current_usage || 0) / server.daily_limit) * 100}%` }}
+                                style={{ width: `${(dailyUsage / server.daily_limit) * 100}%` }}
                               />
                             </div>
                           </div>
@@ -1118,7 +1129,8 @@ export default function PowerSendPage() {
                         </tr>
                       )}
                       </React.Fragment>
-                    ))
+                    );
+                    })
                   ) : (
                     <tr>
                       <td colSpan={7} className="px-8 py-20 text-center">
@@ -1200,10 +1212,12 @@ export default function PowerSendPage() {
               <div className="px-8 py-5 bg-gray-50/50 border-t border-gray-100">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">28-Day Warmup Schedule</p>
                 <div className="flex items-center gap-1">
-                  {warmupSchedule.map((step, idx) => (
+                  {warmupSchedule.map((step, idx) => {
+                    const currentStepIdx = warmingNodes[0]?.warmup_day ? getWarmupStepIndex(warmingNodes[0].warmup_day) : -1;
+                    return (
                     <div key={idx} className="flex-1 text-center">
                       <div className={`h-6 rounded-md flex items-center justify-center text-[8px] font-black uppercase ${
-                        idx < (warmingNodes[0]?.warmup_day || 0) 
+                        idx <= currentStepIdx 
                           ? 'bg-amber-500 text-white' 
                           : 'bg-gray-100 text-gray-400'
                       }`}>
@@ -1211,7 +1225,8 @@ export default function PowerSendPage() {
                       </div>
                       <p className="text-[7px] font-bold text-gray-400 mt-0.5">D{step.day}</p>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
