@@ -179,6 +179,9 @@ export default function CampaignsPage() {
       if (resp.ok) {
         setCampaigns(prev => prev.map(c => c.id === id ? { ...c, status: 'archived' } : c));
         showToast('Campaign archived successfully!');
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        showToast(err.error || 'Failed to archive campaign', 'error');
       }
     } catch {
       showToast('Failed to archive campaign', 'error');

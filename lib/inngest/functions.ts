@@ -88,39 +88,78 @@ export const campaignLauncher = inngest.createFunction(
   { id: "campaign-launcher" },
   { event: "campaign/launch" },
   async ({ event, step }) => {
-    const { campaignId, orgId, leadIds, listId } = event.data;
+    const { campaignId, orgId, listId } = event.data;
     const supabase = getAdminClient();
 
-    // 1. Get leads for this campaign
-    const leads = await step.run("fetch-leads", async () => {
-      // Priority: explicit leadIds > listId > legacy fallback (all 'new' leads)
-      if (leadIds && leadIds.length > 0) {
-        // Supabase .in() has a practical limit ~1000 items — batch for safety
+    // 1. Get leads for this campaign — read lead_ids from the campaign row (reliable, no event size limits)
+    // We split into multiple Inngest steps to avoid step execution timeout on large lead sets
+    const campaignData = await step.run("fetch-campaign-data", async () => {
+      const { data: campaign } = await (supabase as any)
+        .from("campaigns")
+        .select("lead_ids, list_id")
+        .eq("id", campaignId)
+        .single();
+      return {
+        storedLeadIds: (campaign as any)?.lead_ids || [],
+        resolvedListId: (campaign as any)?.list_id || listId,
+      };
+    });
+
+    const { storedLeadIds, resolvedListId } = campaignData;
+
+    let leads: { id: string; email: string }[] = [];
+
+    if (storedLeadIds.length > 0) {
+      // Fetch leads in chunked steps to avoid timeout — each step handles up to 500 IDs
+      const STEP_CHUNK = 500;
+      const IN_BATCH = 200; // ~200 UUIDs per .in() query is safe for URL length
+      for (let chunk = 0; chunk < storedLeadIds.length; chunk += STEP_CHUNK) {
+        const chunkIds = storedLeadIds.slice(chunk, chunk + STEP_CHUNK);
+        const chunkLeads = await step.run(`fetch-leads-${chunk}`, async () => {
+          const results: any[] = [];
+          for (let i = 0; i < chunkIds.length; i += IN_BATCH) {
+            const batch = chunkIds.slice(i, i + IN_BATCH);
+            const { data: batchData, error } = await supabase
+              .from("leads")
+              .select("id, email")
+              .in("id", batch);
+            if (error) {
+              console.error(`[campaign-launcher] Batch ${chunk + i} fetch error:`, error.message);
+              continue;
+            }
+            if (batchData) results.push(...batchData);
+          }
+          return results;
+        });
+        leads.push(...chunkLeads);
+      }
+    } else if (resolvedListId) {
+      leads = await step.run("fetch-leads-from-list", async () => {
+        const { data: listLeads } = await (supabase as any)
+          .rpc("get_leads_in_list", { p_list_id: resolvedListId });
+        return listLeads || [];
+      });
+    } else {
+      leads = await step.run("fetch-leads-fallback", async () => {
         const allLeads: any[] = [];
-        const IN_BATCH = 500;
-        for (let i = 0; i < leadIds.length; i += IN_BATCH) {
-          const batch = leadIds.slice(i, i + IN_BATCH);
-          const { data: batchData } = await supabase
+        let from = 0;
+        const PAGE = 1000;
+        while (true) {
+          const { data, error } = await supabase
             .from("leads")
             .select("id, email")
-            .in("id", batch);
-          if (batchData) allLeads.push(...batchData);
+            .eq("org_id", orgId)
+            .eq("status", "new")
+            .range(from, from + PAGE - 1);
+          if (error) { console.error(`[campaign-launcher] Fallback fetch error:`, error.message); break; }
+          if (!data || data.length === 0) break;
+          allLeads.push(...data);
+          if (data.length < PAGE) break;
+          from += PAGE;
         }
         return allLeads;
-      } else if (listId) {
-        // Resolve leads from the list via RPC
-        const { data: listLeads } = await (supabase as any)
-          .rpc("get_leads_in_list", { p_list_id: listId });
-        return listLeads || [];
-      } else {
-        const { data } = await supabase
-          .from("leads")
-          .select("id, email")
-          .eq("org_id", orgId)
-          .eq("status", "new");
-        return data || [];
-      }
-    });
+      });
+    }
 
     if (leads.length === 0) return { message: "No leads found" };
 
@@ -407,9 +446,24 @@ export const emailProcessor = inngest.createFunction(
       subject = subject.replace(regex, rawValue); // Subject is plain text, no HTML escaping needed
     });
 
+    // Also replace custom_fields if present
+    if (((data as any).lead as any).custom_fields && typeof ((data as any).lead as any).custom_fields === 'object') {
+      Object.keys(((data as any).lead as any).custom_fields).forEach((key: any) => {
+        const rawValue = ((data as any).lead as any).custom_fields[key] || '';
+        const safeValue = esc(rawValue);
+        const regex = new RegExp(`{{${key}}}`, 'gi');
+        processedBody = processedBody.replace(regex, safeValue);
+        subject = subject.replace(regex, rawValue);
+      });
+    }
+
     // Provide defaults for common missing fields if they weren't matched
     processedBody = processedBody.replace(/{{first_name}}/gi, 'there').replace(/{{company}}/gi, 'your company');
     subject = subject.replace(/{{first_name}}/gi, 'there').replace(/{{company}}/gi, 'your company');
+
+    // Strip any remaining unmatched variables
+    processedBody = processedBody.replace(/{{[^}]+}}/g, '');
+    subject = subject.replace(/{{[^}]+}}/g, '');
 
     // Convert newlines to <br> for HTML email since editor is a textarea
     processedBody = processedBody.replace(/\n/g, '<br />');
