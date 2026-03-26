@@ -530,13 +530,13 @@ export default function CampaignsPage() {
                             <td className="px-6 py-6">
                               <div className="flex flex-col gap-2 min-w-[120px] mx-auto">
                                 <div className="flex items-center justify-between text-[10px] font-black text-gray-400 uppercase tracking-tighter">
-                                  <span>{campaign.total_leads > 0 ? Math.round((campaign.sent_count / campaign.total_leads) * 100) : 0}%</span>
+                                  <span>{campaign.total_leads > 0 ? Math.min(100, Math.round((campaign.sent_count / campaign.total_leads) * 100)) : 0}%</span>
                                   <span>{campaign.total_leads || 0} leads</span>
                                 </div>
                                 <div className="h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
                                   <motion.div 
                                     initial={{ width: 0 }}
-                                    animate={{ width: `${campaign.total_leads > 0 ? (campaign.sent_count / campaign.total_leads) * 100 : 0}%` }}
+                                    animate={{ width: `${campaign.total_leads > 0 ? Math.min(100, (campaign.sent_count / campaign.total_leads) * 100) : 0}%` }}
                                     transition={{ duration: 1.5, ease: [0.34, 1.56, 0.64, 1] }}
                                     className={`h-full rounded-full ${
                                       campaign.status === 'running' ? 'bg-[#745DF3]' : 

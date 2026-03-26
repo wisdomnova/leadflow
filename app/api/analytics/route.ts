@@ -60,15 +60,17 @@ export async function GET(req: Request) {
     const prevData = aggregate(prevPeriodStats);
 
     const calculateChange = (current: number, prev: number) => {
-      if (prev === 0) return { trend: current > 0 ? 'up' : 'up', change: current > 0 ? '+100%' : '0%' };
+      if (prev === 0) return { trend: current > 0 ? 'up' : 'neutral', change: current > 0 ? 'New' : '0%' };
       const percent = ((current - prev) / prev) * 100;
+      // Cap at ±999% to avoid misleading numbers from near-zero baselines
+      const capped = Math.max(-999, Math.min(999, percent));
       return {
-        trend: percent >= 0 ? 'up' : 'down',
-        change: `${percent >= 0 ? '+' : ''}${percent.toFixed(0)}%`
+        trend: capped >= 0 ? 'up' : 'down',
+        change: `${capped >= 0 ? '+' : ''}${capped.toFixed(0)}%`
       };
     };
 
-    const getRate = (part: number, total: number) => total > 0 ? ((part / total) * 100).toFixed(1) + '%' : '0%';
+    const getRate = (part: number, total: number) => total > 0 ? (Math.min(100, (part / total) * 100)).toFixed(1) + '%' : '0%';
 
     const stats = [
       { 
