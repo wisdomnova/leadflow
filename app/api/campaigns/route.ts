@@ -75,6 +75,7 @@ export async function POST(req: Request) {
         status: status || "draft",
         sender_id: sender_id || null,
         sender_ids: Array.isArray(sender_ids) && sender_ids.length > 0 ? sender_ids : [],
+        lead_ids: Array.isArray(lead_ids) ? lead_ids : [],
         list_id: list_id || null,
         use_powersend: use_powersend || false,
         powersend_server_ids: Array.isArray(powersend_server_ids) && powersend_server_ids.length > 0 
@@ -99,7 +100,6 @@ export async function POST(req: Request) {
         data: {
           campaignId: data.id,
           orgId: context.orgId,
-          leadIds: lead_ids || [],
           listId: list_id || null,
         },
       });

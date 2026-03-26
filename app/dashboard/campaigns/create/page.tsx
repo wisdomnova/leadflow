@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, 
@@ -95,6 +95,11 @@ export default function CreateCampaignPage() {
   const [selectedServerIds, setSelectedServerIds] = useState<string[]>([]);
   const [showServerDropdown, setShowServerDropdown] = useState(false);
   
+  // Editor focus tracking
+  const [lastFocusedField, setLastFocusedField] = useState<'subject' | 'body'>('body');
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
   // AI States
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isOptimizingAI, setIsOptimizingAI] = useState(false);
@@ -779,10 +784,9 @@ export default function CreateCampaignPage() {
                           <AnimatePresence>
                             {usePowerSend && (
                               <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="overflow-hidden"
+                                initial={{ opacity: 0, height: 0, overflow: 'hidden' as any }}
+                                animate={{ opacity: 1, height: 'auto', overflow: 'visible' as any, transition: { overflow: { delay: 0.3 } } }}
+                                exit={{ opacity: 0, height: 0, overflow: 'hidden' as any }}
                               >
                                 <div className="mt-4 space-y-2">
                                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">
@@ -1449,7 +1453,20 @@ export default function CreateCampaignPage() {
                                     <button
                                       key={key}
                                       onClick={() => {
-                                        updateStepContent(activeStepIndex, 'body', (emailSteps[activeStepIndex]?.body || '') + `{{${key}}}`);
+                                        const field = lastFocusedField;
+                                        const ref = field === 'subject' ? subjectRef.current : bodyRef.current;
+                                        const currentValue = emailSteps[activeStepIndex]?.[field] || '';
+                                        const cursorPos = ref?.selectionStart ?? currentValue.length;
+                                        const newValue = currentValue.slice(0, cursorPos) + `{{${key}}}` + currentValue.slice(cursorPos);
+                                        updateStepContent(activeStepIndex, field, newValue);
+                                        // Restore cursor after variable insertion
+                                        setTimeout(() => {
+                                          if (ref) {
+                                            ref.focus();
+                                            const newPos = cursorPos + key.length + 4;
+                                            ref.setSelectionRange(newPos, newPos);
+                                          }
+                                        }, 0);
                                       }}
                                       className="w-full px-5 py-2 text-left text-[11px] font-bold text-gray-600 hover:bg-[#745DF3]/5 hover:text-[#745DF3] transition-all"
                                     >
@@ -1538,18 +1555,22 @@ export default function CreateCampaignPage() {
                         })()}
                         <div className="px-8 py-6 border-b border-gray-100">
                           <input 
+                            ref={subjectRef}
                             type="text" 
                             placeholder="Subject line..."
                             value={emailSteps[activeStepIndex]?.subject || ''}
                             onChange={(e) => updateStepContent(activeStepIndex, 'subject', e.target.value)}
+                            onFocus={() => setLastFocusedField('subject')}
                             className="w-full bg-transparent text-xl font-black text-[#101828] placeholder:text-gray-200 outline-none"
                           />
                         </div>
                         <textarea 
+                          ref={bodyRef}
                           className="flex-1 w-full p-8 text-sm font-medium text-gray-600 leading-relaxed outline-none resize-none no-scrollbar placeholder:text-gray-200"
                           placeholder="Hey {{first_name}}, I noticed you're scaling your sales team..."
                           value={emailSteps[activeStepIndex]?.body || ''}
                           onChange={(e) => updateStepContent(activeStepIndex, 'body', e.target.value)}
+                          onFocus={() => setLastFocusedField('body')}
                         />
                       </div>
 

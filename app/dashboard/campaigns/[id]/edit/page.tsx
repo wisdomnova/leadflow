@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, use, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft,
@@ -63,6 +63,11 @@ export default function EditCampaignPage({ params }: { params: Promise<{ id: str
   const [powerSendServers, setPowerSendServers] = useState<any[]>([]);
   const [selectedServerIds, setSelectedServerIds] = useState<string[]>([]);
   const [showServerDropdown, setShowServerDropdown] = useState(false);
+
+  // Editor focus tracking
+  const [lastFocusedField, setLastFocusedField] = useState<'subject' | 'body'>('body');
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   // AI States
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
@@ -482,7 +487,7 @@ export default function EditCampaignPage({ params }: { params: Promise<{ id: str
 
                     <AnimatePresence>
                       {usePowerSend && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                        <motion.div initial={{ opacity: 0, height: 0, overflow: 'hidden' as any }} animate={{ opacity: 1, height: 'auto', overflow: 'visible' as any, transition: { overflow: { delay: 0.3 } } }} exit={{ opacity: 0, height: 0, overflow: 'hidden' as any }}>
                           <div className="mt-4 space-y-2">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">
                               Smart Server{selectedServerIds.length > 1 ? 's' : ''}
@@ -614,10 +619,40 @@ export default function EditCampaignPage({ params }: { params: Promise<{ id: str
                     {/* Toolbar */}
                     <div className="px-8 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <button className="flex items-center gap-2 px-4 py-2 bg-white text-[#101828] rounded-lg text-[10px] font-black border border-gray-100 hover:border-[#745DF3]/20 transition-all uppercase tracking-widest">
-                          <UserPlus className="w-3.5 h-3.5 text-[#745DF3]" />
-                          Insert Variable
-                        </button>
+                        <div className="relative group/vars">
+                          <button className="flex items-center gap-2 px-4 py-2 bg-white text-[#101828] rounded-lg text-[10px] font-black border border-gray-100 group-hover/vars:border-[#745DF3]/20 transition-all uppercase tracking-widest">
+                            <UserPlus className="w-3.5 h-3.5 text-[#745DF3]" />
+                            Insert Variable
+                          </button>
+                          <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 py-3 opacity-0 invisible group-hover/vars:opacity-100 group-hover/vars:visible transition-all z-[60] max-h-64 overflow-y-auto no-scrollbar">
+                            {['first_name', 'last_name', 'company', 'email', 'title', 'phone', 'city', 'state', 'country', 'website', 'linkedin_url', 'industry'].map((key) => {
+                              const label = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                              return (
+                                <button
+                                  key={key}
+                                  onClick={() => {
+                                    const field = lastFocusedField;
+                                    const ref = field === 'subject' ? subjectRef.current : bodyRef.current;
+                                    const currentValue = emailSteps[activeStepIndex]?.[field] || '';
+                                    const cursorPos = ref?.selectionStart ?? currentValue.length;
+                                    const newValue = currentValue.slice(0, cursorPos) + `{{${key}}}` + currentValue.slice(cursorPos);
+                                    updateStepContent(activeStepIndex, field, newValue);
+                                    setTimeout(() => {
+                                      if (ref) {
+                                        ref.focus();
+                                        const newPos = cursorPos + key.length + 4;
+                                        ref.setSelectionRange(newPos, newPos);
+                                      }
+                                    }, 0);
+                                  }}
+                                  className="w-full px-5 py-2 text-left text-[11px] font-bold text-gray-600 hover:bg-[#745DF3]/5 hover:text-[#745DF3] transition-all"
+                                >
+                                  {label} <span className="text-[9px] text-gray-300 ml-1 opacity-50">{"{{"}{key}{"}}"}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         {(() => {
@@ -638,13 +673,15 @@ export default function EditCampaignPage({ params }: { params: Promise<{ id: str
                     {/* Subject + Body */}
                     <div className="flex-1 flex flex-col">
                       <div className="px-8 py-6 border-b border-gray-100">
-                        <input type="text" placeholder="Subject line..." value={emailSteps[activeStepIndex]?.subject || ''} onChange={(e) => updateStepContent(activeStepIndex, 'subject', e.target.value)} className="w-full bg-transparent text-xl font-black text-[#101828] placeholder:text-gray-200 outline-none" />
+                        <input ref={subjectRef} type="text" placeholder="Subject line..." value={emailSteps[activeStepIndex]?.subject || ''} onChange={(e) => updateStepContent(activeStepIndex, 'subject', e.target.value)} onFocus={() => setLastFocusedField('subject')} className="w-full bg-transparent text-xl font-black text-[#101828] placeholder:text-gray-200 outline-none" />
                       </div>
                       <textarea
+                        ref={bodyRef}
                         className="flex-1 w-full p-8 text-sm font-medium text-gray-600 leading-relaxed outline-none resize-none no-scrollbar placeholder:text-gray-200"
                         placeholder="Hey {{first_name}}, I noticed you're scaling your sales team..."
                         value={emailSteps[activeStepIndex]?.body || ''}
                         onChange={(e) => updateStepContent(activeStepIndex, 'body', e.target.value)}
+                        onFocus={() => setLastFocusedField('body')}
                       />
                     </div>
 
