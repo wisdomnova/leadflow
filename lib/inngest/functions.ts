@@ -505,49 +505,64 @@ export const emailProcessor = inngest.createFunction(
         return { success: true, messageId: result.messageId };
       } catch (err: any) {
         console.error("Email send failure:", err);
-        // Log failure to database
+
+        // Determine if this is a permanent (non-retryable) failure
+        const msg = (err.message || '').toLowerCase();
+        const isPermanent = msg.includes('invalid') || msg.includes('not found') || msg.includes('rejected') || msg.includes('no refresh_token') || msg.includes('bad credentials');
+
+        if (isPermanent) {
+          // Return failure result — do NOT throw, to avoid Inngest retry
+          // which would re-increment bounce_count on each retry attempt
+          return { success: false, permanent: true, error: err.message };
+        }
+        
+        // Transient error: re-throw to trigger Inngest retry
+        throw err;
+      }
+    });
+
+    // Handle permanent send failure (bounce) in a separate step
+    if (!sendResult.success && (sendResult as any).permanent) {
+      await step.run("handle-bounce", async () => {
+        // Log failure
         await (supabase as any).from("activity_log").insert([{
           org_id: orgId,
           lead_id: leadId,
           action_type: "email_failed",
-          description: `Failed to send email to ${((data as any).lead as any).email}: ${err.message}`,
-          metadata: { campaign_id: campaignId, error: err.message }
+          description: `Failed to send email to ${((data as any).lead as any).email}: ${(sendResult as any).error}`,
+          metadata: { campaign_id: campaignId, error: (sendResult as any).error }
         }] as any);
 
-        // Increment bounce_count for permanent-looking failures
-        const msg = (err.message || '').toLowerCase();
-        const isPermanent = msg.includes('invalid') || msg.includes('not found') || msg.includes('rejected') || msg.includes('no refresh_token') || msg.includes('bad credentials');
-        if (isPermanent) {
-          await (supabase as any).rpc('increment_campaign_stat', {
-            campaign_id_param: campaignId,
-            column_param: 'bounce_count'
-          });
-          // Mark recipient as bounced so we don't retry forever
-          await (supabase as any).from("campaign_recipients").update({ status: 'bounced' }).eq("campaign_id", campaignId).eq("lead_id", leadId);
+        // Increment bounce_count exactly once (this step won't retry on success)
+        await (supabase as any).rpc('increment_campaign_stat', {
+          campaign_id_param: campaignId,
+          column_param: 'bounce_count'
+        });
 
-          // Check if all recipients are done → auto-complete the campaign
-          const { count: activeCount } = await (supabase as any)
-            .from("campaign_recipients")
-            .select("id", { count: "exact", head: true })
-            .eq("campaign_id", campaignId)
-            .eq("status", "active");
-          
-          if (activeCount === 0) {
-            await (supabase as any).from("campaigns").update({ status: "completed" }).eq("id", campaignId).eq("status", "running");
-            
-            await (supabase as any).from("activity_log").insert([{
-              org_id: orgId,
-              action_type: "campaign_completed",
-              description: "Campaign has finished sending to all recipients.",
-              metadata: { campaign_id: campaignId }
-            }]);
-          }
-        }
+        // Mark recipient as bounced
+        await (supabase as any).from("campaign_recipients").update({ status: 'bounced' }).eq("campaign_id", campaignId).eq("lead_id", leadId);
+
+        // Check if all recipients are done → auto-complete the campaign
+        const { count: activeCount } = await (supabase as any)
+          .from("campaign_recipients")
+          .select("id", { count: "exact", head: true })
+          .eq("campaign_id", campaignId)
+          .eq("status", "active");
         
-        // Re-throw to trigger Inngest retry if it's a transient error
-        throw err;
-      }
-    });
+        if (activeCount === 0) {
+          await (supabase as any).from("campaigns").update({ status: "completed" }).eq("id", campaignId).eq("status", "running");
+          
+          await (supabase as any).from("activity_log").insert([{
+            org_id: orgId,
+            action_type: "campaign_completed",
+            description: "Campaign has finished sending to all recipients.",
+            metadata: { campaign_id: campaignId }
+          }]);
+        }
+      });
+
+      return; // Don't proceed to update-status or schedule next step
+    }
 
     // 4. Update Stats & Schedule Next Step
     await step.run("update-status", async () => {
@@ -653,7 +668,7 @@ export const emailProcessor = inngest.createFunction(
       });
     }
 
-    return { success: true, messageId: sendResult.messageId };
+    return { success: true, messageId: (sendResult as any).messageId };
   }
 );
 
