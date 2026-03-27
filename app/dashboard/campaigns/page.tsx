@@ -234,6 +234,24 @@ export default function CampaignsPage() {
     setActiveMenuId(null);
   };
 
+  const handleRelaunchCampaign = async (id: string) => {
+    try {
+      const resp = await fetch(`/api/campaigns/${id}/relaunch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const result = await resp.json();
+      if (resp.ok) {
+        showToast(`Relaunched ${result.relaunched} stuck recipients!`);
+      } else {
+        showToast(result.error || 'Failed to relaunch campaign', 'error');
+      }
+    } catch {
+      showToast('Failed to relaunch campaign', 'error');
+    }
+    setActiveMenuId(null);
+  };
+
   const handleCreateCampaignClick = () => {
     if (accounts.length === 0 && !hasPowerSendProfiles) {
       setIsMissingAccountModalOpen(true);
@@ -601,7 +619,7 @@ export default function CampaignsPage() {
                                           exit={{ opacity: 0, scale: 0.95, y: 10 }}
                                           className="absolute right-0 mt-2 w-48 bg-white rounded-2xl border border-gray-100 shadow-2xl z-[101] py-2"
                                         >
-                                          {/* Running: Pause, Edit, Duplicate, Delete */}
+                                          {/* Running: Pause, Relaunch, Edit, Duplicate, Delete */}
                                           {campaign.status === 'running' && (
                                             <>
                                               <button
@@ -610,6 +628,13 @@ export default function CampaignsPage() {
                                               >
                                                 <Pause className="w-4 h-4" />
                                                 Pause Campaign
+                                              </button>
+                                              <button
+                                                onClick={() => handleRelaunchCampaign(campaign.id)}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-[#745DF3] hover:bg-[#745DF3]/5 transition-colors"
+                                              >
+                                                <Zap className="w-4 h-4" />
+                                                Relaunch Stuck
                                               </button>
                                               <Link 
                                                 href={`/dashboard/campaigns/${campaign.id}/edit`}
