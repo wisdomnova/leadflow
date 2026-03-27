@@ -164,6 +164,8 @@ export const campaignLauncher = inngest.createFunction(
     if (leads.length === 0) return { message: "No leads found" };
 
     // 2. Initialize campaign_recipients for each lead (batched for scale)
+    // Use INSERT with ON CONFLICT DO NOTHING — never overwrite existing recipients
+    // that may already be completed/bounced/replied from a previous run
     const recipients = (leads as any).map((lead: any) => ({
       org_id: orgId,
       campaign_id: campaignId,
@@ -175,10 +177,14 @@ export const campaignLauncher = inngest.createFunction(
 
     await step.run("init-recipients", async () => {
       // Batch upserts in chunks of 200 to prevent payload/timeout issues
+      // ignoreDuplicates: true → ON CONFLICT DO NOTHING (preserve existing recipient state)
       const BATCH_SIZE = 200;
       for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
         const batch = recipients.slice(i, i + BATCH_SIZE);
-        const { error } = await supabase.from("campaign_recipients").upsert(batch, { onConflict: 'campaign_id,lead_id' });
+        const { error } = await supabase.from("campaign_recipients").upsert(batch, {
+          onConflict: 'campaign_id,lead_id',
+          ignoreDuplicates: true
+        });
         if (error) throw new Error(`Failed to initialize recipients batch ${i}: ${error.message}`);
       }
     });
@@ -524,13 +530,12 @@ export const emailProcessor = inngest.createFunction(
     // Handle permanent send failure (bounce) in a separate step
     if (!sendResult.success && (sendResult as any).permanent) {
       await step.run("handle-bounce", async () => {
-        // Log failure
+        // Log failure (lead_id goes in metadata — activity_log has no lead_id column)
         await (supabase as any).from("activity_log").insert([{
           org_id: orgId,
-          lead_id: leadId,
           action_type: "email_failed",
           description: `Failed to send email to ${((data as any).lead as any).email}: ${(sendResult as any).error}`,
-          metadata: { campaign_id: campaignId, error: (sendResult as any).error }
+          metadata: { campaign_id: campaignId, lead_id: leadId, error: (sendResult as any).error }
         }] as any);
 
         // Increment bounce_count exactly once (this step won't retry on success)
