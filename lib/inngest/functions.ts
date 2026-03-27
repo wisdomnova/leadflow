@@ -516,19 +516,29 @@ export const emailProcessor = inngest.createFunction(
         console.error("Email send failure:", err);
 
         // Determine if this is a permanent (non-retryable) failure
-        // NOTE: 'rejected' alone is too broad — 553 "sender address rejected" is a
-        // server config/relay issue (retryable with different mailbox), not a bounce.
-        // Only treat as permanent: invalid recipient, mailbox not found, auth issues.
+        // Be VERY conservative: only treat as permanent for clear recipient-level issues.
+        // Server-side errors (421 rate limits, 553 relay, connection issues) are transient.
         const msg = (err.message || '').toLowerCase();
-        const isPermanent = 
-          (msg.includes('invalid') && !msg.includes('sender address')) ||
-          (msg.includes('not found') && !msg.includes('sender')) ||
+        const smtpCode = (msg.match(/\b([45]\d{2})\b/) || [])[1] || '';
+
+        // 4xx SMTP codes are ALWAYS transient (rate limits, temp failures, greylisting)
+        const is4xx = smtpCode.startsWith('4');
+        
+        // 5xx is permanent ONLY for specific recipient-level codes:
+        //   550 = mailbox not found, 551 = user not local, 552 = exceeded storage
+        //   553 = bad destination mailbox syntax (but also relay rejection — be careful)
+        //   554 = transaction failed
+        // However, 553 "sender address rejected" is server config, not recipient issue
+        const isPermanent = !is4xx && (
           msg.includes('no refresh_token') || 
           msg.includes('bad credentials') ||
           msg.includes('mailbox unavailable') ||
           msg.includes('user unknown') ||
           msg.includes('does not exist') ||
-          /\b5\.1\.[1-4]\b/.test(msg); // RFC 5321: 5.1.1-5.1.4 = bad recipient
+          msg.includes('invalid recipient') ||
+          msg.includes('invalid address') ||
+          /\b5\.1\.[1-4]\b/.test(msg)  // RFC enhanced status: 5.1.1-5.1.4 = bad recipient
+        );
 
         if (isPermanent) {
           // Return failure result — do NOT throw, to avoid Inngest retry
