@@ -318,8 +318,11 @@ export const emailProcessor = inngest.createFunction(
 
           if (mailbox && !mbError && mailbox.email) {
             // Mailbox pool path — use the pool mailbox's SMTP config
+            // IMPORTANT: RPC returns 'mailbox_id' not 'id' — using wrong key causes
+            // all mailboxes to share one cached SMTP transporter → 553 relay errors
+            const mbId = mailbox.mailbox_id || mailbox.id;
             account = {
-              id: mailbox.id,
+              id: mbId,
               email: mailbox.email,
               from_name: mailbox.display_name || mailbox.email.split('@')[0],
               provider: 'custom_smtp',
@@ -332,7 +335,7 @@ export const emailProcessor = inngest.createFunction(
             };
 
             // Increment mailbox usage counter
-            await (supabase as any).rpc('increment_mailbox_usage', { mailbox_id_param: mailbox.id });
+            await (supabase as any).rpc('increment_mailbox_usage', { mailbox_id_param: mbId });
           } else {
             // Legacy fallback — use the node's smtp_config JSONB directly
             const smtpConfig = node.smtp_config || {};
@@ -513,8 +516,19 @@ export const emailProcessor = inngest.createFunction(
         console.error("Email send failure:", err);
 
         // Determine if this is a permanent (non-retryable) failure
+        // NOTE: 'rejected' alone is too broad — 553 "sender address rejected" is a
+        // server config/relay issue (retryable with different mailbox), not a bounce.
+        // Only treat as permanent: invalid recipient, mailbox not found, auth issues.
         const msg = (err.message || '').toLowerCase();
-        const isPermanent = msg.includes('invalid') || msg.includes('not found') || msg.includes('rejected') || msg.includes('no refresh_token') || msg.includes('bad credentials');
+        const isPermanent = 
+          (msg.includes('invalid') && !msg.includes('sender address')) ||
+          (msg.includes('not found') && !msg.includes('sender')) ||
+          msg.includes('no refresh_token') || 
+          msg.includes('bad credentials') ||
+          msg.includes('mailbox unavailable') ||
+          msg.includes('user unknown') ||
+          msg.includes('does not exist') ||
+          /\b5\.1\.[1-4]\b/.test(msg); // RFC 5321: 5.1.1-5.1.4 = bad recipient
 
         if (isPermanent) {
           // Return failure result — do NOT throw, to avoid Inngest retry
@@ -555,14 +569,24 @@ export const emailProcessor = inngest.createFunction(
           .eq("status", "active");
         
         if (activeCount === 0) {
-          await (supabase as any).from("campaigns").update({ status: "completed" }).eq("id", campaignId).eq("status", "running");
+          // Use a CAS-style update: only complete if still 'running' (prevents duplicate completions)
+          const { data: updated } = await (supabase as any)
+            .from("campaigns")
+            .update({ status: "completed" })
+            .eq("id", campaignId)
+            .eq("status", "running")
+            .select("id")
+            .maybeSingle();
           
-          await (supabase as any).from("activity_log").insert([{
-            org_id: orgId,
-            action_type: "campaign_completed",
-            description: "Campaign has finished sending to all recipients.",
-            metadata: { campaign_id: campaignId }
-          }]);
+          // Only log if we actually flipped the status (first one wins)
+          if (updated) {
+            await (supabase as any).from("activity_log").insert([{
+              org_id: orgId,
+              action_type: "campaign_completed",
+              description: "Campaign has finished sending to all recipients.",
+              metadata: { campaign_id: campaignId }
+            }]);
+          }
         }
       });
 
@@ -661,14 +685,23 @@ export const emailProcessor = inngest.createFunction(
           .eq("status", "active");
         
         if (count === 0) {
-          await (supabase as any).from("campaigns").update({ status: "completed" }).eq("id", campaignId).eq("status", "running");
+          // CAS-style: only complete if still 'running' (prevents duplicate completions from concurrent processors)
+          const { data: updated } = await (supabase as any)
+            .from("campaigns")
+            .update({ status: "completed" })
+            .eq("id", campaignId)
+            .eq("status", "running")
+            .select("id")
+            .maybeSingle();
           
-          await (supabase as any).from("activity_log").insert([{
-            org_id: orgId,
-            action_type: "campaign_completed",
-            description: "Campaign has finished sending to all recipients.",
-            metadata: { campaign_id: campaignId }
-          }]);
+          if (updated) {
+            await (supabase as any).from("activity_log").insert([{
+              org_id: orgId,
+              action_type: "campaign_completed",
+              description: "Campaign has finished sending to all recipients.",
+              metadata: { campaign_id: campaignId }
+            }]);
+          }
         }
       });
     }
