@@ -10,6 +10,20 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Protect leads that are in running/paused/scheduled campaigns
+  const { data: activeRecipients } = await context.supabase
+    .from("campaign_recipients")
+    .select("lead_id, campaigns!inner(status)")
+    .eq("lead_id", id)
+    .in("campaigns.status", ["running", "paused", "scheduled"]);
+
+  if (activeRecipients && activeRecipients.length > 0) {
+    return NextResponse.json(
+      { error: "This contact is part of an active campaign and cannot be deleted." },
+      { status: 400 }
+    );
+  }
+
   const { error } = await context.supabase
     .from("leads")
     .delete()
