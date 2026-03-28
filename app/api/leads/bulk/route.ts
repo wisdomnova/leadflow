@@ -74,11 +74,12 @@ export async function DELETE(req: Request) {
 
     // Delete ALL contacts for the org (excluding leads in running campaigns)
     if (deleteAll === true) {
-      // Find leads in active/sending campaigns to protect them
+      // Find leads in running/paused/scheduled campaigns to protect them
+      // Campaign statuses: draft, running, paused, completed, archived, scheduled
       const { data: protectedLeads } = await context.supabase
         .from("campaign_recipients")
         .select("lead_id, campaigns!inner(status)")
-        .in("campaigns.status", ["active", "sending", "scheduled"])
+        .in("campaigns.status", ["running", "paused", "scheduled"])
         .eq("campaigns.org_id", context.orgId);
 
       const protectedIds = [...new Set((protectedLeads || []).map((r: any) => r.lead_id))];
@@ -128,12 +129,12 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Lead IDs are required" }, { status: 400 });
     }
 
-    // Check if any of the selected leads are in running campaigns
+    // Check if any of the selected leads are in running/paused/scheduled campaigns
     const { data: activeRecipients } = await context.supabase
       .from("campaign_recipients")
       .select("lead_id, campaigns!inner(status)")
       .in("lead_id", ids)
-      .in("campaigns.status", ["active", "sending", "scheduled"]);
+      .in("campaigns.status", ["running", "paused", "scheduled"]);
 
     const protectedIds = [...new Set((activeRecipients || []).map((r: any) => r.lead_id))];
     const deletableIds = ids.filter((id: string) => !protectedIds.includes(id));
