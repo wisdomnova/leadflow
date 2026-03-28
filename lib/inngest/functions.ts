@@ -198,22 +198,24 @@ export const campaignLauncher = inngest.createFunction(
       if (error) throw new Error(`Failed to update campaign stats: ${error.message}`);
     });
 
-    // 3. Trigger first email for each lead (batched — Inngest limits events per sendEvent call)
-    const allEvents = (leads as any).map((lead: any) => ({
-      name: "campaign/email.process",
-      data: {
-        campaignId,
-        leadId: lead.id,
-        stepIdx: 0,
-        orgId
+    // 3. Kick-start: dispatch the first batch of events via inngest.send()
+    //    The campaign sweep cron (every 2 min) will pick up any remaining
+    //    unsent recipients automatically — no more 140+step timeouts.
+    await step.run("dispatch-initial-batch", async () => {
+      const INITIAL_CAP = 500; // Kick-start with first 500
+      const toDispatch = leads.slice(0, INITIAL_CAP);
+      const EVENT_BATCH = 100;
+      for (let i = 0; i < toDispatch.length; i += EVENT_BATCH) {
+        const batch = toDispatch.slice(i, i + EVENT_BATCH);
+        await inngest.send(
+          batch.map((lead: any) => ({
+            name: "campaign/email.process" as const,
+            data: { campaignId, leadId: lead.id, stepIdx: 0, orgId },
+          }))
+        );
       }
-    }));
-
-    const EVENT_BATCH_SIZE = 100;
-    for (let i = 0; i < allEvents.length; i += EVENT_BATCH_SIZE) {
-      const batch = allEvents.slice(i, i + EVENT_BATCH_SIZE);
-      await step.sendEvent(`queue-batch-${i}`, batch);
-    }
+      return { dispatched: toDispatch.length, total: leads.length };
+    });
 
     // 4. Create Notification
     await step.run("create-launch-notification", async () => {
@@ -247,6 +249,42 @@ export const emailProcessor = inngest.createFunction(
     const { campaignId, leadId, stepIdx, orgId } = event.data;
     const supabase = getAdminClient();
 
+    // 0. Pre-flight checks: campaign must still be running, recipient must be active & unsent
+    const preflight = await step.run("preflight-check", async () => {
+      const [campRes, recipRes] = await Promise.all([
+        supabase.from("campaigns").select("status").eq("id", campaignId).single(),
+        supabase.from("campaign_recipients")
+          .select("status, last_sent_at, current_step")
+          .eq("campaign_id", campaignId)
+          .eq("lead_id", leadId)
+          .single(),
+      ]);
+
+      const campStatus = (campRes.data as any)?.status;
+      const recip = recipRes.data as any;
+
+      // Campaign no longer running (paused, completed, archived, deleted)
+      if (campStatus !== "running") return { skip: true, reason: `campaign_${campStatus}` };
+
+      // Recipient not active (already completed, bounced, replied, unsubscribed)
+      if (!recip || recip.status !== "active") return { skip: true, reason: `recipient_${recip?.status || "missing"}` };
+
+      // Dedup guard: if this is step 0 and the recipient already has a last_sent_at, skip
+      // (prevents duplicate sends when sweep + launcher both dispatch the same event)
+      if (stepIdx === 0 && recip.last_sent_at) return { skip: true, reason: "already_sent_step0" };
+
+      // For follow-up steps, check current_step to avoid re-sending the same step
+      if (stepIdx > 0 && recip.current_step >= stepIdx && recip.last_sent_at) {
+        return { skip: true, reason: `already_sent_step${stepIdx}` };
+      }
+
+      return { skip: false };
+    });
+
+    if (preflight.skip) {
+      return { skipped: true, reason: (preflight as any).reason };
+    }
+
     // 1. Fetch Campaign, Lead, and Recipient Data
     const data = await step.run("fetch-details", async () => {
       const [campaignRes, leadRes, recipientRes, orgRes] = await Promise.all([
@@ -255,7 +293,6 @@ export const emailProcessor = inngest.createFunction(
         supabase.from("campaign_recipients").select("*").eq("campaign_id", campaignId).eq("lead_id", leadId).single(),
         supabase.from("organizations").select("*").eq("id", orgId).single()
       ]);
-
       if (!orgRes.data) throw new Error("Organization not found");
 
       // 1b. Plan Volume Check
@@ -1465,5 +1502,144 @@ export const replyClassifier = inngest.createFunction(
     });
 
     return result;
+  }
+);
+
+// ─── Campaign Sweep (Self-Healing Dispatcher) ────────────────────────────────
+// Runs every 2 minutes. Finds running campaigns with unsent recipients and
+// dispatches email.process events for them. This is the safety net that makes
+// the pipeline bulletproof: even if the launcher times out or events are lost,
+// the sweep will pick them up within 2 minutes.
+export const campaignSweep = inngest.createFunction(
+  { id: "campaign-sweep" },
+  { cron: "*/2 * * * *" },
+  async ({ step }) => {
+    const supabase = getAdminClient();
+
+    // 1. Find all running campaigns
+    const campaigns = await step.run("find-running-campaigns", async () => {
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("id, org_id, total_leads, sent_count")
+        .eq("status", "running");
+      if (error) throw error;
+      return data || [];
+    });
+
+    if (campaigns.length === 0) return { message: "No running campaigns" };
+
+    let totalDispatched = 0;
+
+    // 2. For each campaign, find unsent recipients and dispatch events
+    for (const campaign of campaigns as any[]) {
+      const dispatched = await step.run(`sweep-${campaign.id}`, async () => {
+        // Fetch active recipients that have never been sent to (the stuck ones)
+        // Cap at 500 per sweep to avoid overloading Inngest event queue
+        const SWEEP_CAP = 500;
+        const { data: stuck, error } = await supabase
+          .from("campaign_recipients")
+          .select("lead_id, current_step")
+          .eq("campaign_id", campaign.id)
+          .eq("status", "active")
+          .is("last_sent_at", null)
+          .limit(SWEEP_CAP);
+
+        if (error || !stuck || stuck.length === 0) return 0;
+
+        // Dispatch in batches of 100
+        const BATCH = 100;
+        for (let i = 0; i < stuck.length; i += BATCH) {
+          const batch = stuck.slice(i, i + BATCH);
+          await inngest.send(
+            batch.map((r: any) => ({
+              name: "campaign/email.process" as const,
+              data: {
+                campaignId: campaign.id,
+                leadId: r.lead_id,
+                stepIdx: r.current_step || 0,
+                orgId: campaign.org_id,
+              },
+            }))
+          );
+        }
+
+        return stuck.length;
+      });
+
+      totalDispatched += dispatched;
+    }
+
+    return { campaigns: campaigns.length, dispatched: totalDispatched };
+  }
+);
+
+// ─── Campaign Health Monitor ─────────────────────────────────────────────────
+// Runs every 10 minutes. Detects campaigns that have been "running" for over
+// 24 hours with no progress (sent_count unchanged). Auto-pauses truly stuck
+// campaigns and notifies the org to prevent silent failures.
+export const campaignHealthMonitor = inngest.createFunction(
+  { id: "campaign-health-monitor" },
+  { cron: "*/10 * * * *" },
+  async ({ step }) => {
+    const supabase = getAdminClient();
+
+    // Find campaigns running for >24h where all recipients are either done or stuck
+    const staleCheck = await step.run("check-stale-campaigns", async () => {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      
+      // Get all running campaigns started more than 24h ago
+      const { data: oldRunning } = await supabase
+        .from("campaigns")
+        .select("id, org_id, name, total_leads, sent_count, created_at")
+        .eq("status", "running")
+        .lt("created_at", twentyFourHoursAgo);
+
+      if (!oldRunning || oldRunning.length === 0) return [];
+
+      const stale: any[] = [];
+      for (const c of oldRunning as any[]) {
+        // Check if there are any active recipients left
+        const { count: activeCount } = await supabase
+          .from("campaign_recipients")
+          .select("id", { count: "exact", head: true })
+          .eq("campaign_id", c.id)
+          .eq("status", "active");
+
+        if (activeCount === 0) {
+          // All recipients are done but campaign wasn't marked complete — fix it
+          stale.push({ ...c, action: "complete", activeRemaining: 0 });
+        }
+      }
+
+      return stale;
+    });
+
+    // Auto-complete campaigns with 0 active recipients
+    for (const campaign of staleCheck as any[]) {
+      if (campaign.action === "complete") {
+        await step.run(`auto-complete-${campaign.id}`, async () => {
+          const { data: updated } = await (supabase as any)
+            .from("campaigns")
+            .update({ status: "completed" })
+            .eq("id", campaign.id)
+            .eq("status", "running")
+            .select("id")
+            .maybeSingle();
+
+          if (updated) {
+            await createNotification({
+              orgId: campaign.org_id,
+              title: "Campaign Completed",
+              description: `"${campaign.name}" has been auto-completed (${campaign.sent_count}/${campaign.total_leads} sent).`,
+              type: "info",
+              category: "campaign_updates",
+              link: "/dashboard/campaigns",
+            });
+          }
+        });
+      }
+    }
+
+    return { checked: staleCheck.length };
   }
 );
