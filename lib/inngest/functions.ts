@@ -240,9 +240,9 @@ export const campaignLauncher = inngest.createFunction(
 export const emailProcessor = inngest.createFunction(
   { 
     id: "email-processor", 
-    concurrency: [{ limit: 5 }],  // Max 5 concurrent sends (prevent SMTP server overload)
-    retries: 8,                     // More retries for transient SMTP errors (421 rate limits)
-    throttle: { limit: 30, period: "1m" }, // Max 30 sends/minute to stay within SMTP server limits
+    concurrency: [{ limit: 20 }],   // 20 concurrent sends — safe with 228 mailboxes across 2 servers
+    retries: 8,                      // More retries for transient SMTP errors (421 rate limits)
+    throttle: { limit: 200, period: "1m" }, // ~200/min across 228 mailboxes = < 1 send/mailbox/min
   },
   { event: "campaign/email.process" },
   async ({ event, step }) => {
@@ -1542,7 +1542,7 @@ export const campaignSweep = inngest.createFunction(
       const dispatched = await step.run(`sweep-${campaign.id}`, async () => {
         // Fetch active recipients that have never been sent to (the stuck ones)
         // Cap at 500 per sweep to avoid overloading Inngest event queue
-        const SWEEP_CAP = 500;
+        const SWEEP_CAP = 2000;
         const { data: stuck, error } = await supabase
           .from("campaign_recipients")
           .select("lead_id, current_step")
