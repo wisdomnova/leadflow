@@ -96,133 +96,117 @@ async function syncGoogleInbox(accountId: string, account: any) {
       // Extract snippet for unibox display
       const snippet = msgData.snippet || '';
 
-      // Skip emails FROM our own account (sent by us) — but only for
-      // reply detection. We still store them in unibox for conversation view.
+      // Skip emails FROM our own account (sent by us)
       const isSelfEmail = fromEmail === account.email.toLowerCase();
-
-      // ── Reply Detection ──────────────────────────────────────────────
-      // Check campaign recipients that were sent emails (active OR completed).
-      // Leads reply AFTER all sequence steps finish, so 'completed' must be included.
-      let recipients: any[] | null = null;
-      if (!isSelfEmail) {
-        const { data } = await supabase
-          .from("campaign_recipients")
-          .select("id, campaign_id, lead_id, leads!inner(email)")
-          .eq("leads.email", fromEmail)
-          .in("status", ["active", "completed"]);
-        recipients = data;
-      }
-
-      if (recipients && recipients.length > 0) {
-        for (const recipient of recipients) {
-          // Mark as replied
-          await (supabase as any).from("campaign_recipients").update({
-            status: 'replied',
-            replied_at: new Date().toISOString()
-          } as any).eq("id", (recipient as any).id);
-
-          // Log activity
-          await (supabase as any).from("activity_log").insert([{
-            org_id: account.org_id,
-            action_type: "email.reply",
-            description: `Lead replied: ${fromEmail}`,
-            metadata: {
-              campaign_id: (recipient as any).campaign_id,
-              lead_id: (recipient as any).lead_id,
-              subject
-            }
-          }] as any);
-
-          // Increment campaign reply_count
-          await (supabase as any).rpc('increment_campaign_stat', {
-            campaign_id_param: (recipient as any).campaign_id,
-            column_param: 'reply_count'
-          });
-
-          // Update lead state for Unibox
-          await (supabase as any).from("leads").update({
-            last_message_received_at: dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString(),
-            status: 'replied'
-          } as any).eq("id", (recipient as any).lead_id);
-
-          // Create Notification
-          await createNotification({
-            orgId: account.org_id,
-            title: "New Reply Received",
-            description: `${fromEmail} replied to your campaign. Click to view in Unibox.`,
-            type: "success",
-            category: "email_events",
-            link: "/dashboard/unibox"
-          });
-        }
-      }
+      if (isSelfEmail) continue;
 
       // ── Warmup Detection ─────────────────────────────────────────────
       const { data: isWarmup } = await (supabase as any).rpc('is_warmup_sender', { sender_email: fromEmail });
       if (isWarmup) {
         await inngest.send({
           name: "warmup/message.received",
-          data: {
-            accountId,
-            senderEmail: fromEmail,
-            subject,
-            bodyText: snippet,
-            messageId: messageIdHeader
-          }
+          data: { accountId, senderEmail: fromEmail, subject, bodyText: snippet, messageId: messageIdHeader }
         });
         await (supabase as any).rpc('increment_warmup_stat', {
           account_id_param: accountId,
           date_param: new Date().toISOString().split('T')[0],
           column_param: 'inbox_count'
         });
-      } else if (!recipients || recipients.length === 0) {
-        // Update lead last_message_received_at even if not a campaign match
-        await (supabase as any).from("leads").update({
-          last_message_received_at: dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString()
-        } as any).eq("email", fromEmail).eq("org_id", account.org_id);
+        continue; // warmup email — don't store in unibox
       }
 
-      // ── Store in unibox_messages (only for campaign leads) ───────────
-      // Skip random inbound emails (Supabase alerts, newsletters, etc.)
-      // Only store messages from senders that are campaign recipients.
-      if (messageIdHeader && !isSelfEmail) {
-        const { data: campaignLead } = await (supabase as any)
-          .from("campaign_recipients")
-          .select("lead_id, leads!inner(id, email)")
-          .eq("leads.email", fromEmail)
-          .eq("leads.org_id", account.org_id)
-          .limit(1)
+      // ── Find the lead by email (independent of campaigns) ────────────
+      const { data: lead } = await (supabase as any)
+        .from("leads")
+        .select("id")
+        .eq("email", fromEmail)
+        .eq("org_id", account.org_id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!lead) continue; // Not a known lead — skip newsletters, alerts, etc.
+
+      // ── Dedup: skip if this message_id is already stored ─────────────
+      if (messageIdHeader) {
+        const { data: existing } = await (supabase as any)
+          .from("unibox_messages")
+          .select("id")
+          .eq("message_id", messageIdHeader)
           .maybeSingle();
+        if (existing) continue; // Already processed
+      }
 
-        if (campaignLead) {
-          await (supabase as any).from("unibox_messages").upsert([{
-            account_id: accountId,
+      const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
+
+      // ── Store in unibox_messages ─────────────────────────────────────
+      if (messageIdHeader) {
+        await (supabase as any).from("unibox_messages").upsert([{
+          account_id: accountId,
+          org_id: account.org_id,
+          lead_id: lead.id,
+          message_id: messageIdHeader,
+          from_email: fromEmail,
+          subject: subject || "(No Subject)",
+          snippet: decodeSnippet(snippet).substring(0, 200),
+          received_at: receivedAt,
+          is_read: false,
+          direction: 'inbound',
+          sender_name: fromName
+        }], { onConflict: 'message_id' }) as any;
+      }
+
+      // ── Update lead & create notification ─────────────────────────
+      await (supabase as any).from("leads").update({
+        last_message_received_at: receivedAt,
+      } as any).eq("id", lead.id);
+
+      await createNotification({
+        orgId: account.org_id,
+        title: "New Reply Received",
+        description: `${fromEmail} replied to your campaign. Click to view in Unibox.`,
+        type: "success",
+        category: "email_events",
+        link: "/dashboard/unibox"
+      });
+
+      // ── Campaign recipient tracking (optional — campaigns may be deleted) ──
+      const { data: recipients } = await supabase
+        .from("campaign_recipients")
+        .select("id, campaign_id, lead_id, leads!inner(email)")
+        .eq("leads.email", fromEmail)
+        .in("status", ["active", "completed"]);
+
+      if (recipients && recipients.length > 0) {
+        for (const recipient of recipients) {
+          await (supabase as any).from("campaign_recipients").update({
+            status: 'replied', replied_at: new Date().toISOString()
+          } as any).eq("id", (recipient as any).id);
+
+          await (supabase as any).from("activity_log").insert([{
             org_id: account.org_id,
-            lead_id: (campaignLead as any).lead_id,
-            message_id: messageIdHeader,
-            from_email: fromEmail,
-            subject: subject || "(No Subject)",
-            snippet: decodeSnippet(snippet).substring(0, 200),
-            received_at: dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString(),
-            is_read: false,
-            direction: 'inbound',
-            sender_name: fromName
-          }], { onConflict: 'message_id' }) as any;
+            action_type: "email.reply",
+            description: `Lead replied: ${fromEmail}`,
+            metadata: { campaign_id: (recipient as any).campaign_id, lead_id: (recipient as any).lead_id, subject }
+          }] as any);
 
-          // Trigger AI classification for this reply (non-blocking via Inngest)
-          await inngest.send({
-            name: "unibox/reply.classify",
-            data: {
-              leadId: (campaignLead as any).lead_id,
-              orgId: account.org_id,
-              snippet: decodeSnippet(snippet).substring(0, 500),
-              subject: subject || "",
-              leadName: fromName || "",
-            }
+          await (supabase as any).rpc('increment_campaign_stat', {
+            campaign_id_param: (recipient as any).campaign_id,
+            column_param: 'reply_count'
           });
         }
-        // else: sender is not a campaign lead — skip storing
       }
+
+      // ── AI Classification (non-blocking via Inngest) ──────────────
+      await inngest.send({
+        name: "unibox/reply.classify",
+        data: {
+          leadId: lead.id,
+          orgId: account.org_id,
+          snippet: decodeSnippet(snippet).substring(0, 500),
+          subject: subject || "",
+          leadName: fromName || "",
+        }
+      });
     } catch (msgErr) {
       console.error(`[Gmail Sync] Error processing message ${msgId}:`, msgErr);
       continue; // Don't let one bad message stop the sync
@@ -336,128 +320,116 @@ export async function syncAccountInbox(accountId: string) {
       if (!msg.source) continue;
       const parsed = await simpleParser(msg.source);
       const fromEmail = parsed.from?.value[0]?.address?.toLowerCase();
-      
-      if (fromEmail) {
-        // 1. Check campaign recipients (active OR completed) from this sender
-        const { data: recipients } = await supabase
-          .from("campaign_recipients")
-          .select("id, campaign_id, lead_id, leads!inner(email)")
-          .eq("leads.email", fromEmail)
-          .in("status", ["active", "completed"]);
+      if (!fromEmail) continue;
 
-        if (recipients && recipients.length > 0) {
-          for (const recipient of recipients) {
-            // 2. Mark as replied
-            await (supabase as any).from("campaign_recipients").update({
-              status: 'replied',
-              replied_at: new Date().toISOString()
-            } as any).eq("id", (recipient as any).id);
+      // ── Warmup Detection ─────────────────────────────────────────────
+      const { data: isWarmup } = await (supabase as any).rpc('is_warmup_sender', { sender_email: fromEmail });
+      if (isWarmup) {
+        await inngest.send({
+          name: "warmup/message.received",
+          data: { accountId, senderEmail: fromEmail, subject: parsed.subject, bodyText: parsed.text, messageId: (msg.envelope as any)?.messageId }
+        });
+        await (supabase as any).rpc('increment_warmup_stat', {
+          account_id_param: accountId,
+          date_param: new Date().toISOString().split('T')[0],
+          column_param: 'inbox_count'
+        });
+        continue; // warmup email — don't store in unibox
+      }
 
-            // 3. Log activity
-            await (supabase as any).from("activity_log").insert([{
-              org_id: (account as any).org_id,
-              action_type: "email.reply",
-              description: `Lead replied: ${fromEmail}`,
-              metadata: {
-                campaign_id: (recipient as any).campaign_id,
-                lead_id: (recipient as any).lead_id,
-                subject: parsed.subject
-              }
-            }] as any);
+      // ── Find the lead by email (independent of campaigns) ──────────────
+      const { data: lead } = await (supabase as any)
+        .from("leads")
+        .select("id")
+        .eq("email", fromEmail)
+        .eq("org_id", (account as any).org_id)
+        .limit(1)
+        .maybeSingle();
 
-            // 4. Increment campaign reply_count
-            await (supabase as any).rpc('increment_campaign_stat', { 
-              campaign_id_param: (recipient as any).campaign_id, 
-              column_param: 'reply_count' 
-            });
+      if (!lead) continue; // Not a known lead — skip
 
-            // 5. Update lead state for Unibox
-            await (supabase as any).from("leads").update({
-              last_message_received_at: parsed.date || new Date().toISOString(),
-              status: 'replied' // Default to replied, but maybe we could do AI sentiment later
-            } as any).eq("id", (recipient as any).lead_id);
+      // ── Dedup: skip if this message_id is already stored ──────────────
+      if (parsed.messageId) {
+        const { data: existing } = await (supabase as any)
+          .from("unibox_messages")
+          .select("id")
+          .eq("message_id", parsed.messageId)
+          .maybeSingle();
+        if (existing) continue; // Already processed
+      }
 
-            // 6. Create Notification
-            await createNotification({
-              orgId: (account as any).org_id,
-              title: "New Reply Received",
-              description: `${fromEmail} replied to your campaign. Click to view in Unibox.`,
-              type: "success",
-              category: "email_events",
-              link: "/dashboard/unibox"
-            });
-          }
-        } 
-        
-        // 7. NEW: Warmup Detection and Response Loop
-        const { data: isWarmup } = await (supabase as any).rpc('is_warmup_sender', { sender_email: fromEmail });
-        if (isWarmup) {
-          // Trigger a warmup response action
-          await inngest.send({
-            name: "warmup/message.received",
-            data: {
-              accountId: accountId,
-              senderEmail: fromEmail,
-              subject: parsed.subject,
-              bodyText: parsed.text,
-              messageId: (msg.envelope as any)?.messageId
-            }
-          });
+      const receivedAt = parsed.date ? new Date(parsed.date).toISOString() : new Date().toISOString();
+      const senderName = parsed.from?.value[0]?.name || "";
 
-          // Update warmup health stats: This email arrived in INBOX (reputation booster)
-          await (supabase as any).rpc('increment_warmup_stat', { 
-              account_id_param: accountId, 
-              date_param: new Date().toISOString().split('T')[0],
-              column_param: 'inbox_count' 
-          });
-        }
+      // ── Store in unibox_messages ──────────────────────────────────────
+      if (parsed.messageId) {
+        await (supabase as any).from("unibox_messages").upsert([{
+          account_id: accountId,
+          org_id: (account as any).org_id,
+          lead_id: lead.id,
+          message_id: parsed.messageId,
+          from_email: fromEmail,
+          subject: parsed.subject || "(No Subject)",
+          snippet: parsed.text?.substring(0, 200) || "",
+          received_at: receivedAt,
+          is_read: false,
+          direction: 'inbound',
+          sender_name: senderName
+        }], { onConflict: 'message_id' }) as any;
+      }
 
-        else {
-            // Even if not a campaign recipient, we might have a lead with this email
-            await (supabase as any).from("leads").update({
-                last_message_received_at: parsed.date || new Date().toISOString()
-            } as any).eq("email", fromEmail).eq("org_id", (account as any).org_id);
-        }
+      // ── Update lead & create notification ─────────────────────────────
+      await (supabase as any).from("leads").update({
+        last_message_received_at: receivedAt,
+      } as any).eq("id", lead.id);
 
-        // Store in unibox_messages
-        if (parsed.messageId) {
-          // Find the lead first to link the message correctly
-          const { data: lead } = await (supabase as any)
-            .from("leads")
-            .select("id")
-            .eq("email", fromEmail)
-            .eq("org_id", (account as any).org_id)
-            .single();
+      await createNotification({
+        orgId: (account as any).org_id,
+        title: "New Reply Received",
+        description: `${fromEmail} replied to your campaign. Click to view in Unibox.`,
+        type: "success",
+        category: "email_events",
+        link: "/dashboard/unibox"
+      });
 
-          await (supabase as any).from("unibox_messages").upsert([{
-            account_id: accountId,
+      // ── Campaign recipient tracking (optional — campaigns may be deleted) ──
+      const { data: recipients } = await supabase
+        .from("campaign_recipients")
+        .select("id, campaign_id, lead_id, leads!inner(email)")
+        .eq("leads.email", fromEmail)
+        .in("status", ["active", "completed"]);
+
+      if (recipients && recipients.length > 0) {
+        for (const recipient of recipients) {
+          await (supabase as any).from("campaign_recipients").update({
+            status: 'replied', replied_at: new Date().toISOString()
+          } as any).eq("id", (recipient as any).id);
+
+          await (supabase as any).from("activity_log").insert([{
             org_id: (account as any).org_id,
-            lead_id: (lead as any)?.id || null, // Link to lead if exists
-            message_id: parsed.messageId,
-            from_email: fromEmail,
-            subject: parsed.subject || "(No Subject)",
-            snippet: parsed.text?.substring(0, 200) || "",
-            received_at: parsed.date || new Date().toISOString(),
-            is_read: false,
-            direction: 'inbound',
-            sender_name: parsed.from?.value[0]?.name || ""
-          }], { onConflict: 'message_id' }) as any;
+            action_type: "email.reply",
+            description: `Lead replied: ${fromEmail}`,
+            metadata: { campaign_id: (recipient as any).campaign_id, lead_id: (recipient as any).lead_id, subject: parsed.subject }
+          }] as any);
 
-          // Trigger AI classification for campaign leads (non-blocking via Inngest)
-          if ((lead as any)?.id && recipients && recipients.length > 0) {
-            await inngest.send({
-              name: "unibox/reply.classify",
-              data: {
-                leadId: (lead as any).id,
-                orgId: (account as any).org_id,
-                snippet: (parsed.text || "").substring(0, 500),
-                subject: parsed.subject || "",
-                leadName: parsed.from?.value[0]?.name || "",
-              }
-            });
-          }
+          await (supabase as any).rpc('increment_campaign_stat', {
+            campaign_id_param: (recipient as any).campaign_id,
+            column_param: 'reply_count'
+          });
         }
       }
+
+      // ── AI Classification (non-blocking via Inngest) ──────────────────
+      await inngest.send({
+        name: "unibox/reply.classify",
+        data: {
+          leadId: lead.id,
+          orgId: (account as any).org_id,
+          snippet: (parsed.text || "").substring(0, 500),
+          subject: parsed.subject || "",
+          leadName: senderName,
+        }
+      });
     }
 
     // Update last sync UID once at the end
@@ -539,17 +511,13 @@ export async function syncPowerSendMailbox(mailboxId: string) {
       // First sync — last 24 hours
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const innerLock = await client.getMailboxLock('INBOX');
-      try {
-        const uids = await client.search({ since: yesterday });
-        if (uids && Array.isArray(uids) && uids.length > 0) {
-          fetchRange = uids.join(',');
-        } else {
-          console.log(`[PowerSend Sync] No messages for ${mailbox.email}`);
-          return;
-        }
-      } finally {
-        innerLock.release();
+      // Use the outer lock (already held) — no inner lock needed
+      const uids = await client.search({ since: yesterday });
+      if (uids && Array.isArray(uids) && uids.length > 0) {
+        fetchRange = uids.join(',');
+      } else {
+        console.log(`[PowerSend Sync] No messages for ${mailbox.email}`);
+        return;
       }
     } else {
       fetchRange = `${lastUid + 1}:*`;
@@ -564,113 +532,116 @@ export async function syncPowerSendMailbox(mailboxId: string) {
       if (!fromEmail) continue;
 
       const isSelfEmail = fromEmail === mailbox.email.toLowerCase();
+      if (isSelfEmail) continue;
 
-      // ── Reply Detection ────────────────────────────────────────────────
-      if (!isSelfEmail) {
-        const { data: recipients } = await supabase
-          .from("campaign_recipients")
-          .select("id, campaign_id, lead_id, leads!inner(email)")
-          .eq("leads.email", fromEmail)
-          .in("status", ["active", "completed"]);
-
-        if (recipients && recipients.length > 0) {
-          for (const recipient of recipients) {
-            await (supabase as any).from("campaign_recipients").update({
-              status: 'replied',
-              replied_at: new Date().toISOString()
-            } as any).eq("id", (recipient as any).id);
-
-            await (supabase as any).from("activity_log").insert([{
-              org_id: orgId,
-              action_type: "email.reply",
-              description: `Lead replied: ${fromEmail}`,
-              metadata: {
-                campaign_id: (recipient as any).campaign_id,
-                lead_id: (recipient as any).lead_id,
-                subject: parsed.subject,
-                via: 'powersend'
-              }
-            }] as any);
-
-            await (supabase as any).rpc('increment_campaign_stat', {
-              campaign_id_param: (recipient as any).campaign_id,
-              column_param: 'reply_count'
-            });
-
-            await (supabase as any).from("leads").update({
-              last_message_received_at: parsed.date || new Date().toISOString(),
-              status: 'replied'
-            } as any).eq("id", (recipient as any).lead_id);
-
-            await createNotification({
-              orgId,
-              title: "New Reply Received",
-              description: `${fromEmail} replied (via PowerSend). Click to view in Unibox.`,
-              type: "success",
-              category: "email_events",
-              link: "/dashboard/unibox"
-            });
-          }
-        }
-
-        // Warmup detection
-        const { data: isWarmup } = await (supabase as any).rpc('is_warmup_sender', { sender_email: fromEmail });
-        if (isWarmup) {
-          await inngest.send({
-            name: "warmup/message.received",
-            data: {
-              accountId: mailboxId,
-              senderEmail: fromEmail,
-              subject: parsed.subject,
-              bodyText: parsed.text,
-              messageId: (msg.envelope as any)?.messageId
-            }
-          });
-          await (supabase as any).rpc('increment_warmup_stat', {
-            account_id_param: mailboxId,
-            date_param: new Date().toISOString().split('T')[0],
-            column_param: 'inbox_count'
-          });
-        }
+      // ── Warmup Detection ───────────────────────────────────────────────
+      const { data: isWarmup } = await (supabase as any).rpc('is_warmup_sender', { sender_email: fromEmail });
+      if (isWarmup) {
+        await inngest.send({
+          name: "warmup/message.received",
+          data: { accountId: mailboxId, senderEmail: fromEmail, subject: parsed.subject, bodyText: parsed.text, messageId: (msg.envelope as any)?.messageId }
+        });
+        await (supabase as any).rpc('increment_warmup_stat', {
+          account_id_param: mailboxId,
+          date_param: new Date().toISOString().split('T')[0],
+          column_param: 'inbox_count'
+        });
+        continue; // warmup email — don't store in unibox
       }
 
-      // ── Store in unibox_messages (campaign leads only) ─────────────────
-      if (parsed.messageId && !isSelfEmail) {
-        const { data: campaignLead } = await (supabase as any)
-          .from("campaign_recipients")
-          .select("lead_id, leads!inner(id, email)")
-          .eq("leads.email", fromEmail)
-          .eq("leads.org_id", orgId)
-          .limit(1)
+      // ── Find the lead by email (independent of campaigns) ──────────────
+      const { data: lead } = await (supabase as any)
+        .from("leads")
+        .select("id")
+        .eq("email", fromEmail)
+        .eq("org_id", orgId)
+        .limit(1)
+        .maybeSingle();
+
+      if (!lead) continue; // Not a known lead — skip
+
+      // ── Dedup: skip if this message_id is already stored ───────────────
+      if (parsed.messageId) {
+        const { data: existing } = await (supabase as any)
+          .from("unibox_messages")
+          .select("id")
+          .eq("message_id", parsed.messageId)
           .maybeSingle();
+        if (existing) continue; // Already processed
+      }
 
-        if (campaignLead) {
-          await (supabase as any).from("unibox_messages").upsert([{
-            account_id: mailboxId,
+      const receivedAt = parsed.date ? new Date(parsed.date).toISOString() : new Date().toISOString();
+      const senderName = parsed.from?.value[0]?.name || "";
+
+      // ── Store in unibox_messages ───────────────────────────────────────
+      if (parsed.messageId) {
+        await (supabase as any).from("unibox_messages").upsert([{
+          account_id: mailboxId,
+          org_id: orgId,
+          lead_id: lead.id,
+          message_id: parsed.messageId,
+          from_email: fromEmail,
+          subject: parsed.subject || "(No Subject)",
+          snippet: (parsed.text || "").substring(0, 200),
+          received_at: receivedAt,
+          is_read: false,
+          direction: 'inbound',
+          sender_name: senderName
+        }], { onConflict: 'message_id' }) as any;
+      }
+
+      // ── Update lead & create notification ─────────────────────────────
+      await (supabase as any).from("leads").update({
+        last_message_received_at: receivedAt,
+      } as any).eq("id", lead.id);
+
+      await createNotification({
+        orgId,
+        title: "New Reply Received",
+        description: `${fromEmail} replied (via PowerSend). Click to view in Unibox.`,
+        type: "success",
+        category: "email_events",
+        link: "/dashboard/unibox"
+      });
+
+      // ── Campaign recipient tracking (optional — campaigns may be deleted) ──
+      const { data: recipients } = await supabase
+        .from("campaign_recipients")
+        .select("id, campaign_id, lead_id, leads!inner(email)")
+        .eq("leads.email", fromEmail)
+        .in("status", ["active", "completed"]);
+
+      if (recipients && recipients.length > 0) {
+        for (const recipient of recipients) {
+          await (supabase as any).from("campaign_recipients").update({
+            status: 'replied', replied_at: new Date().toISOString()
+          } as any).eq("id", (recipient as any).id);
+
+          await (supabase as any).from("activity_log").insert([{
             org_id: orgId,
-            lead_id: (campaignLead as any).lead_id,
-            message_id: parsed.messageId,
-            from_email: fromEmail,
-            subject: parsed.subject || "(No Subject)",
-            snippet: (parsed.text || "").substring(0, 200),
-            received_at: parsed.date || new Date().toISOString(),
-            is_read: false,
-            direction: 'inbound',
-            sender_name: parsed.from?.value[0]?.name || ""
-          }], { onConflict: 'message_id' }) as any;
+            action_type: "email.reply",
+            description: `Lead replied: ${fromEmail}`,
+            metadata: { campaign_id: (recipient as any).campaign_id, lead_id: (recipient as any).lead_id, subject: parsed.subject, via: 'powersend' }
+          }] as any);
 
-          await inngest.send({
-            name: "unibox/reply.classify",
-            data: {
-              leadId: (campaignLead as any).lead_id,
-              orgId,
-              snippet: (parsed.text || "").substring(0, 500),
-              subject: parsed.subject || "",
-              leadName: parsed.from?.value[0]?.name || "",
-            }
+          await (supabase as any).rpc('increment_campaign_stat', {
+            campaign_id_param: (recipient as any).campaign_id,
+            column_param: 'reply_count'
           });
         }
       }
+
+      // ── AI Classification (non-blocking via Inngest) ───────────────────
+      await inngest.send({
+        name: "unibox/reply.classify",
+        data: {
+          leadId: lead.id,
+          orgId,
+          snippet: (parsed.text || "").substring(0, 500),
+          subject: parsed.subject || "",
+          leadName: senderName,
+        }
+      });
     }
 
     // Update last sync UID
