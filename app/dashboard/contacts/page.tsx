@@ -64,6 +64,9 @@ export default function ContactsPage() {
   const [showTagModal, setShowTagModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [bulkTagName, setBulkTagName] = useState('');
+  const [openDropdown, setOpenDropdown] = useState<'status' | 'list' | null>(null);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const listDropdownRef = useRef<HTMLDivElement>(null);
   const [bulkStatus, setBulkStatus] = useState('');
 
   // Lists State
@@ -98,6 +101,20 @@ export default function ContactsPage() {
     setToast({ show: true, msg, type });
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
   };
+
+  // Close filter dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        openDropdown === 'status' && statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)
+      ) setOpenDropdown(null);
+      if (
+        openDropdown === 'list' && listDropdownRef.current && !listDropdownRef.current.contains(e.target as Node)
+      ) setOpenDropdown(null);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openDropdown]);
 
   // Fetch all lists for the org
   const fetchLists = async () => {
@@ -837,31 +854,40 @@ export default function ContactsPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="relative group/filter">
-                    <button className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:text-[#101828] transition-all">
+                  <div className="relative" ref={statusDropdownRef}>
+                    <button 
+                      onClick={() => setOpenDropdown(openDropdown === 'status' ? null : 'status')}
+                      className={`flex items-center gap-2 px-4 py-3 bg-white border rounded-xl text-sm font-bold transition-all ${openDropdown === 'status' ? 'border-[#745DF3]/30 text-[#745DF3]' : 'border-gray-100 text-gray-500 hover:text-[#101828]'}`}
+                    >
                       <Filter className="w-4 h-4" />
                       Status
                     </button>
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl border border-gray-100 shadow-2xl z-20 py-2 hidden group-hover/filter:block">
-                      {['All', 'Active', 'Unsubscribed', 'Bounced'].map(status => (
-                        <button 
-                          key={status}
-                          onClick={() => setStatusFilter(status === 'All' ? null : status)}
-                          className={`w-full text-left px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${statusFilter === status ? 'text-[#745DF3] bg-[#745DF3]/5' : 'text-gray-500 hover:bg-gray-50'}`}
-                        >
-                          {status}
-                        </button>
-                      ))}
-                    </div>
+                    {openDropdown === 'status' && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl border border-gray-100 shadow-2xl z-20 py-2">
+                        {['All', 'Active', 'Unsubscribed', 'Bounced'].map(status => (
+                          <button 
+                            key={status}
+                            onClick={() => { setStatusFilter(status === 'All' ? null : status); setOpenDropdown(null); }}
+                            className={`w-full text-left px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${statusFilter === status ? 'text-[#745DF3] bg-[#745DF3]/5' : 'text-gray-500 hover:bg-gray-50'}`}
+                          >
+                            {status}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="relative group/listfilter">
-                    <button className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:text-[#101828] transition-all">
+                  <div className="relative" ref={listDropdownRef}>
+                    <button 
+                      onClick={() => setOpenDropdown(openDropdown === 'list' ? null : 'list')}
+                      className={`flex items-center gap-2 px-4 py-3 bg-white border rounded-xl text-sm font-bold transition-all ${openDropdown === 'list' ? 'border-[#745DF3]/30 text-[#745DF3]' : 'border-gray-100 text-gray-500 hover:text-[#101828]'}`}
+                    >
                       <List className="w-4 h-4" />
                       List
                     </button>
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-gray-100 shadow-2xl z-20 py-2 hidden group-hover/listfilter:block">
+                    {openDropdown === 'list' && (
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-gray-100 shadow-2xl z-20 py-2">
                       <button
-                        onClick={() => setSelectedListId(null)}
+                        onClick={() => { setSelectedListId(null); setOpenDropdown(null); }}
                         className={`w-full text-left px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${!selectedListId ? 'text-[#745DF3] bg-[#745DF3]/5' : 'text-gray-500 hover:bg-gray-50'}`}
                       >
                         All Contacts
@@ -869,7 +895,7 @@ export default function ContactsPage() {
                       {lists.map(list => (
                         <button
                           key={list.id}
-                          onClick={() => setSelectedListId(list.id)}
+                          onClick={() => { setSelectedListId(list.id); setOpenDropdown(null); }}
                           className={`w-full text-left px-5 py-2.5 text-xs font-bold transition-colors flex items-center justify-between ${selectedListId === list.id ? 'text-[#745DF3] bg-[#745DF3]/5' : 'text-gray-500 hover:bg-gray-50'}`}
                         >
                           <span className="uppercase tracking-widest truncate">{list.name}</span>
@@ -879,7 +905,8 @@ export default function ContactsPage() {
                       {lists.length === 0 && (
                         <p className="px-5 py-2.5 text-xs text-gray-400">No lists yet</p>
                       )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                   <button 
                     onClick={() => {
