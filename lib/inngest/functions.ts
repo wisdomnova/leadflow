@@ -353,6 +353,7 @@ export const emailProcessor = inngest.createFunction(
         if (node && !nodeError) {
           powersendNodeId = node.id;
 
+
           // Try mailbox pool first (new architecture: 1 server = N mailboxes)
           const { data: mailbox, error: mbError } = await (supabase as any)
             .rpc('get_next_pool_mailbox', { server_id_param: node.id })
@@ -410,6 +411,12 @@ export const emailProcessor = inngest.createFunction(
               }
             };
           }
+        } else if (isPowerSend) {
+          // All PowerSend servers are over their daily quota — throw a retryable
+          // error so Inngest retries this event later (e.g. after midnight reset).
+          // Without this, the processor silently returns "missing account" and the
+          // email is never sent.
+          throw new Error("All PowerSend servers are at daily capacity. Will retry later.");
         }
       }
 
