@@ -236,7 +236,12 @@ export const campaignLauncher = inngest.createFunction(
  * Handles variable replacement, sending via SES, and scheduling follow-ups.
  */
 export const emailProcessor = inngest.createFunction(
-  { id: "email-processor", concurrency: 10 },
+  { 
+    id: "email-processor", 
+    concurrency: [{ limit: 5 }],  // Max 5 concurrent sends (prevent SMTP server overload)
+    retries: 8,                     // More retries for transient SMTP errors (421 rate limits)
+    throttle: { limit: 30, period: "1m" }, // Max 30 sends/minute to stay within SMTP server limits
+  },
   { event: "campaign/email.process" },
   async ({ event, step }) => {
     const { campaignId, leadId, stepIdx, orgId } = event.data;
