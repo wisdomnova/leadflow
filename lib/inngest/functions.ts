@@ -1615,6 +1615,20 @@ export const campaignHealthMonitor = inngest.createFunction(
         if (activeCount === 0) {
           // All recipients are done but campaign wasn't marked complete — fix it
           stale.push({ ...c, action: "complete", activeRemaining: 0 });
+        } else if ((activeCount as number) > 0) {
+          // Campaign has active recipients — check if sending is stalled
+          // (sent_count hasn't changed in the last 2 hours)
+          const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+          const { count: recentSends } = await (supabase as any)
+            .from("activity_log")
+            .select("id", { count: "exact", head: true })
+            .eq("metadata->>campaign_id", c.id)
+            .eq("action_type", "email.sent")
+            .gte("created_at", twoHoursAgo);
+
+          if ((recentSends as number) === 0) {
+            stale.push({ ...c, action: "stalled", activeRemaining: activeCount });
+          }
         }
       }
 
@@ -1622,6 +1636,7 @@ export const campaignHealthMonitor = inngest.createFunction(
     });
 
     // Auto-complete campaigns with 0 active recipients
+    // Alert on stalled campaigns (active recipients but no sends in 2h)
     for (const campaign of staleCheck as any[]) {
       if (campaign.action === "complete") {
         await step.run(`auto-complete-${campaign.id}`, async () => {
@@ -1643,6 +1658,17 @@ export const campaignHealthMonitor = inngest.createFunction(
               link: "/dashboard/campaigns",
             });
           }
+        });
+      } else if (campaign.action === "stalled") {
+        await step.run(`alert-stalled-${campaign.id}`, async () => {
+          await createNotification({
+            orgId: campaign.org_id,
+            title: "Campaign Sending Stalled",
+            description: `"${campaign.name}" has ${campaign.activeRemaining} unsent recipients but no emails sent in 2+ hours. Check server/mailbox capacity.`,
+            type: "warning",
+            category: "campaign_updates",
+            link: "/dashboard/campaigns",
+          });
         });
       }
     }
