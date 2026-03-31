@@ -508,17 +508,9 @@ export async function syncPowerSendMailbox(mailboxId: string) {
   try {
     let fetchRange: string;
     if (lastUid === 0) {
-      // First sync — last 24 hours
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      // Use the outer lock (already held) — no inner lock needed
-      const uids = await client.search({ since: yesterday });
-      if (uids && Array.isArray(uids) && uids.length > 0) {
-        fetchRange = uids.join(',');
-      } else {
-        console.log(`[PowerSend Sync] No messages for ${mailbox.email}`);
-        return;
-      }
+      // First sync (or forced resync) — scan ALL messages.
+      // PowerSend mailboxes only receive warmup + campaign replies, so this is safe.
+      fetchRange = '1:*';
     } else {
       fetchRange = `${lastUid + 1}:*`;
     }
