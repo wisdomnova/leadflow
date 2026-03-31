@@ -126,34 +126,34 @@ async function syncGoogleInbox(accountId: string, account: any) {
 
       if (!lead) continue; // Not a known lead — skip newsletters, alerts, etc.
 
+      // ── Generate a stable message_id when missing ────────────────────
+      const effectiveMessageId = messageIdHeader
+        || `<synth-${fromEmail}-${new Date(dateHeader || Date.now()).getTime()}-${accountId}@leadflow>`;
+
       // ── Dedup: skip if this message_id is already stored ─────────────
-      if (messageIdHeader) {
-        const { data: existing } = await (supabase as any)
-          .from("unibox_messages")
-          .select("id")
-          .eq("message_id", messageIdHeader)
-          .maybeSingle();
-        if (existing) continue; // Already processed
-      }
+      const { data: existing } = await (supabase as any)
+        .from("unibox_messages")
+        .select("id")
+        .eq("message_id", effectiveMessageId)
+        .maybeSingle();
+      if (existing) continue; // Already processed
 
       const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
 
       // ── Store in unibox_messages ─────────────────────────────────────
-      if (messageIdHeader) {
-        await (supabase as any).from("unibox_messages").upsert([{
-          account_id: accountId,
-          org_id: account.org_id,
-          lead_id: lead.id,
-          message_id: messageIdHeader,
-          from_email: fromEmail,
-          subject: subject || "(No Subject)",
-          snippet: decodeSnippet(snippet).substring(0, 200),
-          received_at: receivedAt,
-          is_read: false,
-          direction: 'inbound',
-          sender_name: fromName
-        }], { onConflict: 'message_id' }) as any;
-      }
+      await (supabase as any).from("unibox_messages").upsert([{
+        account_id: accountId,
+        org_id: account.org_id,
+        lead_id: lead.id,
+        message_id: effectiveMessageId,
+        from_email: fromEmail,
+        subject: subject || "(No Subject)",
+        snippet: decodeSnippet(snippet).substring(0, 200),
+        received_at: receivedAt,
+        is_read: false,
+        direction: 'inbound',
+        sender_name: fromName
+      }], { onConflict: 'message_id' }) as any;
 
       // ── Update lead & create notification ─────────────────────────
       await (supabase as any).from("leads").update({
@@ -348,35 +348,35 @@ export async function syncAccountInbox(accountId: string) {
 
       if (!lead) continue; // Not a known lead — skip
 
+      // ── Generate a stable message_id when missing ──────────────────────
+      const effectiveMessageId = parsed.messageId
+        || `<synth-${fromEmail}-${(parsed.date || new Date()).getTime()}-${accountId}@leadflow>`;
+
       // ── Dedup: skip if this message_id is already stored ──────────────
-      if (parsed.messageId) {
-        const { data: existing } = await (supabase as any)
-          .from("unibox_messages")
-          .select("id")
-          .eq("message_id", parsed.messageId)
-          .maybeSingle();
-        if (existing) continue; // Already processed
-      }
+      const { data: existing } = await (supabase as any)
+        .from("unibox_messages")
+        .select("id")
+        .eq("message_id", effectiveMessageId)
+        .maybeSingle();
+      if (existing) continue; // Already processed
 
       const receivedAt = parsed.date ? new Date(parsed.date).toISOString() : new Date().toISOString();
       const senderName = parsed.from?.value[0]?.name || "";
 
       // ── Store in unibox_messages ──────────────────────────────────────
-      if (parsed.messageId) {
-        await (supabase as any).from("unibox_messages").upsert([{
-          account_id: accountId,
-          org_id: (account as any).org_id,
-          lead_id: lead.id,
-          message_id: parsed.messageId,
-          from_email: fromEmail,
-          subject: parsed.subject || "(No Subject)",
-          snippet: parsed.text?.substring(0, 200) || "",
-          received_at: receivedAt,
-          is_read: false,
-          direction: 'inbound',
-          sender_name: senderName
-        }], { onConflict: 'message_id' }) as any;
-      }
+      await (supabase as any).from("unibox_messages").upsert([{
+        account_id: accountId,
+        org_id: (account as any).org_id,
+        lead_id: lead.id,
+        message_id: effectiveMessageId,
+        from_email: fromEmail,
+        subject: parsed.subject || "(No Subject)",
+        snippet: parsed.text?.substring(0, 200) || "",
+        received_at: receivedAt,
+        is_read: false,
+        direction: 'inbound',
+        sender_name: senderName
+      }], { onConflict: 'message_id' }) as any;
 
       // ── Update lead & create notification ─────────────────────────────
       await (supabase as any).from("leads").update({
@@ -560,37 +560,51 @@ export async function syncPowerSendMailbox(mailboxId: string) {
 
       if (!lead) continue; // Not a known lead — skip
 
+      // ── Generate a stable message_id when missing ──────────────────────
+      const effectiveMessageId = parsed.messageId
+        || `<synth-${fromEmail}-${(parsed.date || new Date()).getTime()}-${mailboxId}@leadflow>`;
+
       // ── Dedup: skip if this message_id is already stored ───────────────
-      if (parsed.messageId) {
-        const { data: existing } = await (supabase as any)
-          .from("unibox_messages")
-          .select("id")
-          .eq("message_id", parsed.messageId)
-          .maybeSingle();
-        if (existing) continue; // Already processed
-      }
+      const { data: existing } = await (supabase as any)
+        .from("unibox_messages")
+        .select("id")
+        .eq("message_id", effectiveMessageId)
+        .maybeSingle();
+      if (existing) continue; // Already processed
+
+      // ── Cross-mailbox dedup: skip if another mailbox already stored a
+      //    reply from this lead within the last 60 seconds (same reply
+      //    arriving in multiple server_mailboxes on the same domain) ──────
+      const { data: recentFromLead } = await (supabase as any)
+        .from("unibox_messages")
+        .select("id")
+        .eq("from_email", fromEmail)
+        .eq("org_id", orgId)
+        .eq("direction", "inbound")
+        .gte("created_at", new Date(Date.now() - 60_000).toISOString())
+        .limit(1)
+        .maybeSingle();
+      if (recentFromLead) continue; // Another mailbox already handled this reply
 
       const receivedAt = parsed.date ? new Date(parsed.date).toISOString() : new Date().toISOString();
       const senderName = parsed.from?.value[0]?.name || "";
 
       // ── Store in unibox_messages ───────────────────────────────────────
-      if (parsed.messageId) {
-        await (supabase as any).from("unibox_messages").upsert([{
-          account_id: mailboxId,
-          org_id: orgId,
-          lead_id: lead.id,
-          message_id: parsed.messageId,
-          from_email: fromEmail,
-          subject: parsed.subject || "(No Subject)",
-          snippet: (parsed.text || "").substring(0, 200),
-          received_at: receivedAt,
-          is_read: false,
-          direction: 'inbound',
-          sender_name: senderName
-        }], { onConflict: 'message_id' }) as any;
-      }
+      await (supabase as any).from("unibox_messages").upsert([{
+        account_id: mailboxId,
+        org_id: orgId,
+        lead_id: lead.id,
+        message_id: effectiveMessageId,
+        from_email: fromEmail,
+        subject: parsed.subject || "(No Subject)",
+        snippet: (parsed.text || "").substring(0, 200),
+        received_at: receivedAt,
+        is_read: false,
+        direction: 'inbound',
+        sender_name: senderName
+      }], { onConflict: 'message_id' }) as any;
 
-      // ── Update lead & create notification ─────────────────────────────
+      // ── Update lead & create notification (only once per reply) ────────
       await (supabase as any).from("leads").update({
         last_message_received_at: receivedAt,
       } as any).eq("id", lead.id);
