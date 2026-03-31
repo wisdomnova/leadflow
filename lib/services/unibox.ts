@@ -582,8 +582,9 @@ export async function syncPowerSendMailbox(mailboxId: string) {
       const senderName = parsed.from?.value[0]?.name || "";
 
       // ── Store in unibox_messages ───────────────────────────────────────
-      await (supabase as any).from("unibox_messages").upsert([{
-        account_id: mailboxId,
+      const { error: upsertErr } = await (supabase as any).from("unibox_messages").upsert([{
+        account_id: null,          // PowerSend — no email_account
+        mailbox_id: mailboxId,     // FK to server_mailboxes
         org_id: orgId,
         lead_id: lead.id,
         message_id: effectiveMessageId,
@@ -595,6 +596,11 @@ export async function syncPowerSendMailbox(mailboxId: string) {
         direction: 'inbound',
         sender_name: senderName
       }], { onConflict: 'message_id' }) as any;
+
+      if (upsertErr) {
+        console.error(`[PowerSend Sync] unibox upsert failed for ${fromEmail}:`, upsertErr);
+        continue;
+      }
 
       // ── Update lead & create notification (only once per reply) ────────
       await (supabase as any).from("leads").update({
