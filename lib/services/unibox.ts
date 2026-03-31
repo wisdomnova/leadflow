@@ -141,7 +141,7 @@ async function syncGoogleInbox(accountId: string, account: any) {
       const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
 
       // ── Store in unibox_messages ─────────────────────────────────────
-      await (supabase as any).from("unibox_messages").upsert([{
+      const { error: upsertErr } = await (supabase as any).from("unibox_messages").upsert([{
         account_id: accountId,
         org_id: account.org_id,
         lead_id: lead.id,
@@ -154,6 +154,11 @@ async function syncGoogleInbox(accountId: string, account: any) {
         direction: 'inbound',
         sender_name: fromName
       }], { onConflict: 'message_id' }) as any;
+
+      if (upsertErr) {
+        console.error(`[Gmail Sync] unibox upsert failed for ${fromEmail}:`, upsertErr);
+        continue;
+      }
 
       // ── Update lead & create notification ─────────────────────────
       await (supabase as any).from("leads").update({
@@ -364,7 +369,7 @@ export async function syncAccountInbox(accountId: string) {
       const senderName = parsed.from?.value[0]?.name || "";
 
       // ── Store in unibox_messages ──────────────────────────────────────
-      await (supabase as any).from("unibox_messages").upsert([{
+      const { error: upsertErr } = await (supabase as any).from("unibox_messages").upsert([{
         account_id: accountId,
         org_id: (account as any).org_id,
         lead_id: lead.id,
@@ -377,6 +382,11 @@ export async function syncAccountInbox(accountId: string) {
         direction: 'inbound',
         sender_name: senderName
       }], { onConflict: 'message_id' }) as any;
+
+      if (upsertErr) {
+        console.error(`[IMAP Sync] unibox upsert failed for ${fromEmail}:`, upsertErr);
+        continue;
+      }
 
       // ── Update lead & create notification ─────────────────────────────
       await (supabase as any).from("leads").update({
