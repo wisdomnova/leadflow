@@ -19,7 +19,65 @@ export async function GET() {
     return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  // For running campaigns, check if daily sending capacity is exhausted
+  const runningCampaigns = (data || []).filter((c: any) => c.status === "running");
+  const capacityMap: Record<string, boolean> = {};
+
+  if (runningCampaigns.length > 0) {
+    // Check PowerSend server capacity
+    const { data: servers } = await context.supabase
+      .from("smart_servers")
+      .select("id, current_usage, daily_limit")
+      .eq("org_id", context.orgId)
+      .in("status", ["active", "warming"]);
+
+    // Check mailbox capacity for each server
+    const serverIds = (servers || []).map((s: any) => s.id);
+    let allMailboxesAtLimit = false;
+
+    if (serverIds.length > 0) {
+      const { data: mailboxes } = await (context.supabase as any)
+        .from("server_mailboxes")
+        .select("server_id, current_usage, daily_limit")
+        .in("server_id", serverIds)
+        .eq("status", "active");
+
+      const availableMailboxes = (mailboxes || []).filter(
+        (m: any) => m.current_usage < m.daily_limit
+      );
+      allMailboxesAtLimit = (mailboxes || []).length > 0 && availableMailboxes.length === 0;
+
+      // Server-level check
+      const allServersAtLimit = (servers || []).length > 0 && (servers || []).every(
+        (s: any) => s.current_usage >= s.daily_limit
+      );
+
+      // Mark each running campaign
+      for (const campaign of runningCampaigns) {
+        if ((campaign as any).use_powersend) {
+          // PowerSend: check the servers assigned to this campaign
+          const campaignServerIds: string[] = (campaign as any).powersend_server_ids || [];
+          if (campaignServerIds.length > 0) {
+            const campaignServers = (servers || []).filter((s: any) => campaignServerIds.includes(s.id));
+            const campaignMailboxes = (mailboxes || []).filter((m: any) => campaignServerIds.includes(m.server_id));
+            const campaignAvailable = campaignMailboxes.filter((m: any) => m.current_usage < m.daily_limit);
+            const serversAtLimit = campaignServers.length > 0 && campaignServers.every((s: any) => s.current_usage >= s.daily_limit);
+            capacityMap[(campaign as any).id] = (campaignMailboxes.length > 0 && campaignAvailable.length === 0) || serversAtLimit;
+          } else {
+            capacityMap[(campaign as any).id] = allMailboxesAtLimit || allServersAtLimit;
+          }
+        }
+      }
+    }
+  }
+
+  // Attach daily_limit_reached flag to each campaign
+  const enriched = (data || []).map((c: any) => ({
+    ...c,
+    daily_limit_reached: capacityMap[c.id] || false,
+  }));
+
+  return NextResponse.json(enriched);
 }
 
 export async function POST(req: Request) {
