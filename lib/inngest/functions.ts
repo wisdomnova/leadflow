@@ -1623,7 +1623,7 @@ export const campaignHealthMonitor = inngest.createFunction(
             .from("activity_log")
             .select("id", { count: "exact", head: true })
             .eq("metadata->>campaign_id", c.id)
-            .eq("action_type", "email.sent")
+            .eq("action_type", "email_sent")
             .gte("created_at", twoHoursAgo);
 
           if ((recentSends as number) === 0) {
@@ -1660,16 +1660,8 @@ export const campaignHealthMonitor = inngest.createFunction(
           }
         });
       } else if (campaign.action === "stalled") {
-        await step.run(`alert-stalled-${campaign.id}`, async () => {
-          await createNotification({
-            orgId: campaign.org_id,
-            title: "Campaign Sending Stalled",
-            description: `"${campaign.name}" has ${campaign.activeRemaining} unsent recipients but no emails sent in 2+ hours. Check server/mailbox capacity.`,
-            type: "warning",
-            category: "campaign_updates",
-            link: "/dashboard/campaigns",
-          });
-        });
+        // Log internally only — no user-facing notification
+        console.warn(`[CampaignHealthMonitor] STALLED: "${campaign.name}" (${campaign.id}) has ${campaign.activeRemaining} unsent recipients but 0 sends in 2+ hours`);
       }
     }
 
