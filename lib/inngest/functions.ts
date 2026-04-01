@@ -1540,18 +1540,35 @@ export const campaignSweep = inngest.createFunction(
     // 2. For each campaign, find unsent recipients and dispatch events
     for (const campaign of campaigns as any[]) {
       const dispatched = await step.run(`sweep-${campaign.id}`, async () => {
-        // Fetch active recipients that have never been sent to (the stuck ones)
-        // Cap at 500 per sweep to avoid overloading Inngest event queue
-        const SWEEP_CAP = 2000;
+        // Fetch active recipients that have never been sent to AND haven't
+        // been dispatched to Inngest in the last 30 min. This prevents the
+        // sweep from re-flooding the event queue with duplicates every 2 min
+        // (which starves real sends due to the 200/min throttle).
+        const SWEEP_CAP = 500;
+        const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
         const { data: stuck, error } = await supabase
           .from("campaign_recipients")
           .select("lead_id, current_step")
           .eq("campaign_id", campaign.id)
           .eq("status", "active")
           .is("last_sent_at", null)
+          .or(`dispatched_at.is.null,dispatched_at.lt.${thirtyMinAgo}`)
           .limit(SWEEP_CAP);
 
         if (error || !stuck || stuck.length === 0) return 0;
+
+        // Mark as dispatched BEFORE sending events — prevents the next sweep
+        // (2 min later) from picking up the same leads again
+        const leadIds = stuck.map((r: any) => r.lead_id);
+        const MARK_BATCH = 200;
+        for (let j = 0; j < leadIds.length; j += MARK_BATCH) {
+          await supabase
+            .from("campaign_recipients")
+            .update({ dispatched_at: new Date().toISOString() } as any)
+            .eq("campaign_id", campaign.id)
+            .in("lead_id", leadIds.slice(j, j + MARK_BATCH));
+        }
 
         // Dispatch in batches of 100
         const BATCH = 100;
