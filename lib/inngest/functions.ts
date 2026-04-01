@@ -1563,9 +1563,9 @@ export const campaignSweep = inngest.createFunction(
         const leadIds = stuck.map((r: any) => r.lead_id);
         const MARK_BATCH = 200;
         for (let j = 0; j < leadIds.length; j += MARK_BATCH) {
-          await supabase
+          await (supabase as any)
             .from("campaign_recipients")
-            .update({ dispatched_at: new Date().toISOString() } as any)
+            .update({ dispatched_at: new Date().toISOString() })
             .eq("campaign_id", campaign.id)
             .in("lead_id", leadIds.slice(j, j + MARK_BATCH));
         }
