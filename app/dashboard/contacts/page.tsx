@@ -197,7 +197,7 @@ export default function ContactsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, tagFilter]);
 
   useEffect(() => {
     fetchLists();
@@ -208,7 +208,7 @@ export default function ContactsPage() {
       fetchContacts();
     }, searchQuery ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [searchQuery, statusFilter, currentPage, selectedListId]);
+  }, [searchQuery, statusFilter, tagFilter, currentPage, selectedListId]);
 
   useEffect(() => {
     if (selectedContact) {
@@ -1667,12 +1667,56 @@ export default function ContactsPage() {
                   </div>
                   <h2 className="text-2xl font-black text-[#101828] tracking-tight">{selectedContact.first_name} {selectedContact.last_name}</h2>
                   <p className="text-gray-500 font-medium mb-4">{selectedContact.email}</p>
-                  <div className="flex items-center gap-2">
-                    {selectedContact.tags?.map((tag: string) => (
-                      <span key={tag} className="px-3 py-1 bg-gray-50 text-gray-500 rounded-lg text-xs font-bold border border-gray-100">
+                  <div className="flex items-center gap-2 flex-wrap justify-center">
+                    {(selectedContact.tags || []).map((tag: string, idx: number) => (
+                      <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-50 text-gray-500 rounded-lg text-xs font-bold border border-gray-100 group/tag">
                         {tag}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const updatedTags = (selectedContact.tags || []).filter((_: string, i: number) => i !== idx);
+                            const res = await fetch(`/api/leads/${selectedContact.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ tags: updatedTags }),
+                            });
+                            if (res.ok) {
+                              const updated = { ...selectedContact, tags: updatedTags };
+                              setSelectedContact(updated);
+                              setContacts(prev => prev.map(c => c.id === selectedContact.id ? updated : c));
+                              showToast('Tag removed');
+                            }
+                          }}
+                          className="text-gray-300 hover:text-red-500 transition-colors hidden group-hover/tag:inline-flex"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </span>
                     ))}
+                    <button
+                      onClick={() => {
+                        const tag = prompt('Enter tag name:');
+                        if (tag && tag.trim()) {
+                          const newTags = [...new Set([...(selectedContact.tags || []), tag.trim()])];
+                          fetch(`/api/leads/${selectedContact.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ tags: newTags }),
+                          }).then(res => {
+                            if (res.ok) {
+                              const updated = { ...selectedContact, tags: newTags };
+                              setSelectedContact(updated);
+                              setContacts(prev => prev.map(c => c.id === selectedContact.id ? updated : c));
+                              showToast('Tag added');
+                            }
+                          });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white text-gray-400 rounded-lg text-xs font-bold border border-dashed border-gray-200 hover:border-[#745DF3] hover:text-[#745DF3] transition-all"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Tag
+                    </button>
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                       selectedContact.status === 'new' ? 'bg-emerald-50 text-emerald-600' : 
                       selectedContact.status === 'unsubscribed' ? 'bg-orange-50 text-orange-600' : 

@@ -503,23 +503,31 @@ export default function CampaignsPage() {
                               </div>
                             </td>
                             <td className="px-6 py-6">
-                              <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                                campaign.status === 'running' ? 'bg-emerald-50 text-emerald-600' :
-                                campaign.status === 'paused' ? 'bg-amber-50 text-amber-600' :
-                                campaign.status === 'draft' ? 'bg-gray-100 text-gray-500' :
-                                campaign.status === 'completed' ? 'bg-blue-50 text-blue-600' :
-                                campaign.status === 'archived' ? 'bg-slate-50 text-slate-400' :
-                                'bg-purple-50 text-purple-600'
-                              }`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${
-                                  campaign.status === 'running' ? 'bg-emerald-500 animate-pulse' :
-                                  campaign.status === 'paused' ? 'bg-amber-500' :
-                                  campaign.status === 'draft' ? 'bg-gray-400' :
-                                  campaign.status === 'completed' ? 'bg-blue-500' :
-                                  campaign.status === 'archived' ? 'bg-slate-400' :
-                                  'bg-purple-500'
-                                }`} />
-                                {campaign.status === 'running' ? 'Sending' : campaign.status}
+                              <div className="flex flex-col gap-1.5">
+                                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                                  campaign.status === 'running' ? 'bg-emerald-50 text-emerald-600' :
+                                  campaign.status === 'paused' ? 'bg-amber-50 text-amber-600' :
+                                  campaign.status === 'draft' ? 'bg-gray-100 text-gray-500' :
+                                  campaign.status === 'completed' ? 'bg-blue-50 text-blue-600' :
+                                  campaign.status === 'archived' ? 'bg-slate-50 text-slate-400' :
+                                  'bg-purple-50 text-purple-600'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                                    campaign.status === 'running' ? 'bg-emerald-500 animate-pulse' :
+                                    campaign.status === 'paused' ? 'bg-amber-500' :
+                                    campaign.status === 'draft' ? 'bg-gray-400' :
+                                    campaign.status === 'completed' ? 'bg-blue-500' :
+                                    campaign.status === 'archived' ? 'bg-slate-400' :
+                                    'bg-purple-500'
+                                  }`} />
+                                  {campaign.status === 'running' ? 'Sending' : campaign.status}
+                                </div>
+                                {campaign.status === 'running' && campaign.daily_limit_reached && (
+                                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-orange-50 text-orange-600 border border-orange-100 w-fit">
+                                    <Clock className="w-3 h-3" />
+                                    Daily Limit Reached
+                                  </div>
+                                )}
                               </div>
                             </td>
                             <td className="px-6 py-6">
