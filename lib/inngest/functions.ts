@@ -247,6 +247,21 @@ export const emailProcessor = inngest.createFunction(
   { event: "campaign/email.process" },
   async ({ event, step }) => {
     const { campaignId, leadId, stepIdx, orgId } = event.data;
+
+    // ── Stale event guard ──────────────────────────────────────────────
+    // Before the sweep-dedup fix, the old sweep re-dispatched the same
+    // 2,000 leads every 2 min for days, flooding the Inngest queue with
+    // millions of duplicate events. Each one consumes a throttle slot
+    // even when it just skips at preflight (2 DB queries per skip).
+    // This TTL check skips old events INSTANTLY (zero DB calls) so the
+    // queue drains in minutes instead of weeks. The sweep re-dispatches
+    // fresh events for any leads that still need processing.
+    const EVENT_TTL_MS = 45 * 60 * 1000; // 45 minutes
+    const eventAge = Date.now() - (event.ts || 0);
+    if (eventAge > EVENT_TTL_MS) {
+      return { skipped: true, reason: "stale_event", ageMinutes: Math.round(eventAge / 60000) };
+    }
+
     const supabase = getAdminClient();
 
     // 0. Pre-flight checks: campaign must still be running, recipient must be active & unsent
