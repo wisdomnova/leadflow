@@ -303,10 +303,10 @@ export const emailProcessor = inngest.createFunction(
     // 1. Fetch Campaign, Lead, and Recipient Data
     const data = await step.run("fetch-details", async () => {
       const [campaignRes, leadRes, recipientRes, orgRes] = await Promise.all([
-        supabase.from("campaigns").select("id, steps, status, use_powersend, powersend_config, powersend_server_ids, sender_id, sender_ids, config, daily_limit, daily_sent_count, name").eq("id", campaignId).single(),
-        supabase.from("leads").select("id, email, first_name, last_name, company, title, city, state, country, timezone, phone, website, linkedin_url, custom_fields").eq("id", leadId).single(),
+        supabase.from("campaigns").select("id, steps, status, use_powersend, powersend_config, powersend_server_ids, sender_id, sender_ids, config, name, org_id, sent_count, total_leads").eq("id", campaignId).single(),
+        supabase.from("leads").select("id, email, first_name, last_name, company, job_title, city, country, timezone, phone, custom_fields, tags, status, org_id, source, sentiment").eq("id", leadId).single(),
         supabase.from("campaign_recipients").select("id, status, current_step, last_sent_at").eq("campaign_id", campaignId).eq("lead_id", leadId).single(),
-        supabase.from("organizations").select("id, name, timezone, ai_usage_current, subscription_status, plan_tier, smart_sending_enabled").eq("id", orgId).single()
+        supabase.from("organizations").select("id, name, ai_usage_current, subscription_status, plan_tier, smart_sending_enabled").eq("id", orgId).single()
       ]);
       if (!orgRes.data) throw new Error("Organization not found");
 
@@ -447,14 +447,14 @@ export const emailProcessor = inngest.createFunction(
           const chosenSenderId = senderIds[rotationIdx];
           const { data: rotatedAccount } = await supabase
             .from("email_accounts")
-            .select("id, email, from_name, provider, config, status")
+            .select("id, email, provider, config, status")
             .eq("id", chosenSenderId)
             .single();
           account = rotatedAccount;
         } else if (senderIds.length === 1) {
           const { data: specificAccount } = await supabase
             .from("email_accounts")
-            .select("id, email, from_name, provider, config, status")
+            .select("id, email, provider, config, status")
             .eq("id", senderIds[0])
             .single();
           account = specificAccount;
@@ -462,14 +462,14 @@ export const emailProcessor = inngest.createFunction(
           // Legacy single sender_id fallback
           const { data: specificAccount } = await supabase
             .from("email_accounts")
-            .select("id, email, from_name, provider, config, status")
+            .select("id, email, provider, config, status")
             .eq("id", senderId)
             .single();
           account = specificAccount;
         } else {
           const { data: firstAccount } = await supabase
             .from("email_accounts")
-            .select("id, email, from_name, provider, config, status")
+            .select("id, email, provider, config, status")
             .eq("org_id", orgId)
             .eq("status", "active")
             .limit(1)
@@ -1275,7 +1275,7 @@ export const warmupAccountProcessor = inngest.createFunction(
 
     // 1. Fetch Account and Today's Stats
     const data = await step.run("fetch-warmup-context", async () => {
-      const { data: account } = await (supabase as any).from("email_accounts").select("id, email, org_id, warmup_daily_limit, warmup_enabled, provider, config, from_name, status").eq("id", accountId).single();
+      const { data: account } = await (supabase as any).from("email_accounts").select("id, email, org_id, warmup_daily_limit, warmup_enabled, provider, config, status").eq("id", accountId).single();
       const { data: stats } = await (supabase as any).from("warmup_stats").select("id, account_id, date, sent_count, inbox_count").eq("account_id", accountId).eq("date", today).single();
       
       // If no stats yet for today, create them
@@ -1380,7 +1380,7 @@ export const warmupReplyProcessor = inngest.createFunction(
 
     // 2. Fetch Account Details
     const account = await step.run("fetch-account", async () => {
-      const { data } = await (supabase as any).from("email_accounts").select("id, email, from_name, provider, config, status").eq("id", accountId).single();
+      const { data } = await (supabase as any).from("email_accounts").select("id, email, provider, config, status").eq("id", accountId).single();
       return data;
     });
 
