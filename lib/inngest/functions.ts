@@ -249,14 +249,12 @@ export const emailProcessor = inngest.createFunction(
     const { campaignId, leadId, stepIdx, orgId } = event.data;
 
     // ── Stale event guard ──────────────────────────────────────────────
-    // Before the sweep-dedup fix, the old sweep re-dispatched the same
-    // 2,000 leads every 2 min for days, flooding the Inngest queue with
-    // millions of duplicate events. Each one consumes a throttle slot
-    // even when it just skips at preflight (2 DB queries per skip).
-    // This TTL check skips old events INSTANTLY (zero DB calls) so the
-    // queue drains in minutes instead of weeks. The sweep re-dispatches
-    // fresh events for any leads that still need processing.
-    const EVENT_TTL_MS = 45 * 60 * 1000; // 45 minutes
+    // Skip old events sitting in Inngest queue to prevent stale sends.
+    // - Step 0: sweep redispatches every 30 min → 2-hour TTL is generous
+    // - Follow-ups (step 1+): sweep now also handles them, but give extra
+    //   headroom because follow-up events are created after step.sleep
+    //   and may queue during high-traffic windows.
+    const EVENT_TTL_MS = stepIdx === 0 ? 2 * 60 * 60 * 1000 : 4 * 60 * 60 * 1000;
     const eventAge = Date.now() - (event.ts || 0);
     if (eventAge > EVENT_TTL_MS) {
       return { skipped: true, reason: "stale_event", ageMinutes: Math.round(eventAge / 60000) };
@@ -669,10 +667,18 @@ export const emailProcessor = inngest.createFunction(
 
     // 4. Update Stats & Schedule Next Step
     await step.run("update-status", async () => {
+      // Calculate next_send_at so the sweep can pick up follow-ups if
+      // the step.sleep chain is interrupted (deploy, error, etc.)
+      const nextStepForUpdate = ((data as any).campaign as any).steps[stepIdx + 1];
+      const nextSendAt = nextStepForUpdate
+        ? new Date(Date.now() + (nextStepForUpdate.wait || 1) * 86400000).toISOString()
+        : null;
+
       // Update recipient record
       await (supabase as any).from("campaign_recipients").update({
         last_sent_at: new Date().toISOString(),
-        current_step: stepIdx
+        current_step: stepIdx,
+        ...(nextSendAt ? { next_send_at: nextSendAt } : {})
       }).eq("campaign_id", campaignId).eq("lead_id", leadId);
 
       // Increment global campaign sent_count using optimized RPC
@@ -715,22 +721,28 @@ export const emailProcessor = inngest.createFunction(
 
     if (nextStep) {
       const isSmartEnabled = ((data as any).campaign as any).config?.smart_sending;
-      const sub = await checkSubscription(orgId); // Use local sub check for precision
       
       let delayValue = `${nextStep.wait}d`;
 
-      if (isSmartEnabled && sub.active) {
-        // Enforce plan limits: Starter has a limit, Pro/Enterprise are unlimited
-        const isWithinLimits = !(sub.usage?.isOver || false);
-        
-        if (isWithinLimits) {
-          const optimalTime = calculateOptimalSendTime(
-            (data as any).lead.timezone, 
-            nextStep.wait, 
-            (data as any).lead.job_title
-          );
-          delayValue = getInngestDelay(optimalTime);
+      // Smart scheduling: wrap in try/catch so a subscription-check failure
+      // doesn't kill the follow-up chain (the email was already sent).
+      try {
+        if (isSmartEnabled) {
+          const sub = await step.run("check-sub-for-scheduling", async () => {
+            return await checkSubscription(orgId);
+          });
+          if (sub.active && !((sub as any).usage?.isOver || false)) {
+            const optimalTime = calculateOptimalSendTime(
+              (data as any).lead.timezone, 
+              nextStep.wait, 
+              (data as any).lead.job_title
+            );
+            delayValue = getInngestDelay(optimalTime);
+          }
         }
+      } catch (err) {
+        // Fall back to basic delay — don't break the follow-up chain
+        console.warn(`[emailProcessor] Smart scheduling failed for ${campaignId}, using basic delay:`, err);
       }
 
       // Sleep for the calculated delay BEFORE sending the next event
@@ -1528,21 +1540,23 @@ export const replyClassifier = inngest.createFunction(
 );
 
 // ─── Campaign Sweep (Self-Healing Dispatcher) ────────────────────────────────
-// Runs every 2 minutes. Finds running campaigns with unsent recipients and
-// dispatches email.process events for them. This is the safety net that makes
-// the pipeline bulletproof: even if the launcher times out or events are lost,
-// the sweep will pick them up within 2 minutes.
+// Runs every 2 minutes. Handles TWO cases:
+//   A) Initial sends: recipients never sent to (last_sent_at IS NULL)
+//   B) Follow-ups: recipients already sent to, where the next step's
+//      send time (next_send_at) has passed. This is the critical safety
+//      net for follow-ups whose Inngest step.sleep chain was broken
+//      (by deploys, errors, or retry exhaustion).
 export const campaignSweep = inngest.createFunction(
   { id: "campaign-sweep" },
   { cron: "*/2 * * * *" },
   async ({ step }) => {
     const supabase = getAdminClient();
 
-    // 1. Find all running campaigns
+    // 1. Find all running campaigns (include steps to know step count)
     const campaigns = await step.run("find-running-campaigns", async () => {
       const { data, error } = await supabase
         .from("campaigns")
-        .select("id, org_id, total_leads, sent_count")
+        .select("id, org_id, total_leads, sent_count, steps")
         .eq("status", "running");
       if (error) throw error;
       return data || [];
@@ -1552,30 +1566,49 @@ export const campaignSweep = inngest.createFunction(
 
     let totalDispatched = 0;
 
-    // 2. For each campaign, find unsent recipients and dispatch events
+    // 2. For each campaign, find unsent + follow-up recipients
     for (const campaign of campaigns as any[]) {
       const dispatched = await step.run(`sweep-${campaign.id}`, async () => {
-        // Fetch active recipients that have never been sent to AND haven't
-        // been dispatched to Inngest in the last 30 min. This prevents the
-        // sweep from re-flooding the event queue with duplicates every 2 min
-        // (which starves real sends due to the 200/min throttle).
         const SWEEP_CAP = 500;
         const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        const now = new Date().toISOString();
+        const totalSteps = ((campaign as any).steps || []).length;
 
-        const { data: stuck, error } = await supabase
+        // ── A) Initial sends: never sent to ──────────────────────────────
+        const { data: unsent } = await supabase
           .from("campaign_recipients")
-          .select("lead_id, current_step")
+          .select("lead_id, current_step, last_sent_at")
           .eq("campaign_id", campaign.id)
           .eq("status", "active")
           .is("last_sent_at", null)
           .or(`dispatched_at.is.null,dispatched_at.lt.${thirtyMinAgo}`)
           .limit(SWEEP_CAP);
 
-        if (error || !stuck || stuck.length === 0) return 0;
+        // ── B) Follow-ups: sent before, next_send_at in the past ─────────
+        const { data: followups } = await supabase
+          .from("campaign_recipients")
+          .select("lead_id, current_step, last_sent_at")
+          .eq("campaign_id", campaign.id)
+          .eq("status", "active")
+          .not("last_sent_at", "is", null)
+          .lt("next_send_at", now)
+          .or(`dispatched_at.is.null,dispatched_at.lt.${thirtyMinAgo}`)
+          .limit(SWEEP_CAP);
 
-        // Mark as dispatched BEFORE sending events — prevents the next sweep
-        // (2 min later) from picking up the same leads again
-        const leadIds = stuck.map((r: any) => r.lead_id);
+        // Merge both lists (dedup by lead_id)
+        const seen = new Set<string>();
+        const all: { lead_id: string; current_step: number; last_sent_at: string | null }[] = [];
+        for (const r of [...(unsent || []), ...(followups || [])] as any[]) {
+          if (!seen.has(r.lead_id)) {
+            seen.add(r.lead_id);
+            all.push(r);
+          }
+        }
+
+        if (all.length === 0) return 0;
+
+        // Mark as dispatched BEFORE sending events
+        const leadIds = all.map(r => r.lead_id);
         const MARK_BATCH = 200;
         for (let j = 0; j < leadIds.length; j += MARK_BATCH) {
           await (supabase as any)
@@ -1585,24 +1618,35 @@ export const campaignSweep = inngest.createFunction(
             .in("lead_id", leadIds.slice(j, j + MARK_BATCH));
         }
 
-        // Dispatch in batches of 100
-        const BATCH = 100;
-        for (let i = 0; i < stuck.length; i += BATCH) {
-          const batch = stuck.slice(i, i + BATCH);
-          await inngest.send(
-            batch.map((r: any) => ({
+        // Build events with correct stepIdx:
+        //   - Unsent (last_sent_at null): send current_step (usually 0)
+        //   - Follow-up (last_sent_at set): send current_step + 1
+        const events = all
+          .map(r => {
+            const stepIdx = r.last_sent_at
+              ? (r.current_step || 0) + 1   // follow-up: next step
+              : (r.current_step || 0);       // initial: current step
+            // Don't dispatch past the last step
+            if (stepIdx >= totalSteps) return null;
+            return {
               name: "campaign/email.process" as const,
               data: {
                 campaignId: campaign.id,
                 leadId: r.lead_id,
-                stepIdx: r.current_step || 0,
+                stepIdx,
                 orgId: campaign.org_id,
               },
-            }))
-          );
+            };
+          })
+          .filter(Boolean) as any[];
+
+        // Dispatch in batches of 100
+        const BATCH = 100;
+        for (let i = 0; i < events.length; i += BATCH) {
+          await inngest.send(events.slice(i, i + BATCH));
         }
 
-        return stuck.length;
+        return events.length;
       });
 
       totalDispatched += dispatched;
