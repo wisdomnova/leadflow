@@ -231,7 +231,7 @@ export async function syncAccountInbox(accountId: string) {
   const supabase = getAdminClient();
   const { data: account } = await supabase
     .from("email_accounts")
-    .select("*")
+    .select("id, email, org_id, provider, config, status, last_sync_at, last_sync_uid")
     .eq("id", accountId)
     .single();
 
@@ -303,17 +303,12 @@ export async function syncAccountInbox(accountId: string) {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       
-      // Select INBOX first to search
-      const mailbox = await client.getMailboxLock('INBOX');
-      try {
-          const uids = await client.search({ since: yesterday });
-          if (uids && Array.isArray(uids) && uids.length > 0) {
-              fetchRange = uids.join(',');
-          } else {
-              return; // Nothing to sync
-          }
-      } finally {
-          mailbox.release();
+      // We already hold the INBOX lock from above — just search directly
+      const uids = await client.search({ since: yesterday });
+      if (uids && Array.isArray(uids) && uids.length > 0) {
+          fetchRange = uids.join(',');
+      } else {
+          return; // Nothing to sync
       }
     } else {
       fetchRange = `${lastUid + 1}:*`;

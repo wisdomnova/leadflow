@@ -1256,8 +1256,8 @@ export const leadEnrichmentProcessor = inngest.createFunction(
         inferredTz = "America/New_York";
       } else {
         // Fallback: Default to organization's timezone if available
-        const { data: org } = await (supabase as any).from("organizations").select("timezone").eq("id", orgId).single();
-        inferredTz = (org as any)?.timezone || "America/New_York";
+        // organizations table has no timezone column — default to America/New_York
+        inferredTz = "America/New_York";
       }
 
       await (supabase as any).from("leads").update({ timezone: inferredTz } as any).eq("id", leadId);
