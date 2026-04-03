@@ -77,7 +77,7 @@ export async function POST(
   for (let i = 0; i < allStuck.length; i += EVENT_BATCH_SIZE) {
     const batch = allStuck.slice(i, i + EVENT_BATCH_SIZE);
     const events = batch.map((r: any) => ({
-      name: "campaign/email.process" as const,
+      name: "campaign/email.send" as const,
       data: {
         campaignId,
         leadId: r.lead_id,

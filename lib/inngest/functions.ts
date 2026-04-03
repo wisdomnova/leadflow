@@ -215,7 +215,7 @@ export const campaignLauncher = inngest.createFunction(
         const batch = toDispatch.slice(i, i + EVENT_BATCH);
         await inngest.send(
           batch.map((lead: any) => ({
-            name: "campaign/email.process" as const,
+            name: "campaign/email.send" as const,
             data: { campaignId, leadId: lead.id, stepIdx: 0, orgId },
           }))
         );
@@ -250,7 +250,7 @@ export const emailProcessor = inngest.createFunction(
     retries: 3,                      // Fewer retries — sweep will re-dispatch if needed
     throttle: { limit: 60, period: "1m" }, // 60/min max — prevents queue flood when servers are at capacity
   },
-  { event: "campaign/email.process" },
+  { event: "campaign/email.send" },
   async ({ event, step }) => {
     const { campaignId, leadId, stepIdx, orgId } = event.data;
 
@@ -757,7 +757,7 @@ export const emailProcessor = inngest.createFunction(
       await step.sleep("wait-for-next-step", delayValue);
 
       await step.sendEvent("schedule-next", {
-        name: "campaign/email.process",
+        name: "campaign/email.send",
         data: {
           campaignId,
           leadId,
@@ -1661,7 +1661,7 @@ export const campaignSweep = inngest.createFunction(
             // Don't dispatch past the last step
             if (stepIdx >= totalSteps) return null;
             return {
-              name: "campaign/email.process" as const,
+              name: "campaign/email.send" as const,
               data: {
                 campaignId: campaign.id,
                 leadId: r.lead_id,
