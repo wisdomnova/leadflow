@@ -404,12 +404,12 @@ export const emailProcessor = inngest.createFunction(
             if (senderId) {
               const { data: senderAccount } = await supabase
                 .from("email_accounts")
-                .select("email, from_name")
+                .select("email")
                 .eq("id", senderId)
                 .single();
               if (senderAccount) {
                 fromEmail = (senderAccount as any).email;
-                fromName = (senderAccount as any).from_name;
+                fromName = fromEmail.split('@')[0];
               }
             }
 
