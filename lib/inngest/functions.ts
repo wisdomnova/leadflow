@@ -54,14 +54,20 @@ export const uniboxSyncScheduler = inngest.createFunction(
 );
 
 export const accountSyncProcessor = inngest.createFunction(
-  { id: "account-sync-processor", concurrency: 5 },
+  { id: "account-sync-processor", concurrency: 5, retries: 1 },
   { event: "unibox/account.sync" },
   async ({ event, step }) => {
     const { accountId } = event.data;
     
     await step.run("sync-imap", async () => {
-      await syncAccountInbox(accountId);
-      return { success: true };
+      try {
+        await syncAccountInbox(accountId);
+        return { success: true };
+      } catch (err: any) {
+        // Don't retry OAuth / credential errors — they won't self-heal
+        console.error(`[account-sync] Failed for ${accountId}:`, err.message);
+        return { success: false, error: err.message };
+      }
     });
   }
 );
@@ -240,9 +246,9 @@ export const campaignLauncher = inngest.createFunction(
 export const emailProcessor = inngest.createFunction(
   { 
     id: "email-processor", 
-    concurrency: [{ limit: 20 }],   // 20 concurrent sends — safe with 228 mailboxes across 2 servers
-    retries: 8,                      // More retries for transient SMTP errors (421 rate limits)
-    throttle: { limit: 200, period: "1m" }, // ~200/min across 228 mailboxes = < 1 send/mailbox/min
+    concurrency: [{ limit: 10 }],   // 10 concurrent sends — keeps queue manageable
+    retries: 3,                      // Fewer retries — sweep will re-dispatch if needed
+    throttle: { limit: 60, period: "1m" }, // 60/min max — prevents queue flood when servers are at capacity
   },
   { event: "campaign/email.process" },
   async ({ event, step }) => {
@@ -250,11 +256,9 @@ export const emailProcessor = inngest.createFunction(
 
     // ── Stale event guard ──────────────────────────────────────────────
     // Skip old events sitting in Inngest queue to prevent stale sends.
-    // - Step 0: sweep redispatches every 30 min → 2-hour TTL is generous
-    // - Follow-ups (step 1+): sweep now also handles them, but give extra
-    //   headroom because follow-up events are created after step.sleep
-    //   and may queue during high-traffic windows.
-    const EVENT_TTL_MS = stepIdx === 0 ? 2 * 60 * 60 * 1000 : 4 * 60 * 60 * 1000;
+    // - Step 0: sweep redispatches every 30 min → 35-min TTL is sufficient
+    // - Follow-ups (step 1+): give extra headroom for step.sleep delays
+    const EVENT_TTL_MS = stepIdx === 0 ? 35 * 60 * 1000 : 2 * 60 * 60 * 1000;
     const eventAge = Date.now() - (event.ts || 0);
     if (eventAge > EVENT_TTL_MS) {
       return { skipped: true, reason: "stale_event", ageMinutes: Math.round(eventAge / 60000) };
@@ -425,11 +429,10 @@ export const emailProcessor = inngest.createFunction(
             };
           }
         } else if (isPowerSend) {
-          // All PowerSend servers are over their daily quota — throw a retryable
-          // error so Inngest retries this event later (e.g. after midnight reset).
-          // Without this, the processor silently returns "missing account" and the
-          // email is never sent.
-          throw new Error("All PowerSend servers are at daily capacity. Will retry later.");
+          // All PowerSend servers are over their daily quota.
+          // Do NOT throw — throwing causes Inngest retries which flood the queue.
+          // The sweep will re-dispatch this recipient tomorrow when quota resets.
+          return { skipped: true, reason: "daily_capacity_reached" };
         }
       }
 
@@ -487,6 +490,11 @@ export const emailProcessor = inngest.createFunction(
     });
 
     const powersendNodeId = (data as any).powersendNodeId;
+
+    // Early exit if capacity reached (returned from fetch-details without throwing)
+    if ((data as any).skipped) {
+      return { skipped: true, reason: (data as any).reason };
+    }
 
     if (!data.campaign || !data.lead || !data.recipient || !data.account || !data.org) return { error: "Missing campaign, lead, recipient, org or sending account" };
     
@@ -1556,7 +1564,7 @@ export const campaignSweep = inngest.createFunction(
     const campaigns = await step.run("find-running-campaigns", async () => {
       const { data, error } = await supabase
         .from("campaigns")
-        .select("id, org_id, total_leads, sent_count, steps")
+        .select("id, org_id, total_leads, sent_count, steps, use_powersend, powersend_server_ids")
         .eq("status", "running");
       if (error) throw error;
       return data || [];
@@ -1569,10 +1577,34 @@ export const campaignSweep = inngest.createFunction(
     // 2. For each campaign, find unsent + follow-up recipients
     for (const campaign of campaigns as any[]) {
       const dispatched = await step.run(`sweep-${campaign.id}`, async () => {
-        const SWEEP_CAP = 500;
+        let SWEEP_CAP = 500;
         const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
         const now = new Date().toISOString();
         const totalSteps = ((campaign as any).steps || []).length;
+
+        // ── Capacity pre-check: skip dispatch if all servers are at daily limit ──
+        // This prevents flooding the Inngest queue with events that will just
+        // return "daily_capacity_reached" and waste throughput.
+        if ((campaign as any).use_powersend) {
+          const serverIds: string[] = (campaign as any).powersend_server_ids || [];
+          if (serverIds.length > 0) {
+            const { data: servers } = await supabase
+              .from("smart_servers")
+              .select("id, current_usage, daily_limit")
+              .in("id", serverIds);
+            const hasCapacity = (servers || []).some(
+              (s: any) => (s.current_usage || 0) < (s.daily_limit || 0)
+            );
+            if (!hasCapacity) {
+              return 0; // All servers at capacity — skip this cycle
+            }
+            // Cap dispatch to actual remaining capacity across all servers
+            const remainingCapacity = (servers || []).reduce(
+              (sum: number, s: any) => sum + Math.max(0, (s.daily_limit || 0) - (s.current_usage || 0)), 0
+            );
+            SWEEP_CAP = Math.min(SWEEP_CAP, remainingCapacity);
+          }
+        }
 
         // ── A) Initial sends: never sent to ──────────────────────────────
         const { data: unsent } = await supabase
