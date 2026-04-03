@@ -1,7 +1,7 @@
 import { Inngest } from "inngest";
 
 // Create a client to send and receive events
-export const inngest = new Inngest({ id: "leadflow-app" });
+export const inngest = new Inngest({ id: "leadflow-v2" });
 
 /**
  * Event: campaign/email.staggered_send
