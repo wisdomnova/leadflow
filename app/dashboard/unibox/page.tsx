@@ -270,9 +270,20 @@ export default function UniboxPage() {
             : c
         ));
         setReplyText('');
+        setToastMsg('Reply sent');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      } else {
+        const errData = await res.json().catch(() => ({ error: 'Failed to send reply' }));
+        setToastMsg(errData.error || 'Failed to send reply');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
       }
     } catch (error) {
       console.error('Failed to send reply:', error);
+      setToastMsg('Failed to send reply');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
     } finally {
       setIsSending(false);
     }

@@ -63,7 +63,7 @@ const Hero = () => {
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
             </Link>
-            <Link href="https://cal.com/leadflow/demo" target="_blank">
+            <Link href="https://cal.com/adrianberisha04/book-a-demo" target="_blank">
               <button className="bg-white text-[#101828] px-10 py-5 rounded-2xl font-bold text-lg border border-gray-100 hover:border-gray-200 transition-all shadow-sm flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-[#745DF3]" />
                 Book a Demo

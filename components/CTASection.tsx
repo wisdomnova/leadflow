@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Calendar } from 'lucide-react';
 
 const CTASection = () => {
   const [sparkles, setSparkles] = useState<{ top: string, left: string, opacity: number }[]>([]);
@@ -57,6 +58,12 @@ const CTASection = () => {
               <Link href="/signup" className="w-full sm:w-auto">
                 <button className="bg-[#745DF3] text-white px-10 py-5 rounded-2xl font-bold text-lg hover:bg-[#745DF3]/90 transition-all shadow-xl shadow-[#745DF3]/20 w-full sm:w-auto">
                   Start free trial
+                </button>
+              </Link>
+              <Link href="https://cal.com/adrianberisha04/book-a-demo" target="_blank" className="w-full sm:w-auto sm:ml-4 mt-4 sm:mt-0">
+                <button className="bg-white text-[#101828] px-10 py-5 rounded-2xl font-bold text-lg border border-gray-100 hover:border-gray-200 transition-all shadow-sm w-full sm:w-auto flex items-center justify-center gap-2">
+                  <Calendar className="w-5 h-5 text-[#745DF3]" />
+                  Book a Demo
                 </button>
               </Link>
             </motion.div>
