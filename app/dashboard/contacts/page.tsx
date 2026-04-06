@@ -73,6 +73,7 @@ export default function ContactsPage() {
   const [lists, setLists] = useState<any[]>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [uploadListId, setUploadListId] = useState<string>('');
+  const uploadListIdRef = useRef<string>('');
   const [newListName, setNewListName] = useState('');
   const [isCreatingList, setIsCreatingList] = useState(false);
 
@@ -518,7 +519,7 @@ export default function ContactsPage() {
       const res = await fetch('/api/leads/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leads, list_id: uploadListId || undefined }),
+        body: JSON.stringify({ leads, list_id: uploadListIdRef.current || undefined }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -1313,7 +1314,7 @@ export default function ContactsPage() {
                   <div className="flex items-center gap-3">
                     <select
                       value={uploadListId}
-                      onChange={(e) => setUploadListId(e.target.value)}
+                      onChange={(e) => { setUploadListId(e.target.value); uploadListIdRef.current = e.target.value; }}
                       className="flex-1 bg-gray-50 border border-gray-100 focus:border-[#745DF3] focus:bg-white rounded-2xl py-3 px-4 text-sm font-medium outline-none transition-all appearance-none"
                     >
                       <option value="">No list (global)</option>
@@ -1337,6 +1338,7 @@ export default function ContactsPage() {
                           const id = await createList(newListName.trim());
                           if (id) {
                             setUploadListId(id);
+                            uploadListIdRef.current = id;
                             setNewListName('');
                             showToast('List created');
                           }
@@ -1434,7 +1436,7 @@ export default function ContactsPage() {
                   Cancel
                 </button>
                 {!isUploading && (
-                  <label className="flex-2 py-4 bg-[#101828] text-white rounded-2xl font-bold text-sm hover:opacity-90 transition-all px-12 group cursor-pointer text-center">
+                  <label className="flex-[2] py-4 bg-[#101828] text-white rounded-2xl font-bold text-sm hover:opacity-90 transition-all px-12 group cursor-pointer text-center">
                     Select File
                     <input type="file" className="hidden" accept=".csv" onChange={handleFileUpload} />
                   </label>

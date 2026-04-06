@@ -26,15 +26,38 @@ export async function POST(req: Request) {
     if (isUUID && leadId) {
       const { data } = await context.supabase
         .from("leads")
-        .select("*, email_accounts!inner(*)")
+        .select("*")
         .eq("id", leadId)
         .eq("org_id", context.orgId)
         .single();
       lead = data;
     }
 
-    // Get sending account: from lead's linked account, or org's first active account
-    let account = lead?.email_accounts;
+    // Get sending account: try to find the account that originally sent to this lead,
+    // otherwise fall back to the org's first active account
+    let account: any = null;
+
+    if (isUUID && leadId) {
+      // Look up the campaign_recipient to find which account sent the original email
+      const { data: recipient } = await context.supabase
+        .from("campaign_recipients")
+        .select("account_id")
+        .eq("lead_id", leadId)
+        .not("account_id", "is", null)
+        .limit(1)
+        .single();
+
+      if (recipient?.account_id) {
+        const { data: senderAccount } = await context.supabase
+          .from("email_accounts")
+          .select("*")
+          .eq("id", recipient.account_id)
+          .eq("status", "active")
+          .single();
+        account = senderAccount;
+      }
+    }
+
     if (!account) {
       const { data: fallbackAccount } = await context.supabase
         .from("email_accounts")
@@ -50,10 +73,9 @@ export async function POST(req: Request) {
       account = fallbackAccount;
     }
 
-    // Build subject line
-    const subject = inSubject
-      ? `Re: ${inSubject}`
-      : `Re: ${lead?.company || 'Our conversation'}`;
+    // Build subject line — strip existing Re: prefixes to avoid "Re: Re: Re: ..."
+    const bareSubject = (inSubject || '').replace(/^(Re:\s*)+/i, '').trim();
+    const subject = `Re: ${bareSubject || lead?.company || 'Our conversation'}`;
 
     // Send the email
     const response = await sendOutreachEmail({
