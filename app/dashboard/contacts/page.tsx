@@ -64,9 +64,11 @@ export default function ContactsPage() {
   const [showTagModal, setShowTagModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [bulkTagName, setBulkTagName] = useState('');
-  const [openDropdown, setOpenDropdown] = useState<'status' | 'list' | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<'status' | 'list' | 'tag' | null>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const listDropdownRef = useRef<HTMLDivElement>(null);
+  const tagDropdownRef = useRef<HTMLDivElement>(null);
+  const [allTags, setAllTags] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState('');
 
   // Lists State
@@ -111,6 +113,9 @@ export default function ContactsPage() {
       ) setOpenDropdown(null);
       if (
         openDropdown === 'list' && listDropdownRef.current && !listDropdownRef.current.contains(e.target as Node)
+      ) setOpenDropdown(null);
+      if (
+        openDropdown === 'tag' && tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)
       ) setOpenDropdown(null);
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -259,6 +264,7 @@ export default function ContactsPage() {
         setContacts(data.leads || []);
         setTotal(data.total || 0);
         setStats(data.stats);
+        if (data.tags) setAllTags(data.tags);
       }
     } catch (err) {
       console.error("Failed to fetch contacts:", err);
@@ -909,16 +915,43 @@ export default function ContactsPage() {
                       </div>
                     )}
                   </div>
-                  <button 
-                    onClick={() => {
-                      if (selectedIds.length > 0) setShowTagModal(true);
-                      else showToast('Select contacts to tag', 'error');
-                    }}
-                    className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-xl text-sm font-bold text-gray-500 hover:text-[#101828] transition-all"
-                  >
-                    <TagIcon className="w-4 h-4" />
-                    Tag
-                  </button>
+                  <div className="relative" ref={tagDropdownRef}>
+                    <button 
+                      onClick={() => {
+                        if (selectedIds.length > 0) {
+                          setShowTagModal(true);
+                        } else {
+                          setOpenDropdown(openDropdown === 'tag' ? null : 'tag');
+                        }
+                      }}
+                      className={`flex items-center gap-2 px-4 py-3 bg-white border rounded-xl text-sm font-bold transition-all ${openDropdown === 'tag' ? 'border-[#745DF3]/30 text-[#745DF3]' : 'border-gray-100 text-gray-500 hover:text-[#101828]'}`}
+                    >
+                      <TagIcon className="w-4 h-4" />
+                      Tag
+                    </button>
+                    {openDropdown === 'tag' && (
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-gray-100 shadow-2xl z-20 py-2">
+                        <button
+                          onClick={() => { setTagFilter(null); setOpenDropdown(null); }}
+                          className={`w-full text-left px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${!tagFilter ? 'text-[#745DF3] bg-[#745DF3]/5' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                          All Tags
+                        </button>
+                        {allTags.map(tag => (
+                          <button
+                            key={tag}
+                            onClick={() => { setTagFilter(tag); setOpenDropdown(null); }}
+                            className={`w-full text-left px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors truncate ${tagFilter === tag ? 'text-[#745DF3] bg-[#745DF3]/5' : 'text-gray-500 hover:bg-gray-50'}`}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                        {allTags.length === 0 && (
+                          <p className="px-5 py-2.5 text-xs text-gray-400">No tags yet</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <button 
                     onClick={() => {
                       if (selectedIds.length > 0) setShowStatusModal(true);

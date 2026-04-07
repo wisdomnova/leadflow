@@ -72,7 +72,7 @@ export async function GET(req: Request) {
   // Get stats for the overview cards
   const { data: statsData } = await context.supabase
     .from("leads")
-    .select("status")
+    .select("status, tags")
     .eq("org_id", context.orgId);
 
   const stats = {
@@ -84,7 +84,13 @@ export async function GET(req: Request) {
     bounced: statsData?.filter(l => l.status === 'bounced').length || 0,
   };
 
-  return NextResponse.json({ leads: data, total: count, stats });
+  // Collect unique tags across all leads
+  const tagSet = new Set<string>();
+  statsData?.forEach((l: any) => {
+    if (Array.isArray(l.tags)) l.tags.forEach((t: string) => tagSet.add(t));
+  });
+
+  return NextResponse.json({ leads: data, total: count, stats, tags: Array.from(tagSet).sort() });
 }
 
 export async function POST(req: Request) {
