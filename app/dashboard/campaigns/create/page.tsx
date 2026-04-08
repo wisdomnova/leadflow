@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Papa from 'papaparse';
 import { 
   Plus, 
   Trash2, 
@@ -31,7 +32,8 @@ import {
   Tag as TagIcon,
   Server,
   ChevronDown,
-  Zap
+  Zap,
+  Upload,
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import Header from '@/components/dashboard/Header';
@@ -116,10 +118,157 @@ export default function CreateCampaignPage() {
 
   const [toast, setToast] = useState<{ show: boolean, msg: string, type: 'success' | 'error' }>({ show: false, msg: '', type: 'success' });
 
+  // CSV Upload States
+  const [isUploadingCSV, setIsUploadingCSV] = useState(false);
+  const [csvUploadProgress, setCsvUploadProgress] = useState(0);
+  const [csvUploadStats, setCsvUploadStats] = useState({ parsed: 0, imported: 0, errors: 0 });
+  const csvAbortRef = useRef(false);
+
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, msg, type });
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
   };
+
+  // ---- CSV header normalization ----
+  const normalizeHeader = (raw: string): string | null => {
+    const h = raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const map: Record<string, string> = {
+      email: 'email', email_address: 'email', e_mail: 'email',
+      first_name: 'first_name', firstname: 'first_name', first: 'first_name', given_name: 'first_name',
+      last_name: 'last_name', lastname: 'last_name', last: 'last_name', surname: 'last_name', family_name: 'last_name',
+      company: 'company', company_name: 'company', organization: 'company', organisation: 'company',
+      job_title: 'job_title', jobtitle: 'job_title', title: 'job_title', position: 'job_title', role: 'job_title',
+      phone: 'phone', phone_number: 'phone', telephone: 'phone', mobile: 'phone',
+      linkedin: 'linkedin', linkedin_url: 'linkedin',
+      website: 'website', url: 'website', web: 'website',
+      city: 'city', state: 'state', country: 'country',
+      tags: 'tags', tag: 'tags', label: 'tags',
+    };
+    return map[h] || null;
+  };
+
+  // ---- Send a batch of leads to the import API ----
+  const sendCSVBatch = async (leads: any[]): Promise<{ imported: number; errors: number }> => {
+    try {
+      const res = await fetch('/api/leads/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leads }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { imported: data.count || leads.length, errors: 0 };
+      }
+      return { imported: 0, errors: leads.length };
+    } catch {
+      return { imported: 0, errors: leads.length };
+    }
+  };
+
+  // ---- CSV upload handler for campaign create ----
+  const handleCSVUpload = useCallback(async (file: File) => {
+    if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+      showToast('Please select a CSV file', 'error');
+      return;
+    }
+
+    setIsUploadingCSV(true);
+    setCsvUploadProgress(0);
+    setCsvUploadStats({ parsed: 0, imported: 0, errors: 0 });
+    csvAbortRef.current = false;
+
+    const BATCH_SIZE = 1000;
+    let headerMap: Record<number, string> = {};
+    let batch: any[] = [];
+    let totalParsed = 0;
+    let totalImported = 0;
+    let totalErrors = 0;
+    const rowEstimate = Math.max(1, Math.round(file.size / 120));
+
+    await new Promise<void>((resolve) => {
+      Papa.parse(file, {
+        header: false,
+        skipEmptyLines: true,
+        chunkSize: 1024 * 512,
+        chunk: async (results: Papa.ParseResult<string[]>, parser: Papa.Parser) => {
+          if (csvAbortRef.current) { parser.abort(); resolve(); return; }
+
+          const rows = results.data as string[][];
+          for (const row of rows) {
+            if (Object.keys(headerMap).length === 0) {
+              row.forEach((cell, i) => {
+                const mapped = normalizeHeader(cell);
+                if (mapped) headerMap[i] = mapped;
+              });
+              if (!Object.values(headerMap).includes('email')) {
+                showToast('CSV must have an "email" column', 'error');
+                parser.abort();
+                setIsUploadingCSV(false);
+                resolve();
+                return;
+              }
+              continue;
+            }
+
+            const lead: any = {};
+            row.forEach((cell, i) => {
+              const field = headerMap[i];
+              if (field && cell?.trim()) {
+                if (field === 'tags') {
+                  lead.tags = cell.split(';').map((t: string) => t.trim()).filter(Boolean);
+                } else {
+                  lead[field] = cell.trim();
+                }
+              }
+            });
+
+            if (!lead.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email)) continue;
+
+            batch.push(lead);
+            totalParsed++;
+
+            if (batch.length >= BATCH_SIZE) {
+              parser.pause();
+              const result = await sendCSVBatch(batch);
+              totalImported += result.imported;
+              totalErrors += result.errors;
+              batch = [];
+              setCsvUploadProgress(Math.min(95, Math.round((totalParsed / rowEstimate) * 100)));
+              setCsvUploadStats({ parsed: totalParsed, imported: totalImported, errors: totalErrors });
+              parser.resume();
+            }
+          }
+        },
+        complete: async () => {
+          if (batch.length > 0) {
+            const result = await sendCSVBatch(batch);
+            totalImported += result.imported;
+            totalErrors += result.errors;
+          }
+          setCsvUploadProgress(100);
+          setCsvUploadStats({ parsed: totalParsed, imported: totalImported, errors: totalErrors });
+
+          setTimeout(async () => {
+            setIsUploadingCSV(false);
+            if (totalImported > 0) {
+              showToast(`Imported ${totalImported.toLocaleString()} contacts — now select them below`);
+              await fetchLeads(1, '', '', '');
+              setCurrentPage(1);
+            } else if (totalErrors > 0) {
+              showToast(`Import failed for ${totalErrors.toLocaleString()} contacts`, 'error');
+            }
+          }, 600);
+          resolve();
+        },
+        error: (err: Error) => {
+          console.error('CSV parse error:', err);
+          showToast('Failed to parse CSV file', 'error');
+          setIsUploadingCSV(false);
+          resolve();
+        },
+      });
+    });
+  }, []);
 
   const fetchLeads = async (page: number, search: string, tag: string, source?: string) => {
     setIsLoadingLeads(true);
@@ -1069,6 +1218,54 @@ export default function CreateCampaignPage() {
                       </select>
                     </div>
 
+                    {/* Quick CSV Upload */}
+                    <div className="mb-6">
+                      {isUploadingCSV ? (
+                        <div className="p-6 border-2 border-gray-100 rounded-2xl flex items-center gap-6 bg-gray-50/30">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm shrink-0">
+                            <Loader2 className="w-5 h-5 text-[#745DF3] animate-spin" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-[#101828]">
+                              {csvUploadProgress < 100 ? 'Importing Contacts...' : 'Import Complete!'}
+                            </p>
+                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">
+                              {csvUploadStats.parsed > 0
+                                ? `${csvUploadStats.parsed.toLocaleString()} parsed • ${csvUploadStats.imported.toLocaleString()} imported${csvUploadStats.errors > 0 ? ` • ${csvUploadStats.errors.toLocaleString()} failed` : ''}`
+                                : 'Analyzing headers...'}
+                            </p>
+                            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-2">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${csvUploadProgress}%` }}
+                                className="h-full bg-[#745DF3] rounded-full"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="p-5 border-2 border-dashed border-gray-100 hover:border-[#745DF3]/40 rounded-2xl flex items-center gap-4 cursor-pointer group transition-all bg-gray-50/30 hover:bg-[#745DF3]/5">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform shrink-0">
+                            <Upload className="w-5 h-5 text-[#745DF3]" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-[#101828] group-hover:text-[#745DF3] transition-colors">Upload CSV to import contacts</p>
+                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">Drop a CSV file with email, name, company columns — contacts are imported instantly</p>
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".csv"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleCSVUpload(file);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+
                     <div className="space-y-4 max-h-[500px] overflow-y-auto pr-4 no-scrollbar relative min-h-[200px]">
                       {isLoadingLeads ? (
                         <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-3xl">
@@ -1083,7 +1280,7 @@ export default function CreateCampaignPage() {
                         <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
                           <UserPlus className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                           <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">No contacts found</h3>
-                          <Link href="/dashboard/contacts" className="text-[#745DF3] text-xs font-black mt-2 hover:underline inline-block">Import your first contacts →</Link>
+                          <p className="text-gray-400 text-xs font-medium mt-2">Upload a CSV above or <Link href="/dashboard/contacts" className="text-[#745DF3] font-black hover:underline">manage contacts</Link></p>
                         </div>
                       ) : (
                         availableLeads.map((lead) => (
