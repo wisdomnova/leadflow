@@ -45,6 +45,7 @@ export async function POST(req: Request) {
           ...(lead.state ? { state: lead.state } : {}),
           ...(lead.country ? { country: lead.country } : {}),
         },
+        source: "csv",
         status: "new",
       }))
       .filter((l: any) => l.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email));
@@ -101,9 +102,9 @@ export async function POST(req: Request) {
     if (allInsertedIds.length > 0) {
       const activityRows = allInsertedIds.map((r) => ({
         org_id: r.orgId,
-        lead_id: r.id,
         action_type: "lead_created",
         description: "Imported via CSV upload",
+        metadata: { lead_id: r.id },
       }));
 
       // Chunk activity inserts too

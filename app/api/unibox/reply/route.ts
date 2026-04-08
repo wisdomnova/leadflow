@@ -33,31 +33,58 @@ export async function POST(req: Request) {
       lead = data;
     }
 
-    // Get sending account: try to find the account that originally sent to this lead,
-    // otherwise fall back to the org's first active account
+    // Get sending account: try to find the mailbox that originally contacted this lead
+    // (PowerSend uses server_mailboxes, not email_accounts), then fall back to any active account
     let account: any = null;
 
     if (isUUID && leadId) {
-      // Look up the campaign_recipient to find which account sent the original email
-      const { data: recipient } = await context.supabase
-        .from("campaign_recipients")
-        .select("account_id")
+      // Look up the mailbox that synced this lead's conversation
+      const { data: inboundMsg } = await (context.supabase as any)
+        .from("unibox_messages")
+        .select("mailbox_id, account_id")
         .eq("lead_id", leadId)
-        .not("account_id", "is", null)
+        .not("mailbox_id", "is", null)
+        .order("received_at", { ascending: false })
         .limit(1)
         .single();
 
-      if (recipient?.account_id) {
-        const { data: senderAccount } = await context.supabase
+      if (inboundMsg?.mailbox_id) {
+        // Resolve the server_mailbox SMTP credentials
+        const { data: mailbox } = await (context.supabase as any)
+          .from("server_mailboxes")
+          .select("id, email, display_name, smtp_host, smtp_port, smtp_username, smtp_password, status")
+          .eq("id", inboundMsg.mailbox_id)
+          .single();
+
+        if (mailbox && mailbox.smtp_host && mailbox.smtp_password) {
+          account = {
+            id: mailbox.id,
+            email: mailbox.email,
+            from_name: mailbox.display_name || mailbox.email.split('@')[0],
+            provider: 'custom_smtp',
+            config: {
+              smtpHost: mailbox.smtp_host,
+              smtpPort: String(mailbox.smtp_port || '465'),
+              smtpUser: mailbox.smtp_username,
+              smtpPass: mailbox.smtp_password,
+            }
+          };
+        }
+      }
+
+      // Fallback: try email_accounts if a linked account_id exists
+      if (!account && inboundMsg?.account_id) {
+        const { data: linked } = await context.supabase
           .from("email_accounts")
           .select("*")
-          .eq("id", recipient.account_id)
+          .eq("id", inboundMsg.account_id)
           .eq("status", "active")
           .single();
-        account = senderAccount;
+        account = linked;
       }
     }
 
+    // Final fallback: any active email_account for the org
     if (!account) {
       const { data: fallbackAccount } = await context.supabase
         .from("email_accounts")
@@ -67,10 +94,37 @@ export async function POST(req: Request) {
         .limit(1)
         .single();
 
+      // If still nothing, try any active server_mailbox for the org
       if (!fallbackAccount) {
+        const { data: fallbackMailbox } = await (context.supabase as any)
+          .from("server_mailboxes")
+          .select("id, email, display_name, smtp_host, smtp_port, smtp_username, smtp_password")
+          .eq("org_id", context.orgId)
+          .in("status", ["active", "warming"])
+          .limit(1)
+          .single();
+
+        if (fallbackMailbox && fallbackMailbox.smtp_host && fallbackMailbox.smtp_password) {
+          account = {
+            id: fallbackMailbox.id,
+            email: fallbackMailbox.email,
+            from_name: fallbackMailbox.display_name || fallbackMailbox.email.split('@')[0],
+            provider: 'custom_smtp',
+            config: {
+              smtpHost: fallbackMailbox.smtp_host,
+              smtpPort: String(fallbackMailbox.smtp_port || '465'),
+              smtpUser: fallbackMailbox.smtp_username,
+              smtpPass: fallbackMailbox.smtp_password,
+            }
+          };
+        }
+      } else {
+        account = fallbackAccount;
+      }
+
+      if (!account) {
         return NextResponse.json({ error: "No active email account found" }, { status: 400 });
       }
-      account = fallbackAccount;
     }
 
     // Build subject line — strip existing Re: prefixes to avoid "Re: Re: Re: ..."
@@ -90,11 +144,13 @@ export async function POST(req: Request) {
     }
 
     // Store sent message in unibox_messages
+    const isMailbox = account.provider === 'custom_smtp' && !account.org_id; // server_mailbox objects lack org_id
     await (context.supabase as any).from("unibox_messages").insert([{
       org_id: context.orgId,
-      account_id: account.id,
+      account_id: isMailbox ? null : account.id,
+      mailbox_id: isMailbox ? account.id : null,
       lead_id: isUUID ? leadId : null,
-      message_id: response.messageId || `sent-${Date.now()}`,
+      message_id: response.messageId || `sent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       from_email: account.email,
       subject,
       snippet: text.substring(0, 200),
