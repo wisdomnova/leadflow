@@ -61,6 +61,7 @@ export default function ContactsPage() {
   const [uploadStats, setUploadStats] = useState({ parsed: 0, imported: 0, errors: 0, total: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const uploadAbortRef = useRef(false);
+  const dragCounterRef = useRef(0);
   const [showTagModal, setShowTagModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [bulkTagName, setBulkTagName] = useState('');
@@ -540,7 +541,13 @@ export default function ContactsPage() {
 
   // ---- Core upload handler (works for both click and drag-drop) ----
   const processFile = useCallback(async (file: File) => {
-    if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+    // Accept .csv, .tsv, .txt, or any text/* MIME type — macOS UTI often misclassifies
+    // CSV files depending on folder location, causing the strict .csv check to fail
+    const name = file.name.toLowerCase();
+    const isCSVLike = name.endsWith('.csv') || name.endsWith('.tsv') || name.endsWith('.txt') 
+      || file.type === 'text/csv' || file.type === 'text/plain' || file.type === 'application/csv' 
+      || file.type === 'application/vnd.ms-excel' || file.type === '';
+    if (!file || !isCSVLike) {
       showToast('Please select a CSV file', 'error');
       return;
     }
@@ -657,21 +664,34 @@ export default function ContactsPage() {
   };
 
   // ---- Drag-and-drop handlers ----
+  // Use a counter to handle dragLeave firing when crossing child elements.
+  // Without this, dragging over the icon/text inside the drop zone triggers dragLeave
+  // on the parent, causing the visual state to flicker and sometimes lose the drop target.
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    setIsDragging(true);
+  }, []);
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(true);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounterRef.current = 0;
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) processFile(file);
@@ -1386,13 +1406,18 @@ export default function ContactsPage() {
                 </div>
 
                 {!isUploading ? (
-                  <label 
+                  <div 
                     className={`p-12 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center text-center group transition-all cursor-pointer ${
                       isDragging ? 'border-[#745DF3] bg-[#745DF3]/5 scale-[1.02]' : 'border-gray-100 hover:border-[#745DF3]/40 bg-gray-50/50'
                     }`}
+                    onDragEnter={handleDragEnter}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
+                    onClick={() => {
+                      const input = document.getElementById('csv-upload-input') as HTMLInputElement;
+                      input?.click();
+                    }}
                   >
                     <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
                       <FileText className="w-8 h-8 text-[#745DF3]" />
@@ -1402,12 +1427,13 @@ export default function ContactsPage() {
                     </h3>
                     <p className="text-sm text-gray-400 font-medium">CSV files up to 100MB &bull; Handles large files with streaming</p>
                     <input 
+                      id="csv-upload-input"
                       type="file" 
                       className="hidden" 
-                      accept=".csv" 
+                      accept=".csv,.tsv,.txt,text/csv,text/plain,application/csv,application/vnd.ms-excel" 
                       onChange={handleFileUpload}
                     />
-                  </label>
+                  </div>
                 ) : (
                   <div className="p-12 border-2 border-gray-50 rounded-[2rem] flex flex-col items-center justify-center text-center bg-gray-50/30">
                     <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-sm relative overflow-hidden">
@@ -1471,7 +1497,7 @@ export default function ContactsPage() {
                 {!isUploading && (
                   <label className="flex-[2] py-4 bg-[#101828] text-white rounded-2xl font-bold text-sm hover:opacity-90 transition-all px-12 group cursor-pointer text-center">
                     Select File
-                    <input type="file" className="hidden" accept=".csv" onChange={handleFileUpload} />
+                    <input type="file" className="hidden" accept=".csv,.tsv,.txt,text/csv,text/plain,application/csv,application/vnd.ms-excel" onChange={handleFileUpload} />
                   </label>
                 )}
               </div>
