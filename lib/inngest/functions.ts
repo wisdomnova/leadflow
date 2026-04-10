@@ -169,6 +169,17 @@ export const campaignLauncher = inngest.createFunction(
 
     if (leads.length === 0) return { message: "No leads found" };
 
+    // 1b. Re-check campaign status — if paused/deleted between launch and here, abort
+    const stillRunning = await step.run("verify-still-running", async () => {
+      const { data: camp } = await (supabase as any)
+        .from("campaigns")
+        .select("status")
+        .eq("id", campaignId)
+        .single();
+      return (camp as any)?.status === "running";
+    });
+    if (!stillRunning) return { message: "Campaign no longer running, aborting launch" };
+
     // 2. Initialize campaign_recipients for each lead (batched for scale)
     // Use INSERT with ON CONFLICT DO NOTHING — never overwrite existing recipients
     // that may already be completed/bounced/replied from a previous run
@@ -207,8 +218,9 @@ export const campaignLauncher = inngest.createFunction(
     // 3. Kick-start: dispatch the first batch of events via inngest.send()
     //    The campaign sweep cron (every 2 min) will pick up any remaining
     //    unsent recipients automatically — no more 140+step timeouts.
+    //    Cap at 120 to match processor throughput (60/min throttle).
     await step.run("dispatch-initial-batch", async () => {
-      const INITIAL_CAP = 500; // Kick-start with first 500
+      const INITIAL_CAP = 120;
       const toDispatch = leads.slice(0, INITIAL_CAP);
       const EVENT_BATCH = 100;
       for (let i = 0; i < toDispatch.length; i += EVENT_BATCH) {
@@ -249,16 +261,24 @@ export const emailProcessor = inngest.createFunction(
     concurrency: [{ limit: 10 }],   // 10 concurrent sends — keeps queue manageable
     retries: 3,                      // Fewer retries — sweep will re-dispatch if needed
     throttle: { limit: 60, period: "1m" }, // 60/min max — prevents queue flood when servers are at capacity
+    cancelOn: [
+      {
+        event: "campaign/cancel",
+        match: "data.campaignId",  // Cancel only runs for this specific campaign
+      },
+    ],
   },
   { event: "campaign/email.send" },
   async ({ event, step }) => {
     const { campaignId, leadId, stepIdx, orgId } = event.data;
 
     // ── Stale event guard ──────────────────────────────────────────────
-    // Skip old events sitting in Inngest queue to prevent stale sends.
-    // - Step 0: sweep redispatches every 30 min → 35-min TTL is sufficient
-    // - Follow-ups (step 1+): give extra headroom for step.sleep delays
-    const EVENT_TTL_MS = stepIdx === 0 ? 35 * 60 * 1000 : 2 * 60 * 60 * 1000;
+    // Safety net for truly orphaned events. The real dedup protection is the
+    // preflight check below (campaign running + recipient active + last_sent_at).
+    // Keep a generous 24-hour TTL — a tight TTL causes a death spiral when
+    // the Inngest queue backs up (events expire before the processor reaches them,
+    // sweep re-dispatches them, they queue behind even more events, repeat forever).
+    const EVENT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
     const eventAge = Date.now() - (event.ts || 0);
     if (eventAge > EVENT_TTL_MS) {
       return { skipped: true, reason: "stale_event", ageMinutes: Math.round(eventAge / 60000) };
@@ -1577,8 +1597,11 @@ export const campaignSweep = inngest.createFunction(
     // 2. For each campaign, find unsent + follow-up recipients
     for (const campaign of campaigns as any[]) {
       const dispatched = await step.run(`sweep-${campaign.id}`, async () => {
-        let SWEEP_CAP = 500;
-        const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        // Cap at 120 per sweep cycle (2 min) to match emailProcessor throughput
+        // (throttle: 60/min). Dispatching more than the processor can drain
+        // causes unbounded queue growth → events expire → death spiral.
+        let SWEEP_CAP = 120;
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
         const now = new Date().toISOString();
         const totalSteps = ((campaign as any).steps || []).length;
 
@@ -1613,7 +1636,7 @@ export const campaignSweep = inngest.createFunction(
           .eq("campaign_id", campaign.id)
           .eq("status", "active")
           .is("last_sent_at", null)
-          .or(`dispatched_at.is.null,dispatched_at.lt.${thirtyMinAgo}`)
+          .or(`dispatched_at.is.null,dispatched_at.lt.${twoHoursAgo}`)
           .limit(SWEEP_CAP);
 
         // ── B) Follow-ups: sent before, next_send_at in the past ─────────
@@ -1624,7 +1647,7 @@ export const campaignSweep = inngest.createFunction(
           .eq("status", "active")
           .not("last_sent_at", "is", null)
           .lt("next_send_at", now)
-          .or(`dispatched_at.is.null,dispatched_at.lt.${thirtyMinAgo}`)
+          .or(`dispatched_at.is.null,dispatched_at.lt.${twoHoursAgo}`)
           .limit(SWEEP_CAP);
 
         // Merge both lists (dedup by lead_id)
