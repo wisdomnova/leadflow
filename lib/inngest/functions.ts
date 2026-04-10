@@ -258,9 +258,9 @@ export const campaignLauncher = inngest.createFunction(
 export const emailProcessor = inngest.createFunction(
   { 
     id: "email-processor", 
-    concurrency: [{ limit: 50 }],    // Temporarily boosted from 10 to drain stale event backlog
+    concurrency: [{ limit: 20 }],    // 20 concurrent sends — balances throughput vs server load
     retries: 3,                      // Fewer retries — sweep will re-dispatch if needed
-    throttle: { limit: 5000, period: "1m" }, // Temporarily boosted from 60 to drain stale event backlog
+    throttle: { limit: 200, period: "1m" }, // 200/min — well within 24h stale TTL, prevents SMTP overload
     cancelOn: [
       {
         event: "campaign/cancel",
