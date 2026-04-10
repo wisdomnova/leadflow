@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
 import { checkSubscription } from "@/lib/subscription-check";
+import { inngest } from "@/lib/services/inngest";
 
 export async function GET(
   req: Request,
@@ -59,6 +60,20 @@ export async function PATCH(
     return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
   }
 
+  // Cancel all running Inngest functions for this campaign when it stops
+  if (status !== "running") {
+    try {
+      await inngest.send({
+        name: "campaign/cancel",
+        data: { campaignId: id },
+      });
+    } catch (err) {
+      // Non-blocking: the DB status update is the source of truth;
+      // preflight checks will still catch anything that slips through
+      console.error("[campaign] Failed to send cancel event:", err);
+    }
+  }
+
   return NextResponse.json({ success: true });
 }
 
@@ -70,6 +85,16 @@ export async function DELETE(
   const context = await getSessionContext();
   if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Cancel all running Inngest functions for this campaign before deleting
+  try {
+    await inngest.send({
+      name: "campaign/cancel",
+      data: { campaignId: id },
+    });
+  } catch (err) {
+    console.error("[campaign] Failed to send cancel event on delete:", err);
   }
 
   const { error } = await context.supabase
