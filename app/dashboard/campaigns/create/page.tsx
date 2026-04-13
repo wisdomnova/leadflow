@@ -132,19 +132,25 @@ export default function CreateCampaignPage() {
   // ---- CSV header normalization ----
   const normalizeHeader = (raw: string): string | null => {
     const h = raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const cleaned = h.replace(/^_+|_+$/g, '');
     const map: Record<string, string> = {
       email: 'email', email_address: 'email', e_mail: 'email',
+      work_email: 'email', business_email: 'email', corporate_email: 'email',
+      personal_email: 'email', contact_email: 'email', primary_email: 'email',
       first_name: 'first_name', firstname: 'first_name', first: 'first_name', given_name: 'first_name',
       last_name: 'last_name', lastname: 'last_name', last: 'last_name', surname: 'last_name', family_name: 'last_name',
       company: 'company', company_name: 'company', organization: 'company', organisation: 'company',
       job_title: 'job_title', jobtitle: 'job_title', title: 'job_title', position: 'job_title', role: 'job_title',
       phone: 'phone', phone_number: 'phone', telephone: 'phone', mobile: 'phone',
-      linkedin: 'linkedin', linkedin_url: 'linkedin',
+      linkedin: 'linkedin', linkedin_url: 'linkedin', personal_linkedin: 'linkedin',
       website: 'website', url: 'website', web: 'website',
-      city: 'city', state: 'state', country: 'country',
+      city: 'city', company_city: 'city',
+      state: 'state', company_state: 'state',
+      country: 'country', company_country: 'country',
       tags: 'tags', tag: 'tags', label: 'tags',
+      industries: 'tags', industry: 'tags',
     };
-    return map[h] || null;
+    return map[cleaned] || map[h] || null;
   };
 
   // ---- Send a batch of leads to the import API ----
@@ -176,13 +182,15 @@ export default function CreateCampaignPage() {
       return;
     }
 
-    setIsUploadingCSV(true);
+    // Don't set isUploadingCSV yet — wait until header validation passes
+    // to avoid a flash of upload UI that immediately vanishes on bad CSVs.
     setCsvUploadProgress(0);
     setCsvUploadStats({ parsed: 0, imported: 0, errors: 0 });
     csvAbortRef.current = false;
 
     const BATCH_SIZE = 1000;
     let headerMap: Record<number, string> = {};
+    let headersValidated = false;
     let batch: any[] = [];
     let totalParsed = 0;
     let totalImported = 0;
@@ -205,12 +213,13 @@ export default function CreateCampaignPage() {
                 if (mapped) headerMap[i] = mapped;
               });
               if (!Object.values(headerMap).includes('email')) {
-                showToast('CSV must have an "email" column', 'error');
+                showToast('CSV must have an "email" column (e.g. Email, Work Email, Personal Email)', 'error');
                 parser.abort();
-                setIsUploadingCSV(false);
                 resolve();
                 return;
               }
+              headersValidated = true;
+              setIsUploadingCSV(true);
               continue;
             }
 
@@ -267,7 +276,7 @@ export default function CreateCampaignPage() {
         error: (err: Error) => {
           console.error('CSV parse error:', err);
           showToast('Failed to parse CSV file', 'error');
-          setIsUploadingCSV(false);
+          if (headersValidated) setIsUploadingCSV(false);
           resolve();
         },
       });
