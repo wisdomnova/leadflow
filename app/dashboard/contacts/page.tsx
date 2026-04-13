@@ -546,7 +546,7 @@ export default function ContactsPage() {
     const name = file.name.toLowerCase();
     const isCSVLike = name.endsWith('.csv') || name.endsWith('.tsv') || name.endsWith('.txt') 
       || file.type === 'text/csv' || file.type === 'text/plain' || file.type === 'application/csv' 
-      || file.type === 'application/vnd.ms-excel' || file.type === '';
+      || file.type === 'application/vnd.ms-excel' || file.type === 'application/octet-stream' || file.type === '';
     if (!file || !isCSVLike) {
       showToast('Please select a CSV file', 'error');
       return;

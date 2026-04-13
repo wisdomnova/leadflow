@@ -314,7 +314,11 @@ export default function EmailProvidersPage() {
   const handleBulkFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.csv')) {
+    const fname = file?.name?.toLowerCase() || '';
+    const isCSVLike = fname.endsWith('.csv') || fname.endsWith('.tsv') || fname.endsWith('.txt')
+      || file?.type === 'text/csv' || file?.type === 'text/plain' || file?.type === 'application/csv'
+      || file?.type === 'application/vnd.ms-excel' || file?.type === 'application/octet-stream' || file?.type === '';
+    if (file && isCSVLike) {
       const reader = new FileReader();
       reader.onload = (ev) => handleBulkCSVPreview(ev.target?.result as string);
       reader.readAsText(file);
@@ -1285,7 +1289,7 @@ export default function EmailProvidersPage() {
                 <input
                   id="bulk-csv-file-input"
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.tsv,.txt,text/csv,text/plain,application/csv,application/vnd.ms-excel"
                   className="hidden"
                   onChange={handleBulkFileSelect}
                 />
