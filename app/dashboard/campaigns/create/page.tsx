@@ -167,7 +167,11 @@ export default function CreateCampaignPage() {
 
   // ---- CSV upload handler for campaign create ----
   const handleCSVUpload = useCallback(async (file: File) => {
-    if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+    const fname = file.name.toLowerCase();
+    const isCSVLike = fname.endsWith('.csv') || fname.endsWith('.tsv') || fname.endsWith('.txt')
+      || file.type === 'text/csv' || file.type === 'text/plain' || file.type === 'application/csv'
+      || file.type === 'application/vnd.ms-excel' || file.type === 'application/octet-stream' || file.type === '';
+    if (!file || !isCSVLike) {
       showToast('Please select a CSV file', 'error');
       return;
     }
@@ -1255,7 +1259,7 @@ export default function CreateCampaignPage() {
                           <input
                             type="file"
                             className="hidden"
-                            accept=".csv"
+                            accept=".csv,.tsv,.txt,text/csv,text/plain,application/csv,application/vnd.ms-excel"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) handleCSVUpload(file);
