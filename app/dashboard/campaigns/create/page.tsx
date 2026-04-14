@@ -163,7 +163,7 @@ export default function CreateCampaignPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        return { imported: data.count || leads.length, errors: 0 };
+        return { imported: data.count ?? leads.length, errors: 0 };
       }
       return { imported: 0, errors: leads.length };
     } catch {

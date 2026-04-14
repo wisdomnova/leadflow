@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth-utils";
+import { getAdminClient } from "@/lib/supabase";
 import { inngest } from "@/lib/services/inngest";
 
 // Increase Vercel body size limit for large batch payloads
@@ -13,6 +14,11 @@ export async function POST(req: Request) {
   if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Use admin client for DB writes — the auth client's custom JWT is rejected
+  // by PostgREST RLS on INSERT (silent failure, returns empty data with no error).
+  // Session is already validated above, so this is safe.
+  const supabase = getAdminClient();
 
   try {
     const { leads, list_id } = await req.json();
@@ -60,7 +66,7 @@ export async function POST(req: Request) {
 
     for (let i = 0; i < leadsToInsert.length; i += UPSERT_CHUNK) {
       const chunk = leadsToInsert.slice(i, i + UPSERT_CHUNK);
-      const { data, error } = await context.supabase
+      const { data, error } = await (supabase as any)
         .from("leads")
         .upsert(chunk, {
           onConflict: "org_id,email",
@@ -89,7 +95,7 @@ export async function POST(req: Request) {
         lead_id: r.id,
       }));
       for (let i = 0; i < membershipRows.length; i += UPSERT_CHUNK) {
-        await context.supabase
+        await (supabase as any)
           .from("lead_list_memberships")
           .upsert(membershipRows.slice(i, i + UPSERT_CHUNK), {
             onConflict: "list_id,lead_id",
@@ -109,10 +115,10 @@ export async function POST(req: Request) {
 
       // Chunk activity inserts too
       for (let i = 0; i < activityRows.length; i += UPSERT_CHUNK) {
-        await context.supabase
+        await (supabase as any)
           .from("activity_log")
-          .insert(activityRows.slice(i, i + UPSERT_CHUNK) as any)
-          .then(({ error }) => {
+          .insert(activityRows.slice(i, i + UPSERT_CHUNK))
+          .then(({ error }: { error: any }) => {
             if (error) console.error("Activity log batch error:", error);
           });
       }
