@@ -56,16 +56,30 @@ export async function POST(req: Request) {
       }))
       .filter((l: any) => l.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email));
 
-    if (leadsToInsert.length === 0) {
+    // Deduplicate by email — CSV files often have the same person listed
+    // multiple times. PostgreSQL's ON CONFLICT DO UPDATE cannot affect the
+    // same row twice in a single statement, causing the entire batch to fail.
+    const deduped = new Map<string, any>();
+    for (const lead of leadsToInsert) {
+      deduped.set(lead.email, lead); // last occurrence wins (most complete data)
+    }
+    const uniqueLeads = Array.from(deduped.values());
+
+    if (uniqueLeads.length === 0) {
       return NextResponse.json({ error: "No valid leads with email addresses found" }, { status: 400 });
     }
+
+    console.log("[CSV IMPORT] orgId:", context.orgId);
+    console.log("[CSV IMPORT] total parsed:", leadsToInsert.length, "unique:", uniqueLeads.length);
+    console.log("[CSV IMPORT] sample lead:", JSON.stringify(uniqueLeads[0]));
 
     // --- Chunked upsert (Supabase PostgREST has a ~1000 row limit) ---
     let totalInserted = 0;
     const allInsertedIds: { id: string; orgId: string }[] = [];
 
-    for (let i = 0; i < leadsToInsert.length; i += UPSERT_CHUNK) {
-      const chunk = leadsToInsert.slice(i, i + UPSERT_CHUNK);
+    for (let i = 0; i < uniqueLeads.length; i += UPSERT_CHUNK) {
+      const chunk = uniqueLeads.slice(i, i + UPSERT_CHUNK);
+      console.log(`[CSV IMPORT] upserting chunk ${i}-${i + chunk.length}...`);
       const { data, error } = await (supabase as any)
         .from("leads")
         .upsert(chunk, {
@@ -73,6 +87,8 @@ export async function POST(req: Request) {
           ignoreDuplicates: false,
         })
         .select("id");
+
+      console.log(`[CSV IMPORT] chunk result — data: ${data?.length ?? 'null'}, error:`, error);
 
       if (error) {
         console.error(`Upsert chunk ${i}-${i + chunk.length} error:`, error);
@@ -87,6 +103,8 @@ export async function POST(req: Request) {
         }
       }
     }
+
+    console.log("[CSV IMPORT] totalInserted:", totalInserted);
 
     // --- Assign to list if specified ---
     if (list_id && allInsertedIds.length > 0) {
