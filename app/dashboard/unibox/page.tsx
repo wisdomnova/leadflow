@@ -595,7 +595,7 @@ export default function UniboxPage() {
                           ? 'bg-[#101828] text-white rounded-[2.5rem] rounded-tr-none' 
                           : 'bg-white border border-gray-100 rounded-[2.5rem] rounded-tl-none'
                       }`}>
-                        <p className={`text-base leading-relaxed whitespace-pre-wrap ${msg.sender === 'you' ? 'font-bold' : 'font-medium text-[#101828]'}`}>
+                        <p className={`text-base leading-relaxed whitespace-pre-wrap ${msg.sender === 'you' ? 'font-bold text-white' : 'font-medium text-[#101828]'}`}>
                           {cleanMessage(msg.text)}
                         </p>
                       </div>
